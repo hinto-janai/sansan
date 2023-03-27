@@ -1,0 +1,69 @@
+[package]
+name           = "sansan"
+version        = "0.0.0"
+edition        = "2021"
+authors        = ["hinto.janai <hinto.janai@protonmail.com>"]
+homepage       = "https://sansan.cat"
+documentation  = "https://docs.rs/sansan"
+repository     = "https://github.com/hinto-janai/sansan"
+keywords       = ["music", "real-time", "audio", "metadata", "lock-free"]
+categories     = ["multimedia"]
+readme         = "README.md"
+license        = "MIT"
+description    = "Real-time audio engine"
+
+[package.metadata.docs.rs]
+all-features = true
+
+[profile.release]
+lto           = true
+strip         = "none"
+codegen-units = 1
+opt-level     = 3
+
+[profile.dev]
+lto       = false
+strip     = "none"
+opt-level = 1
+
+[features]
+default = []
+
+[dependencies]
+### Personal libraries.
+someday  = { version = "0.0.4" }
+readable = { version = "0.13.0" }
+
+## Optional libraries.
+bincode      = { version = "2.0.0-rc.3", features = ["derive"], optional = true }
+serde        = { version = "1.0.190", features = ["derive", "rc"], optional = true }
+log          = { version = "0.4.20", features = ["serde"], optional = true }
+env_logger   = { version = "0.10.0", optional = true }
+
+### Regular libraries.
+arrayvec     = { version = "0.7.4" }
+crossbeam    = { version = "0.8.2", features = ["crossbeam-channel"] }
+#once_cell    = { version = "1.18.0" }
+rand         = { version = "0.8.5", features = ["small_rng"] }
+#strum        = { version = "0.25.0", features = ["derive"] }
+thiserror    = { version = "1.0.50" }
+seq-macro    = { version = "0.3.5" }
+paste        = { version = "1.0.14" }
+
+### Audio libraries.
+cpal      = { version = "0.15.2" }
+souvlaki  = { version = "0.6.1" }
+symphonia = { version = "0.5.3", features = ["all"] }
+rubato    = { version = "0.14.1" }
+rb        = { version = "0.4.1" }
+audio_thread_priority = { version = "0.27.1" }
+
+## Windows.
+[target.'cfg(windows)'.dependencies]
+# Needed for souvlaki + icon.
+windows = { version = "0.51.1", features = [
+	"Win32_Foundation",
+	"Win32_Graphics_Gdi",
+	"Win32_UI_WindowsAndMessaging",
+	"Win32_System_LibraryLoader",
+]}

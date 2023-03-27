@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "full"
+  RUST_MIN_STACK: 8000000
+
+jobs:
+  ci:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [windows-2022, macos-12, ubuntu-20.04]
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: Cache
+      uses: actions/cache@v3
+      with:
+        path: target
+        key: ${{ matrix.os }}
+
+    - name: Install dependencies
+      run: |
+        rustup update
+        if [ "$RUNNER_OS" == "Linux" ]; then
+          sudo apt update
+          sudo apt install -y libasound2-dev libjack-dev libpulse-dev libdbus-1-dev
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          rustup target add aarch64-apple-darwin
+        fi
+      shell: bash
+
+    - name: Clippy
+      run: cargo clippy
+
+    - name: Test
+      run: cargo test
