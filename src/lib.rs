@@ -1,3 +1,0 @@
-//! Sansan
-//!
-//! Reserved crate.
