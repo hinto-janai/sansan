@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "full"
+  RUST_MIN_STACK: 8000000
+
+jobs:
+  ci:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [windows-2022, macos-12, ubuntu-20.04]
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: Cache
+      uses: actions/cache@v3
+      with:
+        path: target
+        key: ${{ matrix.os }}
+
+    - name: Install dependencies
+      run: |
+        rustup update
+        if [ "$RUNNER_OS" == "Linux" ]; then
+          sudo apt update
+          sudo apt install -y libasound2-dev libjack-dev libpulse-dev
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          rustup target add aarch64-apple-darwin
+        fi
+      shell: bash
+
+    - name: Clippy
+      run: cargo clippy
+
+    - name: Test
+      run: cargo test
+
+    - name: Build
+      shell: bash
+      run: |
+        # ARM builds.
+        if [ "$RUNNER_OS" == "macOS" ]; then
+          cargo build --release --target aarch64-apple-darwin
+        fi
+        cargo build --release
+
+    - name: Compress
+      shell: bash
+      run: |
+        mkdir OUTPUT
+        VERSION="$(grep -m1 "version" Cargo.toml | grep -o "[0-9].[0-9].[0-9]")"
+        DOCS=$(grep -m1 "title" mdbook/book.toml | grep -o "[0-9].[0-9].[0-9]")
+
+        if [ "$VERSION" != "$DOCS" ]; then
+          echo "CARGO $VERSION != DOCS TITLE $DOCS"
+          exit 1
+        fi
+
+        cp LICENSE target/release/
+
+        if [ "$RUNNER_OS" == "Linux" ]; then
+          # Tar
+          cd target/release
+          tar -czpf "sansan-v${VERSION}-linux-x64.tar.gz" sansan LICENSE
+          mv "sansan-v${VERSION}-linux-x64.tar.gz" ../../OUTPUT/
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          # x64
+          cd target/release/
+          tar -czpf "sansan-v${VERSION}-macos-x64.tar.gz" sansan LICENSE
+          mv "sansan-v${VERSION}-macos-x64.tar.gz" ../../OUTPUT/
+
+          # ARM64
+          cd ../../
+          cd target/aarch64-apple-darwin/release/
+          cp ../../../LICENSE .
+          tar -czpf "sansan-v${VERSION}-macos-arm64.tar.gz" sansan LICENSE
+          mv "sansan-v${VERSION}-macos-arm64.tar.gz" ../../../OUTPUT/
+        elif [ "$RUNNER_OS" == "Windows" ]; then
+          # Zip
+          cd target/release
+          powershell Compress-Archive -Path "sansan.exe","LICENSE" -DestinationPath "sansan-v${VERSION}-windows-x64.zip"
+          mv "sansan-v${VERSION}-windows-x64.zip" ../../OUTPUT/
+        fi
+
+    - name: Archive
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.os }}
+        path: OUTPUT

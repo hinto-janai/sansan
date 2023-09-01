@@ -1,27 +1,23 @@
 [package]
-name = "sansan"
-version = "0.0.0"
-edition = "2021"
-authors = ["hinto.janai <hinto.janai@protonmail.com>"]
-description = "Sansan"
-documentation = "https://docs.rs/sansan"
-repository = "https://github.com/hinto-janai/sansan"
-readme = "README.md"
-keywords = ["sansan"]
-license = "MIT"
+name           = "sansan"
+version        = "0.0.0"
+edition        = "2021"
+authors        = ["hinto.janai <hinto.janai@protonmail.com>"]
+homepage       = "https://sansan.cat"
+documentation  = "https://docs.rs/sansan"
+repository     = "https://github.com/hinto-janai/sansan"
+keywords       = ["music", "playback", "audio", "metadata"]
+categories     = ["multimedia"]
+readme         = "README.md"
+license        = "MIT"
+description    = "Audio playback library"
+#rust-version   = "1.70"
+
 
 [profile.release]
-debug = false
-strip = "symbols"
+strip         = "none"
+lto           = true
 codegen-units = 1
-lto = true
-
-# Run tests in `--release` mode.
-#[profile.test]
-#debug = false
-#strip = "symbols"
-#codegen-units = 1
-#lto = true
 
 [package.metadata.docs.rs]
 all-features = true

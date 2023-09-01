@@ -1,9 +1,9 @@
 <div align="center">
 
-# Sansan
-Reserved crate.
+# `sansan`
+Cross-platform audio playback library & general audio CLI tool.
 
-![Build](https://github.com/hinto-janai/sansan/actions/workflows/build.yml/badge.svg) ![Tests](https://github.com/hinto-janai/sansan/actions/workflows/test.yml/badge.svg) [![crates.io](https://img.shields.io/crates/v/sansan.svg)](https://crates.io/crates/sansan) [![docs.rs](https://docs.rs/sansan/badge.svg)](https://docs.rs/sansan)
+![CI](https://github.com/hinto-janai/sansan/actions/workflows/ci.yml/badge.svg) [![crates.io](https://img.shields.io/crates/v/sansan.svg)](https://crates.io/crates/sansan) [![docs.rs](https://docs.rs/sansan/badge.svg)](https://docs.rs/sansan)
 
 * [Documentation](#Documentation)
 * [License](#License)
@@ -13,8 +13,9 @@ Reserved crate.
 ---
 
 ## Documentation
-1. For a broad overview of Sansan's internals, see [`src/`](https://github.com/hinto-janai/sansan/tree/main/src).
-2. For library docs, see [`docs.rs`](https://docs.rs/sansan).
+1. For a library user guide, see [`https://sansan.cat`](https://sansan.cat)
+1. For a CLI user guide, see [`https://cli.sansan.cat`](https://cli.sansan.cat)
+2. For library documentation, see [`https://docs.rs/sansan`](https://docs.rs/sansan)
 
 ## License
-Sansan is licensed under the [MIT License](https://github.com/hinto-janai/sansan/blob/main/LICENSE).
+`sansan` is licensed under the [MIT License](https://github.com/hinto-janai/sansan/blob/main/LICENSE).
