@@ -33,9 +33,16 @@ pub fn sansan() {
 //---------------------------------------------------------------------------------------------------- Mod
 mod api;
 pub use api::{
+	Audio,AudioState,
 	Source,SourcePath,SourceBytes,
 	Volume,
 };
+
+///
+pub mod config;
+
+///
+pub mod channel;
 
 mod internals;
 

@@ -3,14 +3,21 @@ use crate::api::audio_state::Audio;
 use crate::api::signal::Signal;
 
 //---------------------------------------------------------------------------------------------------- Engine
-pub struct Engine<T: Clone> {
-	audio: Audio<T>,
+#[derive(Debug,Clone)]
+pub struct Engine<QueueData>
+where
+	QueueData: Clone,
+{
+	audio: Audio<QueueData>,
 	signal: Signal,
 }
 
 //---------------------------------------------------------------------------------------------------- Engine Impl
-impl<T: Clone> Engine<T> {
-	fn audio(&self) -> &Audio<T> {
+impl<QueueData> Engine<QueueData>
+where
+	QueueData: Clone,
+{
+	fn audio(&self) -> &Audio<QueueData> {
 		&self.audio
 	}
 

@@ -12,5 +12,3 @@ pub use source::*;
 
 mod volume;
 pub use volume::*;
-
-pub mod config;

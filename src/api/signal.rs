@@ -2,6 +2,7 @@
 use crate::api::audio_state::AudioState;
 
 //---------------------------------------------------------------------------------------------------- Signal
+#[derive(Debug,Clone)]
 pub struct Signal;
 
 //---------------------------------------------------------------------------------------------------- Signal Etc
@@ -31,7 +32,7 @@ impl Signal {
 	fn repeat(&self, repeat: Repeat) -> Repeat { todo!() }
 	fn shuffle(&self, shuffle: Shuffle) -> Shuffle { todo!() }
 	fn volume(&self, volume: Volume) -> Volume { todo!() }
-	fn restore<T: Clone>(audio_state: AudioState<T>) -> Result<(), ()> { todo!() }
+	fn restore<QueueData: Clone>(audio_state: AudioState<QueueData>) -> Result<(), ()> { todo!() }
 	fn add(&self, add: QueueAdd) { todo!() } // path: impl AsRef<Path>, append: Append, clear: bool, play: bool)
 	fn clear(&self, keep_playing: bool) { todo!() }
 	fn set_index(index: usize) -> Result<usize, AudioIndexError> { todo!() }

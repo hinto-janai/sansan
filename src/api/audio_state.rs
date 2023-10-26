@@ -1,7 +1,7 @@
 //---------------------------------------------------------------------------------------------------- Use
 use crate::api::volume::Volume;
 use someday::{Reader, Commit, CommitRef};
-use readable::Runtime;
+use readable::RuntimeMilli;
 use std::{
 	sync::Arc,
 	path::Path,
@@ -9,24 +9,25 @@ use std::{
 };
 
 //---------------------------------------------------------------------------------------------------- Audio
-pub struct Audio<T>
+#[derive(Clone,Debug)]
+pub struct Audio<QueueData>
 where
-	T: Clone,
+	QueueData: Clone,
 {
-	reader: Reader<AudioState<T>>,
+	reader: Reader<AudioState<QueueData>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone,Debug,PartialEq)]
 pub struct Repeat;
 
 //---------------------------------------------------------------------------------------------------- AudioState
-#[derive(Clone)]
-pub struct AudioState<T>
+#[derive(Clone,Debug,PartialEq)]
+pub struct AudioState<QueueData>
 where
-	T: Clone,
+	QueueData: Clone,
 {
 	/// The current song queue.
-	pub queue: VecDeque<T>,
+	pub queue: VecDeque<Track<QueueData>>,
 
 	/// Are we playing audio right now?
 	pub playing: bool,
@@ -37,63 +38,63 @@ where
 	pub volume: Volume,
 
 	/// The currently playing index in the queue.
-	pub current: Option<Track<T>>,
+	pub current: Option<Track<QueueData>>,
 }
 
-#[derive(Clone)]
-pub struct Track<T> {
-	pub elapsed: Runtime,
-	pub runtime: Runtime,
-	pub data: T,
+#[derive(Clone,Debug,PartialEq)]
+pub struct Track<QueueData> {
+	pub data: QueueData,
+	pub elapsed: RuntimeMilli,
+	pub runtime: RuntimeMilli,
 }
 
 //---------------------------------------------------------------------------------------------------- AudioStateReader
-pub struct AudioStateReader<T>
+pub struct AudioStateReader<QueueData>
 where
-	T: Clone,
+	QueueData: Clone,
 {
-	reader: Reader<AudioState<T>>,
+	reader: Reader<AudioState<QueueData>>,
 }
 
 //---------------------------------------------------------------------------------------------------- AudioStateSnapshot
-pub struct AudioStateSnapshot<T: Clone>(CommitRef<AudioState<T>>);
+pub struct AudioStateSnapshot<QueueData: Clone>(CommitRef<AudioState<QueueData>>);
 
-impl<T> std::ops::Deref for AudioStateSnapshot<T>
+impl<QueueData> std::ops::Deref for AudioStateSnapshot<QueueData>
 where
-	T: Clone,
+	QueueData: Clone,
 {
-	type Target = AudioState<T>;
+	type Target = AudioState<QueueData>;
 	#[inline]
 	fn deref(&self) -> &Self::Target {
 		&self.0
 	}
 }
 
-impl<T> AsRef<AudioState<T>> for AudioStateSnapshot<T>
+impl<QueueData> AsRef<AudioState<QueueData>> for AudioStateSnapshot<QueueData>
 where
-	T: Clone,
+	QueueData: Clone,
 {
 	#[inline]
-	fn as_ref(&self) -> &AudioState<T> {
+	fn as_ref(&self) -> &AudioState<QueueData> {
 		&self.0
 	}
 }
 
 //---------------------------------------------------------------------------------------------------- Audio Impl
-impl<T> Audio<T>
+impl<QueueData> Audio<QueueData>
 where
-	T: Clone,
+	QueueData: Clone,
 {
 	#[inline]
-	fn get(&self) -> AudioStateSnapshot<T> {
+	fn get(&self) -> AudioStateSnapshot<QueueData> {
 		AudioStateSnapshot(self.reader.head_spin())
 	}
 	#[inline]
-	fn get_latest(&self) -> AudioState<T> { // forces `Writer` to push new data
+	fn get_latest(&self) -> AudioState<QueueData> { // forces `Writer` to push new data
 		todo!()
 	}
 	#[inline]
-	fn get_reader(&self) -> AudioStateReader<T> {
+	fn get_reader(&self) -> AudioStateReader<QueueData> {
 		AudioStateReader { reader: Reader::clone(&self.reader) }
 	}
 }

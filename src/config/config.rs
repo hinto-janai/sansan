@@ -1,21 +1,22 @@
 //---------------------------------------------------------------------------------------------------- use
-use crate::api::config::{
+use std::marker::PhantomData;
+use crate::config::{
 	callbacks::Callbacks,
 	audio_state::AudioStateConfig,
 };
-use crate::api::engine::Engine;
+use crate::api::Engine;
+use crate::channel::SansanSender;
 
 //---------------------------------------------------------------------------------------------------- Config
 #[cfg_attr(feature = "serde", serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "bincode", bincode::Encode, bincode::Decode)]
-#[derive(Copy,Clone,Debug,PartialEq,PartialOrd)]
-struct Config<F, I, T>
+struct Config<QueueData, CallbackSender>
 where
-	F: FnMut(&mut I, &mut Engine<T>),
-	T: Clone,
+	QueueData: Clone,
+	CallbackSender: SansanSender<()>,
 {
 	// Callbacks
-	callbacks: Option<Callbacks<F, I, T>>,
+	callbacks: Option<Callbacks<QueueData, CallbackSender>>,
 
 	// AudioState
 	audio_state: AudioStateConfig,
@@ -31,17 +32,19 @@ where
 
 	// // Media Controls
 	// media_controls: bool,
+	_q: PhantomData<QueueData>,
 }
 
 
 //---------------------------------------------------------------------------------------------------- Config Impl
-impl<F, I, T> Config<F, I, T>
+impl<QueueData, CallbackSender> Config<QueueData, CallbackSender>
 where
-	F: FnMut(&mut I, &mut Engine<T>),
-	T: Clone,
+	QueueData: Clone,
+	CallbackSender: SansanSender<()>,
 {
 	pub const DEFAULT: Self = Self {
 		callbacks: None,
 		audio_state: AudioStateConfig::DEFAULT,
+		_q: PhantomData,
 	};
 }
