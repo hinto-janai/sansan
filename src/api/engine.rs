@@ -9,7 +9,7 @@ where
 	QueueData: Clone,
 {
 	audio: Audio<QueueData>,
-	signal: Signal,
+	signal: Signal<QueueData>,
 }
 
 //---------------------------------------------------------------------------------------------------- Engine Impl
@@ -21,15 +21,24 @@ where
 		&self.audio
 	}
 
-	fn signal(&mut self) -> &Signal {
-		&self.signal
+	// INVARIANT
+	//
+	// The `Engine`'s channel <-> return system relies
+	// on the fact that only 1 thread is `.recv()`'ing
+	// at any given moment, `&mut self` ensures this
+	// mutual exclusion.
+	//
+	// There is no "routing" so-to-speak so we must
+	// ensure the caller also `.recv()`'s the return value.
+	fn signal(&mut self) -> &mut Signal<QueueData> {
+		&mut self.signal
 	}
 
-	fn shutdown(self) -> () {
+	fn shutdown(self) {
 		todo!()
 	}
 
-	fn shutdown_hang(self) -> () {
+	fn shutdown_blocking(self) {
 		todo!()
 	}
 }

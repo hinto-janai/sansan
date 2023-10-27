@@ -14,7 +14,7 @@ pub struct Audio<QueueData>
 where
 	QueueData: Clone,
 {
-	reader: Reader<AudioState<QueueData>>,
+	pub(crate) reader: Reader<AudioState<QueueData>>,
 }
 
 #[derive(Clone,Debug,PartialEq)]
