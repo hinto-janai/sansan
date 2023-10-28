@@ -17,7 +17,7 @@ use symphonia::core::{
 use symphonia::default::{
 	get_probe,get_codecs,
 };
-use crate::api::Source;
+use crate::source::Source;
 
 //---------------------------------------------------------------------------------------------------- Constants
 // `symphonia` format options.

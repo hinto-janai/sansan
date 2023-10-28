@@ -49,6 +49,22 @@ impl<T> SansanReceiver<T> for std::sync::mpsc::Receiver<T> {
 	}
 }
 
+//---------------------------------------------------------------------------------------------------- "Fake" Channel
+impl SansanSender<()> for () {
+	type Error = ();
+	#[inline(always)]
+	fn try_send(&self, t: ()) -> Result<(), Self::Error> {
+		Ok(())
+	}
+}
+impl SansanReceiver<()> for () {
+	type Error = ();
+	#[inline(always)]
+	fn try_recv(&self) -> Result<(), Self::Error> {
+		Ok(())
+	}
+}
+
 // pub type SansanSender<T>   = crossbeam::channel::Sender<T>;
 // pub type SansanReceiver<T> = crossbeam::channel::Receiver<T>;
 

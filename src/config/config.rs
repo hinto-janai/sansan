@@ -4,13 +4,14 @@ use crate::config::{
 	callbacks::Callbacks,
 	audio_state::AudioStateConfig,
 };
-use crate::api::Engine;
+use crate::engine::Engine;
 use crate::channel::SansanSender;
 
 //---------------------------------------------------------------------------------------------------- Config
 #[cfg_attr(feature = "serde", serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "bincode", bincode::Encode, bincode::Decode)]
-struct Config<QueueData, CallbackSender>
+#[derive(Debug)]
+pub struct Config<QueueData, CallbackSender>
 where
 	QueueData: Clone,
 	CallbackSender: SansanSender<()>,

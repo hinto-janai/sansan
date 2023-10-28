@@ -7,14 +7,14 @@ use std::{
 
 //---------------------------------------------------------------------------------------------------- Source
 #[allow(unused_imports)] // docs
-use crate::api::Audio;
+use crate::AudioStateReader;
 #[non_exhaustive]
 #[derive(Debug,Clone,PartialEq,PartialOrd)]
 /// Audio source
 ///
 /// This is the main type that encapsulates data that can
 /// be used as an audio source, and can be appended to
-/// the [`Audio`] queue.
+/// the [`AudioState`] queue.
 ///
 /// The two different variants are either:
 /// - A [`Path`] of some sort

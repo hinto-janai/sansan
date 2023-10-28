@@ -31,19 +31,25 @@ pub fn sansan() {
 //---------------------------------------------------------------------------------------------------- Lints
 
 //---------------------------------------------------------------------------------------------------- Mod
-mod api;
-pub use api::{
-	Audio,AudioState,
-	Source,SourcePath,SourceBytes,
-	Volume,
-};
+mod audio_state;
+pub use audio_state::{AudioStateReader,AudioState};
+
+mod engine;
+pub use engine::Engine;
+
+mod source;
+pub use source::{Source,SourcePath,SourceBytes};
+
+mod channel;
+pub use channel::{SansanReceiver,SansanSender};
 
 ///
 pub mod config;
 
 ///
-pub mod channel;
+pub mod signal;
 
 mod internals;
+mod patch;
 
 //----------------------------------------------------------------------------------------------------

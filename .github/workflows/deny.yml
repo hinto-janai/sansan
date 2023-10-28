@@ -31,4 +31,4 @@ jobs:
       run: |
         cargo install cargo-deny
     - name: Deny
-      run: cargo deny
+      run: cargo deny check
