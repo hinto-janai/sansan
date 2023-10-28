@@ -33,7 +33,7 @@ This table summarizes the **audio-specific** libraries used by `sansan` and thei
 | Dependency              | Version  | Owner                                                       | Purpose |
 |-------------------------|----------|-------------------------------------------------------------|---------|
 | `audio_thread_priority` | `0.27.1` | [Mozilla](https://github.com/mozilla/audio_thread_priority) | Real-time audio thread promotion
-| `cpal`                  | `0.15.2` | [RustAudio](https://github.com/RustAudio/cpal)              | Audio device input/output
+| `cubeb`                 | `0.10.3` | [Mozilla](https://github.com/mozilla/cubeb-rs)              | Audio device input/output
 | `souvlaki`              | `0.6.1`  | [Sinono3](https://github.com/Sinono3/souvlaki)              | OS media control interface
 | `symphonia`             | `0.5.3`  | [Pdeljanov](https://github.com/pdeljanov/Symphonia)         | Audio demuxing/decoding/metadata
 | `rubato`                | `0.14.1` | [HEnquist](https://github.com/HEnquist/rubato)              | Audio resampling

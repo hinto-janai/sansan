@@ -51,7 +51,7 @@ seq-macro    = { version = "0.3.5" }
 paste        = { version = "1.0.14" }
 
 ### Audio libraries.
-cpal      = { version = "0.15.2" }
+cubeb     = { version = "0.10.3" }
 souvlaki  = { version = "0.6.1" }
 symphonia = { version = "0.5.3", features = ["all"] }
 rubato    = { version = "0.14.1" }
