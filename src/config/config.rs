@@ -1,11 +1,14 @@
 //---------------------------------------------------------------------------------------------------- use
 use std::marker::PhantomData;
-use crate::config::{
-	callbacks::Callbacks,
-	audio_state::AudioStateConfig,
+use crate::{
+	config::{
+		callbacks::Callbacks,
+		audio_state::AudioStateConfig,
+	},
+	engine::Engine,
+	channel::SansanSender,
+	audio_state::AudioState,
 };
-use crate::engine::Engine;
-use crate::channel::SansanSender;
 
 //---------------------------------------------------------------------------------------------------- Config
 #[cfg_attr(feature = "serde", serde::Serialize, serde::Deserialize)]
@@ -17,10 +20,14 @@ where
 	CallbackSender: SansanSender<()>,
 {
 	// Callbacks
-	callbacks: Option<Callbacks<QueueData, CallbackSender>>,
+	pub callbacks: Option<Callbacks<QueueData, CallbackSender>>,
 
 	// AudioState
-	audio_state: AudioStateConfig,
+	pub audio_state: AudioStateConfig,
+
+
+	// Restore
+	pub restore: Option<AudioState<QueueData>>,
 
 	// // Filesystem
 	// file_open_error_behavior: FileOpenErrorBehavior,
@@ -44,8 +51,9 @@ where
 	CallbackSender: SansanSender<()>,
 {
 	pub const DEFAULT: Self = Self {
-		callbacks: None,
+		callbacks:   None,
 		audio_state: AudioStateConfig::DEFAULT,
-		_q: PhantomData,
+		restore:     None,
+		_q:          PhantomData,
 	};
 }

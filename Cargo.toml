@@ -32,36 +32,37 @@ default = []
 [dependencies]
 ### Personal libraries.
 someday  = { version = "0.0.4" }
-readable = { version = "0.13.0" }
+readable = { version = "0.13" }
+lpt      = { version = "0.1" }
 
 ## Optional libraries.
 bincode      = { version = "2.0.0-rc.3", features = ["derive"], optional = true }
-serde        = { version = "1.0.190", features = ["derive", "rc"], optional = true }
-log          = { version = "0.4.20", features = ["serde"], optional = true }
-env_logger   = { version = "0.10.0", optional = true }
+serde        = { version = "1", features = ["derive", "rc"], optional = true }
+log          = { version = "0.4", features = ["serde"], optional = true }
+env_logger   = { version = "0.10", optional = true }
 
 ### Regular libraries.
-arrayvec     = { version = "0.7.4" }
-crossbeam    = { version = "0.8.2", features = ["crossbeam-channel"] }
-#once_cell    = { version = "1.18.0" }
-rand         = { version = "0.8.5", features = ["small_rng"] }
-#strum        = { version = "0.25.0", features = ["derive"] }
-thiserror    = { version = "1.0.50" }
-seq-macro    = { version = "0.3.5" }
-paste        = { version = "1.0.14" }
+arrayvec     = { version = "0.7" }
+crossbeam    = { version = "0.8", features = ["crossbeam-channel"] }
+#once_cell    = { version = "1.18" }
+rand         = { version = "0.8", features = ["small_rng"] }
+#strum        = { version = "0.25", features = ["derive"] }
+thiserror    = { version = "1" }
+seq-macro    = { version = "0.3" }
+paste        = { version = "1" }
 
 ### Audio libraries.
-cubeb     = { version = "0.10.3" }
-souvlaki  = { version = "0.6.1" }
-symphonia = { version = "0.5.3", features = ["all"] }
-rubato    = { version = "0.14.1" }
-rb        = { version = "0.4.1" }
-audio_thread_priority = { version = "0.27.1" }
+audio_thread_priority = { version = "0.27" }
+cubeb     = { version = "0.10" }
+souvlaki  = { version = "0.6" }
+symphonia = { version = "0.5", features = ["all"] }
+rubato    = { version = "0.14" }
+rb        = { version = "0.4" }
 
 ## Windows.
 [target.'cfg(windows)'.dependencies]
 # Needed for souvlaki + icon.
-windows = { version = "0.51.1", features = [
+windows = { version = "0.51", features = [
 	"Win32_Foundation",
 	"Win32_Graphics_Gdi",
 	"Win32_UI_WindowsAndMessaging",

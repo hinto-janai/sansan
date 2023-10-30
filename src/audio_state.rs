@@ -28,6 +28,8 @@ where
 pub struct Repeat;
 
 //---------------------------------------------------------------------------------------------------- AudioState
+#[cfg_attr(feature = "serde", serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "bincode", bincode::Encode, bincode::Decode)]
 #[derive(Clone,Debug,PartialEq)]
 pub struct AudioState<QueueData>
 where
@@ -53,7 +55,7 @@ impl<QueueData> AudioState<QueueData>
 where
 	QueueData: Clone,
 {
-	pub(crate) const DUMMY: Self = Self {
+	pub const DUMMY: Self = Self {
 		queue: VecDeque::new(),
 		playing: false,
 		repeat: Repeat,
