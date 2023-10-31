@@ -91,7 +91,7 @@ impl Audio {
 		let shutdown    = select.recv(&channels.shutdown);
 
 		// Loop, receiving signals and routing them
-		// to their approriate handler function [fn_*()].
+		// to their appropriate handler function [fn_*()].
 		loop {
 			let signal = select.select();
 			match signal.index() {

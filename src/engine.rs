@@ -153,8 +153,8 @@ where
 		// Variables are prefix/suffixed accordingly:
 		// - [Audio]  == [a]
 		// - [Decode] == [d]
-		let (a_to_d, d_from_a) = bounded(AUDIO_BUFFER_LEN);
-		let (d_to_a, a_from_d) = unbounded();
+		let (d_to_a, a_from_d) = bounded(AUDIO_BUFFER_LEN);
+		let (a_to_d, d_from_a) = unbounded();
 		let (a_to_k, k_from_a) = unbounded();
 		let (k_to_a, a_from_k) = unbounded();
 
@@ -243,8 +243,8 @@ where
 	}
 
 	#[inline]
-	pub fn audio_state_reader(&self) -> &AudioStateReader<QueueData> {
-		&self.audio
+	pub fn audio_state_reader(&self) -> AudioStateReader<QueueData> {
+		AudioStateReader::clone(&self.audio)
 	}
 
 	#[inline]

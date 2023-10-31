@@ -47,13 +47,13 @@ where
 // TL;DR - this structs exists because [self] borrowing rules are too strict
 //
 // This is struct [Kernel] uses that exists
-// because in [Kernel::main()], we must [&] the recieve
+// because in [Kernel::main()], we must [&] the receive
 // channels for [Select], but later when receiving the messages
 // we need [&mut] access, which conflicts with the in-scope [&].
 //
 // Technically, the [&] and [&mut] are touching different data
 // but since they're both behind [self], Rust complains, so the
-// recieve channels are in this one-off [Recv] instead of within
+// receive channels are in this one-off [Recv] instead of within
 // [Kernel] as fields.
 pub(crate) struct Channels<QueueData: Clone> {
 	// Shutdown signal.
@@ -146,7 +146,7 @@ where
 		let shutdown     = select.recv(&channels.shutdown);
 
 		// Loop, receiving signals and routing them
-		// to their approriate handler function [fn_*()].
+		// to their appropriate handler function [fn_*()].
 		loop {
 			let signal = select.select();
 			match signal.index() {
