@@ -65,12 +65,6 @@ where
 	pub(crate) remove_range_recv: Receiver<Result<usize, RemoveRangeError>>,
 }
 
-impl<QueueData> Signal<QueueData>
-where
-	QueueData: Clone
-{
-}
-
 //---------------------------------------------------------------------------------------------------- Signal Impl
 impl<QueueData> Signal<QueueData>
 where

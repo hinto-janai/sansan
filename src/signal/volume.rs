@@ -1,15 +1,19 @@
 //---------------------------------------------------------------------------------------------------- use
 
 //---------------------------------------------------------------------------------------------------- Volume
-/// Audio volume levels
+/// Audio volume level
 ///
-/// This Wrapper around [`f32`] that is between `0.0..=1.0`
+/// This is a wrapper around [`f32`] that is between `0.0..=1.0`,
+/// where `0.0` represents silence and `1.0` represents using the
+/// decoded audio sample as-is, aka, max volume.
 ///
-/// This is the volume unit [`Engine`] wants audio volume changes in.
-#[cfg_attr(feature = "serde", serde(transparent))]
-#[cfg_attr(feature = "serde", serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "bincode", bincode::Encode, bincode::Decode)]
+/// This unit is linear, not logarithmic - so `1.0` is 2x louder than `0.5`.
+///
+/// This is the type that the [`Engine`] wants audio volume changes in.
 #[derive(Copy,Clone,Debug,PartialEq,PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
+#[cfg_attr(feature = "serde", serde(transparent))]
 pub struct Volume(f32);
 
 macro_rules! impl_const {

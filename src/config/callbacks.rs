@@ -91,8 +91,6 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- Callbacks
-#[cfg_attr(feature = "serde", serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "bincode", bincode::Encode, bincode::Decode)]
 #[derive(Debug)]
 /// ```rust
 /// # use sansan::*;

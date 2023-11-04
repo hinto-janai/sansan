@@ -11,8 +11,8 @@ use crate::{
 };
 
 //---------------------------------------------------------------------------------------------------- Config
-#[cfg_attr(feature = "serde", serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "bincode", bincode::Encode, bincode::Decode)]
+// #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+// #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug)]
 pub struct Config<QueueData, CallbackSender>
 where

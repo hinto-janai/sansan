@@ -1,5 +1,7 @@
 //---------------------------------------------------------------------------------------------------- Use
-use crate::signal::Volume;
+use crate::signal::{
+	Volume,Repeat,
+};
 use someday::{Reader, Commit, CommitRef};
 use readable::RuntimeMilli;
 use std::{
@@ -23,13 +25,9 @@ where
 	}
 }
 
-// TODO
-#[derive(Clone,Debug,PartialEq)]
-pub struct Repeat;
-
 //---------------------------------------------------------------------------------------------------- AudioState
-#[cfg_attr(feature = "serde", serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "bincode", bincode::Encode, bincode::Decode)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq)]
 pub struct AudioState<QueueData>
 where
@@ -78,6 +76,8 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- Track
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq)]
 pub struct Track<QueueData> {
 	pub data: QueueData,
