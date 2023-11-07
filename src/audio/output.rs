@@ -10,9 +10,45 @@
 // simplification of what this part of the system should do.
 
 //----------------------------------------------------------------------------------------------- use
+use crate::audio::resampler::Resampler;
 use symphonia::core::audio::{
-	AudioBuffer,SignalSpec,Channels,
+	AudioBuffer,SignalSpec,Channels, Signal, AudioBufferRef, SampleBuffer,
 };
+use thiserror::Error;
+
+//----------------------------------------------------------------------------------------------- AudioOutput Write Errors
+/// Error that occurs when attempting to
+/// write an audio buffer to the hardware/server.
+///
+/// Audio outputs will generally have the same
+/// errors, so instead of being generic per backend,
+/// each one will just conform to this enum.
+#[derive(Error, Debug)]
+pub enum WriteError {
+	#[error("audio stream was closed")]
+	/// The audio stream was closed
+	StreamClosed,
+
+	#[error("failed to write bytes to the audio stream: {0}")]
+	/// Failed to write bytes to the audio stream
+	Write(#[from] std::io::Error),
+}
+
+//----------------------------------------------------------------------------------------------- AudioOutput Open Errors
+/// Error that occurs when attempting to
+/// initialize a connection with the hardware/server.
+#[derive(Error, Debug)]
+pub enum OpenError {
+	#[error("audio data specification contains an invalid/unsupported channel layout")]
+	/// The audio data's specification contains an invalid/unsupported channel layout
+	InvalidChannels,
+
+	#[error("audio data specification is invalid/unsupported")]
+	/// The audio stream's specification itself is invalid/unsupported
+	///
+	/// e.g, bad sample rate, unsupported format, etc.
+	InvalidSpec,
+}
 
 //----------------------------------------------------------------------------------------------- AudioOutput Trait
 // # Safety
@@ -22,15 +58,12 @@ pub(crate) trait AudioOutput
 where
 	Self: Sized,
 {
-	/// Error that occurs when attempting to
-	/// write an audio buffer to the hardware/server.
-	type WriteError;
-	/// Error that occurs when attempting to
-	/// initialize a connection with the hardware/server.
-	type OpenError;
-
 	/// Fully write an audio buffer to the hardware/server (or internal buffer).
-	fn write(&mut self, audio: AudioBuffer<f32>) -> Result<(), Self::WriteError>;
+	///
+	/// Some invariants:
+	/// 1. `audio` may be a non-zero amount of frames (silence)
+	/// 2. `audio` may need to be resampled
+	fn write(&mut self, audio: AudioBuffer<f32>) -> Result<(), WriteError>;
 
 	/// Fully flush all the current audio in the internal buffer (if any).
 	///
@@ -48,7 +81,7 @@ where
 	/// The `signal_spec`'s sample rate and channel layout
 	/// must be followed, and an appropriate audio connection
 	/// with the same specification must be created.
-	fn try_open(signal_spec: SignalSpec) -> Result<Self, Self::OpenError>;
+	fn try_open(signal_spec: SignalSpec) -> Result<Self, OpenError>;
 
 	/// Start playback
 	///
@@ -75,7 +108,7 @@ where
 	}
 
 	/// Create a "fake" dummy connection to the audio hardware/server.
-	fn dummy() -> Result<Self, Self::OpenError> {
+	fn dummy() -> Result<Self, OpenError> {
 		let spec = SignalSpec {
 			// INVARIANT: Must be non-zero.
 			rate: 48_000,
@@ -85,5 +118,3 @@ where
 		Self::try_open(spec)
 	}
 }
-
-//----------------------------------------------------------------------------------------------- `cubeb` Impl

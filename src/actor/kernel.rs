@@ -2,8 +2,8 @@
 use std::thread::JoinHandle;
 use crossbeam::channel::{Sender, Receiver, Select};
 use crate::audio_state::{AudioState,AudioStatePatch};
-use crate::internals::decode::{KernelToDecode,DecodeToKernel};
-use crate::internals::audio::{KernelToAudio,AudioToKernel};
+use crate::actor::decode::{KernelToDecode,DecodeToKernel};
+use crate::actor::audio::{KernelToAudio,AudioToKernel};
 use crate::signal::{
 	Clear,
 	Repeat,

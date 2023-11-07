@@ -8,7 +8,7 @@ use crate::{
 	audio_state::{AudioState,AudioStatePatch},
 };
 use symphonia::core::audio::AudioBuffer;
-use crate::internals::audio::AudioToDecode;
+use crate::actor::audio::AudioToDecode;
 use std::{
 	sync::{
 		Arc,

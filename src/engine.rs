@@ -5,7 +5,7 @@ use crate::audio_state::{
 };
 use crate::signal::Signal;
 use crate::config::Config;
-use crate::internals::{
+use crate::actor::{
 	audio::{Audio,AUDIO_BUFFER_LEN},
 	decode::Decode,
 	kernel::Kernel,
@@ -189,7 +189,7 @@ where
 
 		// Spawn [Kernel]
 		let (k_shutdown, shutdown) = bounded(1);
-		let channels = crate::internals::kernel::Channels {
+		let channels = crate::actor::kernel::Channels {
 			shutdown,
 			toggle_recv,
 			play_recv,
