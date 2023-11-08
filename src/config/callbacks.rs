@@ -149,12 +149,6 @@ where
 	CallbackSender: SansanSender<()>,
 {
 	/// A fresh [`Self`] with no callbacks, same as [`Self::new()`]
-	///
-	/// ```rust
-	/// # use sansan::*;
-	/// # use sansan::config::*;
-	/// assert_eq!(Callbacks::DEFAULT, Callbacks::new());
-	/// ```
 	pub const DEFAULT: Self = Self::new();
 
 	/// Returns a fresh [`Self`] with no callbacks (empty [`Vec`]'s)

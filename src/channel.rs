@@ -21,22 +21,20 @@
 //!
 //! For example, if you wanted to use the [`std`]'s channels:
 //! ```rust
-//! # use sansan::*;
-//! # use sansan::config::*;
-//! # use std::sync::{*,atomic::*};
+//! use sansan::config::{Callback, Callbacks};
+//! use std::sync::mpsc::{channel, Sender};
+//!
 //! // Create an empty `Callbacks`.
-//! let mut callbacks = Callbacks::new();
+//! let mut callbacks: Callbacks<(), Sender<()>> = Callbacks::new();
 //!
-//! let (send, recv) = std::sync::mpsc::channel();
+//! let (send, recv) = channel();
+//!
 //! // Send a channel message every 1 second.
-//! let duration = std::time::Duration::from_secs(1);
-//!
-//! // Add a channel-style callback.
 //! callbacks.elapsed(
 //! 	// This takes in anything that implements `SansanSender`,
 //! 	// which `std::sync::mpsc::Sender` does.
-//! 	Callback::Channel(elapsed_send),
-//! 	duration,
+//! 	Callback::Channel(send),
+//! 	std::time::Duration::from_secs(1),
 //! );
 //! ```
 
