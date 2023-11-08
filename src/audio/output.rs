@@ -10,7 +10,10 @@
 // simplification of what this part of the system should do.
 
 //----------------------------------------------------------------------------------------------- use
-use crate::{audio::resampler::Resampler, SansanSender};
+use crate::{
+	audio::resampler::Resampler,
+	channel::SansanSender
+};
 use symphonia::core::audio::{
 	AudioBuffer,SignalSpec,Channels, Signal, AudioBufferRef, SampleBuffer,
 };
@@ -157,14 +160,14 @@ where
 		}
 	}
 
-	/// Create a "fake" dummy connection to the audio hardware/server.
-	fn dummy() -> Result<Self, AudioOutputError> {
-		let spec = SignalSpec {
-			// INVARIANT: Must be non-zero.
-			rate: 44_100,
-			// This also counts a mono speaker.
-			channels: Channels::FRONT_LEFT,
-		};
-		Self::try_open("", spec, 4096, false, None)
-	}
+	///// Create a "fake" dummy connection to the audio hardware/server.
+	// fn dummy() -> Result<Self, AudioOutputError> {
+	// 	let spec = SignalSpec {
+	// 		// INVARIANT: Must be non-zero.
+	// 		rate: 44_100,
+	// 		// This also counts a mono speaker.
+	// 		channels: Channels::FRONT_LEFT,
+	// 	};
+	// 	Self::try_open("", spec, 4096, false, None)
+	// }
 }

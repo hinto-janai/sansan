@@ -40,8 +40,10 @@ pub use engine::Engine;
 mod source;
 pub use source::{Source,SourcePath,SourceBytes};
 
-mod channel;
-pub use channel::{SansanReceiver,SansanSender};
+// pub use channel::{SansanReceiver,SansanSender};
+
+///
+pub mod channel;
 
 ///
 pub mod config;

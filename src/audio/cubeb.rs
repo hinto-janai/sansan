@@ -261,6 +261,8 @@ where
 				// We must tell cubeb how many bytes we wrote.
 				output.len() as isize
 			})
+			// Cubeb calls this when the audio stream has changed
+			// states, e.g, play, pause, drained, error, etc.
 			.state_callback(move |state| {
 				if state == cubeb::State::Drained && drained_send.is_empty() {
 					send!(drained_send, ());

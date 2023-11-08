@@ -3,8 +3,6 @@
 # `sansan` (WIP)
 ![CI](https://github.com/hinto-janai/sansan/actions/workflows/ci.yml/badge.svg) [![crates.io](https://img.shields.io/crates/v/sansan.svg)](https://crates.io/crates/sansan) [![docs.rs](https://docs.rs/sansan/badge.svg)](https://docs.rs/sansan)
 
-Real-time music engine for Windows/macOS/Linux
-
 </div>
 
 ## About
@@ -120,6 +118,15 @@ This table summarizes the **audio-specific** libraries used by `sansan` and thei
 | `souvlaki`              | `0.6.1`  | [Sinono3](https://github.com/Sinono3/souvlaki)              | OS media control interface
 | `symphonia`             | `0.5.3`  | [Pdeljanov](https://github.com/pdeljanov/Symphonia)         | Audio demuxing/decoding/metadata
 | `rubato`                | `0.14.1` | [HEnquist](https://github.com/HEnquist/rubato)              | Audio resampling
+
+## Supported Targets
+Only 64-bit (`x86_64`, `ARM64`, etc) are supported. 32-bit targets may work but are not tested on.
+
+- Windows (WASAPI)
+- macOS (CoreAudio)
+- Linux (PulseAudio)
+
+See [`cubeb-rs`](https://github.com/mozilla/cubeb-rs) for more details.
 
 ## Supported Audio
 `sansan` uses [`symphonia`](https://github.com/pdeljanov/Symphonia) for audio decoding & metadata.

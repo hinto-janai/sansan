@@ -1,16 +1,69 @@
+//! Channel traits
+//!
+//! [`SansanReceiver`] and [`SansanSender`] are traits that are to
+//! be implemented on channel types, like [`std::sync::mpsc::Sender`].
+//!
+//! Since [`crate::config::Config`]'s [`crate::config::Callback`] enum has a generic
+//! that requires you to specify a channel (even if you aren't using it), these trait's
+//! let you use any channel pairing that can implement `try_send()` and `try_recv()`.
+//!
+//! These two traits are already implemented on:
+//! `std::sync::mpsc::Sender`
+//! `std::sync::mpsc::Receiver`
+//! `crossbeam::channel::Sender`
+//! `crossbeam::channel::Receiver`
+//! `()`
+//!
+//! In cases where you never use the channel variant in [`crate::config::Callback`], you can use
+//! `()` in your generic locations, e.g, `Config<(), ()>` and `Callback<(), ()>` to simplify things.
+//!
+//! `try_send()` and `try_recv()` on `()` will do nothing.
+//!
+//! For example, if you wanted to use the [`std`]'s channels:
+//! ```rust
+//! # use sansan::*;
+//! # use sansan::config::*;
+//! # use std::sync::{*,atomic::*};
+//! // Create an empty `Callbacks`.
+//! let mut callbacks = Callbacks::new();
+//!
+//! let (send, recv) = std::sync::mpsc::channel();
+//! // Send a channel message every 1 second.
+//! let duration = std::time::Duration::from_secs(1);
+//!
+//! // Add a channel-style callback.
+//! callbacks.elapsed(
+//! 	// This takes in anything that implements `SansanSender`,
+//! 	// which `std::sync::mpsc::Sender` does.
+//! 	Callback::Channel(elapsed_send),
+//! 	duration,
+//! );
+//! ```
+
+//---------------------------------------------------------------------------------------------------- use
+use std::convert::Infallible;
+
 //---------------------------------------------------------------------------------------------------- Sender
+/// A sender side of a channel, that can send the message `T`.
 pub trait SansanSender<T> {
+	/// The error(s) that can occur when sending.
 	type Error;
+
+	/// Attempt to send the message `t`.
 	fn try_send(&self, t: T) -> Result<(), Self::Error>;
 }
 
 //---------------------------------------------------------------------------------------------------- Receiver
+/// A receiver side of a channel, that can receive the message `T`.
 pub trait SansanReceiver<T> {
+	/// The error(s) that can occur when receiving.
 	type Error;
+
+	/// Attempt to receive a message.
 	fn try_recv(&self) -> Result<T, Self::Error>;
 }
 
-//---------------------------------------------------------------------------------------------------- Crossbeam
+//---------------------------------------------------------------------------------------------------- crossbeam
 impl<T> SansanSender<T> for crossbeam::channel::Sender<T> {
 	type Error = crossbeam::channel::TrySendError<T>;
 	#[inline(always)]
@@ -26,7 +79,7 @@ impl<T> SansanReceiver<T> for crossbeam::channel::Receiver<T> {
 	}
 }
 
-//---------------------------------------------------------------------------------------------------- STD
+//---------------------------------------------------------------------------------------------------- std
 impl<T> SansanSender<T> for std::sync::mpsc::Sender<T> {
 	type Error = std::sync::mpsc::SendError<T>;
 	#[inline(always)]
@@ -51,22 +104,16 @@ impl<T> SansanReceiver<T> for std::sync::mpsc::Receiver<T> {
 
 //---------------------------------------------------------------------------------------------------- "Fake" Channel
 impl SansanSender<()> for () {
-	type Error = ();
-	#[inline(always)]
-	fn try_send(&self, t: ()) -> Result<(), Self::Error> {
+	type Error = Infallible;
+	/// This just returns `Ok(())`.
+	fn try_send(&self, _: ()) -> Result<(), Infallible> {
 		Ok(())
 	}
 }
 impl SansanReceiver<()> for () {
-	type Error = ();
-	#[inline(always)]
-	fn try_recv(&self) -> Result<(), Self::Error> {
+	type Error = Infallible;
+	/// This just returns `Ok(())`.
+	fn try_recv(&self) -> Result<(), Infallible> {
 		Ok(())
 	}
 }
-
-// pub type SansanSender<T>   = crossbeam::channel::Sender<T>;
-// pub type SansanReceiver<T> = crossbeam::channel::Receiver<T>;
-
-// pub type SansanSender<T>   = std::sync::mpsc::Sender<T>;
-// pub type SansanReceiver<T> = std::sync::mpsc::Receiver<T>;
