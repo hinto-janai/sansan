@@ -1,7 +1,8 @@
 <div align="center">
 
-# `sansan` (WIP)
 ![CI](https://github.com/hinto-janai/sansan/actions/workflows/ci.yml/badge.svg) [![crates.io](https://img.shields.io/crates/v/sansan.svg)](https://crates.io/crates/sansan) [![docs.rs](https://docs.rs/sansan/badge.svg)](https://docs.rs/sansan)
+
+<img src="assets/img/banner_1280_377.png" width="60%"/>
 
 </div>
 

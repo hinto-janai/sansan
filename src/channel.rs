@@ -9,6 +9,7 @@
 //!
 //! These two traits are already implemented on:
 //! `std::sync::mpsc::Sender`
+//! `std::sync::mpsc::SyncSender`
 //! `std::sync::mpsc::Receiver`
 //! `crossbeam::channel::Sender`
 //! `crossbeam::channel::Receiver`
