@@ -10,13 +10,14 @@
 // simplification of what this part of the system should do.
 
 //----------------------------------------------------------------------------------------------- use
-use crate::audio::resampler::Resampler;
+use crate::{audio::resampler::Resampler, SansanSender};
 use symphonia::core::audio::{
 	AudioBuffer,SignalSpec,Channels, Signal, AudioBufferRef, SampleBuffer,
 };
 use thiserror::Error;
+use crossbeam::channel::Sender;
 
-//----------------------------------------------------------------------------------------------- AudioOutput Write Errors
+//----------------------------------------------------------------------------------------------- AudioOutput Errors
 /// Error that occurs when attempting to
 /// write an audio buffer to the hardware/server.
 ///
@@ -24,30 +25,47 @@ use thiserror::Error;
 /// errors, so instead of being generic per backend,
 /// each one will just conform to this enum.
 #[derive(Error, Debug)]
-pub enum WriteError {
+pub enum AudioOutputError {
 	#[error("audio stream was closed")]
 	/// The audio stream was closed
 	StreamClosed,
 
+	#[error("audio hardware/server is unavailable")]
+	/// The audio hardware/server is unavailable
+	DeviceUnavailable,
+
+	#[error("audio format is invalid or unsupported")]
+	/// The audio format is invalid or unsupported
+	InvalidFormat,
+
 	#[error("failed to write bytes to the audio stream: {0}")]
 	/// Failed to write bytes to the audio stream
 	Write(#[from] std::io::Error),
-}
 
-//----------------------------------------------------------------------------------------------- AudioOutput Open Errors
-/// Error that occurs when attempting to
-/// initialize a connection with the hardware/server.
-#[derive(Error, Debug)]
-pub enum OpenError {
 	#[error("audio data specification contains an invalid/unsupported channel layout")]
 	/// The audio data's specification contains an invalid/unsupported channel layout
 	InvalidChannels,
 
-	#[error("audio data specification is invalid/unsupported")]
-	/// The audio stream's specification itself is invalid/unsupported
+	#[error("audio sample rate is invalid")]
+	/// The audio's sample rate was invalid.
 	///
-	/// e.g, bad sample rate, unsupported format, etc.
+	/// This either means a `0` sample rate or an insanely
+	/// high one (greater than [`u32::MAX`]).
+	InvalidSampleRate,
+
+	#[error("audio specification is invalid")]
+	/// The audio's specification was invalid.
+	///
+	/// This means something other than the `channel` count
+	/// or `sample_rate` was invalid about the audio specification,
+	/// e.g, a duration of `0`.
 	InvalidSpec,
+
+	#[error("unknown error: {0}")]
+	/// An unknown or very specific error occured.
+	///
+	/// The `str` will contain more information.
+	Unknown(&'static str),
 }
 
 //----------------------------------------------------------------------------------------------- AudioOutput Trait
@@ -60,20 +78,27 @@ where
 {
 	/// Fully write an audio buffer to the hardware/server (or internal buffer).
 	///
-	/// Some invariants:
-	/// 1. `audio` may be a non-zero amount of frames (silence)
+	/// `Audio` will be calling this function so `gc` is where the `audio`
+	/// should be sent to after usage - as we're (soft) real-time.
+	///
+	/// Invariants:
+	/// 1. `audio` may be a zero amount of frames (silence)
 	/// 2. `audio` may need to be resampled
-	fn write(&mut self, audio: AudioBuffer<f32>) -> Result<(), WriteError>;
+	fn write(&mut self, audio: AudioBuffer<f32>, gc: Sender<AudioBuffer<f32>>) -> Result<(), AudioOutputError>;
 
-	/// Fully flush all the current audio in the internal buffer (if any).
+	/// Flush all the current audio in the internal buffer (if any).
 	///
 	/// This means that all the audio have, we _must_ play it back to the speakers.
+	///
+	/// This function is expected to and is allowed to block.
 	fn flush(&mut self);
 
 	/// Discard all the audio in the internal buffer (if any).
 	///
 	/// This is like `flush()`, but we must _not_ play the
 	/// audio to the speakers, we must simply discard them.
+	///
+	/// This function is expected to and is allowed to block.
 	fn discard(&mut self);
 
 	/// Initialize a connection with the audio hardware/server.
@@ -81,40 +106,65 @@ where
 	/// The `signal_spec`'s sample rate and channel layout
 	/// must be followed, and an appropriate audio connection
 	/// with the same specification must be created.
-	fn try_open(signal_spec: SignalSpec) -> Result<Self, OpenError>;
+	fn try_open(
+		// The name of the audio stream?
+		name: impl Into<Vec<u8>>,
+		// The audio's signal specification.
+		// We're opening a stream matching this spec.
+		signal_spec: SignalSpec,
+		// The audio's duration (u64 from symphonia)
+		duration: symphonia::core::units::Duration,
+		// If `true`, this stream will ignore any
+		// device switching and continue playing
+		// to the original device opened.
+		disable_device_switch: bool,
+		// How many milliseconds should the audio buffer be?
+		//
+		// `None` will pick a reasonable default for low-latency pause/play.
+		buffer_milliseconds: Option<u8>,
+	) -> Result<Self, AudioOutputError>;
 
 	/// Start playback
 	///
 	/// This should "enable" the stream so that it is
 	/// active and playing whatever audio buffers it has.
-	fn play(&mut self);
+	fn play(&mut self) -> Result<(), AudioOutputError>;
 
 	/// Pause playback
 	///
 	/// This should completely "disable" the stream so that it
 	/// is playing nothing and using absolutely 0% CPU.
-	fn pause(&mut self);
+	///
+	/// This should _not_ flush the current buffer if any,
+	/// it should solely pause the stream and return immediately.
+	fn pause(&mut self) -> Result<(), AudioOutputError>;
+
+	/// `flush()` + `pause()`.
+	fn flush_pause(&mut self) -> Result<(), AudioOutputError> {
+		self.flush();
+		self.pause()
+	}
 
 	/// Is the stream currently in play mode?
 	fn is_playing(&mut self) -> bool;
 
 	/// Toggle playback.
-	fn toggle(&mut self) {
+	fn toggle(&mut self) -> Result<(), AudioOutputError> {
 		if self.is_playing() {
-			self.pause();
+			self.pause()
 		} else {
-			self.play();
+			self.play()
 		}
 	}
 
 	/// Create a "fake" dummy connection to the audio hardware/server.
-	fn dummy() -> Result<Self, OpenError> {
+	fn dummy() -> Result<Self, AudioOutputError> {
 		let spec = SignalSpec {
 			// INVARIANT: Must be non-zero.
-			rate: 48_000,
+			rate: 44_100,
 			// This also counts a mono speaker.
 			channels: Channels::FRONT_LEFT,
 		};
-		Self::try_open(spec)
+		Self::try_open("", spec, 4096, false, None)
 	}
 }

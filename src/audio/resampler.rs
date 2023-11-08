@@ -1,9 +1,15 @@
 // Audio resampling
 //
-// This file implements the abstract `Resampler`
-// trait using `rubato` as a backend.
+// This file defines and implements the `Resampler` trait.
 //
-// For documentation on `Resampler`, see `resampler.rs`.
+// This object takes audio samples as input (concretely, [f32]'s)
+// and resamples them to whatever target sample rate is provided.
+//
+// This uses pre-allocated buffers so the process of resampling
+// (`Resampler::resample()`) should be real-time safe although
+// creating a new object (`Resampler::new()`) is not.
+//
+// The currently used backend for resampling (the only implementor) is `rubato`.
 
 //----------------------------------------------------------------------------------------------- use
 use std::num::NonZeroUsize;
