@@ -31,17 +31,17 @@ impl Volume {
 	const DEFAULT_F32: f32 = 0.25;
 
 	/// ```rust
-	/// # use sansan::*;
+	/// # use sansan::signal::*;
 	/// assert_eq!(Volume::MAX.inner(), 1.0);
 	/// ```
 	pub const MAX: Self = Self(Self::MAX_F32);
 	/// ```rust
-	/// # use sansan::*;
+	/// # use sansan::signal::*;
 	/// assert_eq!(Volume::MIN.inner(), 0.0);
 	/// ```
 	pub const MIN: Self = Self(Self::MIN_F32);
 	/// ```rust
-	/// # use sansan::*;
+	/// # use sansan::signal::*;
 	/// assert_eq!(Volume::DEFAULT.inner(), 0.25);
 	/// ```
 	pub const DEFAULT: Self = Self(Self::DEFAULT_F32);
@@ -68,7 +68,7 @@ impl Volume {
 	///
 	/// The use case for this function is for creating a `const` [`Volume`], e.g:
 	/// ```rust
-	/// # use sansan::*;
+	/// # use sansan::signal::*;
 	/// const VOLUME_F32: f32 = 25.12345;
 	/// // SAFETY: The f32 is a safe value according to `Volume::fix`.
 	/// const VOLUME: Volume = unsafe { Volume::new_unchecked(VOLUME_F32) };
@@ -97,7 +97,7 @@ impl Volume {
 	/// - If a negative float is passed, [`Volume::MIN`] is returned
 	///
 	/// ```rust
-	/// # use sansan::*;
+	/// # use sansan::signal::*;
 	/// // Normal.
 	/// assert_eq!(Volume::new(0.00).inner(), 0.00);
 	/// assert_eq!(Volume::new(0.25).inner(), 0.25);

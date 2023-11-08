@@ -65,7 +65,7 @@ pub enum AudioOutputError {
 	InvalidSpec,
 
 	#[error("unknown error: {0}")]
-	/// An unknown or very specific error occured.
+	/// An unknown or very specific error occurred.
 	///
 	/// The `str` will contain more information.
 	Unknown(&'static str),

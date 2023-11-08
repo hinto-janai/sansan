@@ -16,7 +16,7 @@ use strum::{
 /// # Size
 /// ```rust
 /// # use sansan::signal::*;
-/// assert_eq!(std::mem::size_of::<Seek>(), 4);
+/// assert_eq!(std::mem::size_of::<Seek>(), 24);
 /// ```
 #[derive(Copy,Clone,Debug,PartialEq,PartialOrd,Eq,Ord,Hash)]
 #[derive(AsRefStr,Display,EnumCount,EnumIter,EnumString,EnumVariantNames,EnumDiscriminants,IntoStaticStr)]
