@@ -1,6 +1,7 @@
 //---------------------------------------------------------------------------------------------------- Use
 use std::thread::JoinHandle;
 use crossbeam::channel::{Receiver, Select, Sender};
+use strum::EnumCount;
 use crate::{
 	channel,
 	audio_state::{AudioState,AudioStatePatch},
@@ -31,24 +32,48 @@ pub(crate) struct Audio {
 	ready_to_recv: Arc<AtomicBool>,
 }
 
-// TODO
-pub(crate) struct KernelToAudio;
-pub(crate) struct AudioToDecode;
-pub(crate) struct AudioToKernel;
-
-// See [src/internals/kernel.rs]'s [Channels]
-// for a comment on why this exists.
-//
-// TL;DR - this structs exists private to [Audio]
-// because [self] borrowing rules are too strict.
+//---------------------------------------------------------------------------------------------------- Channels
+// See [src/actor/kernel.rs]'s [Channels]
 struct Channels {
 	shutdown: Receiver<()>,
 
 	to_decode:   Sender<AudioToDecode>,
-	from_decode: Receiver<AudioBuffer<f32>>,
+	from_decode: Receiver<AudioBuffer<f32>>, // Only 1 msg, no enum required
 
 	to_kernel:   Sender<AudioToKernel>,
 	from_kernel: Receiver<KernelToAudio>,
+}
+
+//---------------------------------------------------------------------------------------------------- Msg
+// See [src/actor/kernel.rs].
+#[repr(u8)]
+#[derive(Debug,Eq,PartialEq)]
+#[derive(EnumCount)]
+enum Msg {
+	FromDecode,
+	FromKernel,
+	Shutdown,
+}
+impl Msg {
+	const fn from_usize(u: usize) -> Self {
+		debug_assert!(u <= Msg::COUNT);
+
+		// SAFETY: repr(u8)
+		unsafe { std::mem::transmute(u as u8) }
+	}
+}
+
+//---------------------------------------------------------------------------------------------------- (Actual) Messages
+pub(crate) enum AudioToDecode {
+	// We (Audio) took out an audio buffer from
+	// the channel, please send another one :)
+	TookAudioBuffer,
+}
+
+pub(crate) enum KernelToAudio {
+}
+
+pub(crate) enum AudioToKernel {
 }
 
 //---------------------------------------------------------------------------------------------------- Audio Impl
@@ -86,27 +111,42 @@ impl Audio {
 		// Create channels that we will
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
-		let from_decode = select.recv(&channels.from_decode);
-		let from_kernel = select.recv(&channels.from_kernel);
-		let shutdown    = select.recv(&channels.shutdown);
+
+		// INVARIANT:
+		// The order these are selected MUST match
+		// order of the `Msg` enum variants.
+		select.recv(&channels.from_decode);
+		select.recv(&channels.from_kernel);
+
+		assert_eq!(Msg::COUNT, select.recv(&channels.shutdown));
 
 		// Loop, receiving signals and routing them
 		// to their appropriate handler function [fn_*()].
 		loop {
 			let signal = select.select();
-			match signal.index() {
-				from_decode => self.fn_from_decode(),
-				from_kernel => self.fn_from_kernel(),
-				shutdown    => self.fn_shutdown(),
+
+			match Msg::from_usize(signal.index()) {
+				Msg::FromDecode => self.fn_from_decode(),
+				Msg::FromKernel => self.fn_from_kernel(),
+				Msg::Shutdown   => self.fn_shutdown(),
 			}
 		}
 	}
 
 	//---------------------------------------------------------------------------------------------------- Signal Handlers
 	#[inline]
-	fn fn_from_decode(&mut self) {}
+	fn fn_from_decode(&mut self) {
+		todo!();
+	}
+
 	#[inline]
-	fn fn_from_kernel(&mut self) {}
-	#[inline]
-	fn fn_shutdown(&mut self) {}
+	fn fn_from_kernel(&mut self) {
+		todo!();
+	}
+
+	#[cold]
+	#[inline(never)]
+	fn fn_shutdown(&mut self) {
+		todo!();
+	}
 }

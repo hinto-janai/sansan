@@ -31,6 +31,7 @@ use std::sync::{
 	Arc,
 	atomic::AtomicBool,
 };
+use strum::EnumCount;
 
 //---------------------------------------------------------------------------------------------------- Kernel
 #[derive(Debug)]
@@ -98,6 +99,43 @@ pub(crate) struct Channels<QueueData: Clone> {
 	pub(crate) remove_range_recv: Receiver<RemoveRange>,
 }
 
+// This solely exists so that the big
+// match below when selecting and receiving
+// over message is a little more type safe,
+// and also so maintenence is easier
+// (new msg variant not added will compile-error).
+#[repr(u8)]
+#[derive(Debug,Eq,PartialEq)]
+#[derive(EnumCount)]
+enum Msg {
+	Toggle,
+	Play,
+	Pause,
+	Clear,
+	Repeat,
+	Shuffle,
+	Volume,
+	Restore,
+	Add,
+	Seek,
+	Next,
+	Previous,
+	Skip,
+	Back,
+	SetIndex,
+	Remove,
+	RemoveRange,
+	Shutdown,
+}
+impl Msg {
+	const fn from_usize(u: usize) -> Self {
+		debug_assert!(u <= Msg::COUNT);
+
+		// SAFETY: repr(u8)
+		unsafe { std::mem::transmute(u as u8) }
+	}
+}
+
 //---------------------------------------------------------------------------------------------------- Kernel Impl
 impl<QueueData> Kernel<QueueData>
 where
@@ -125,93 +163,148 @@ where
 	fn main(mut self, channels: Channels<QueueData>) {
 		// Create channels that we will
 		// be selecting/listening to for all time.
-		let mut select   = Select::new();
-		let toggle       = select.recv(&channels.toggle_recv);
-		let play         = select.recv(&channels.play_recv);
-		let pause        = select.recv(&channels.pause_recv);
-		let clear        = select.recv(&channels.clear_recv);
-		let repeat       = select.recv(&channels.repeat_recv);
-		let shuffle      = select.recv(&channels.shuffle_recv);
-		let volume       = select.recv(&channels.volume_recv);
-		let restore      = select.recv(&channels.restore_recv);
-		let add          = select.recv(&channels.add_recv);
-		let seek         = select.recv(&channels.seek_recv);
-		let next         = select.recv(&channels.next_recv);
-		let previous     = select.recv(&channels.previous_recv);
-		let skip         = select.recv(&channels.skip_recv);
-		let back         = select.recv(&channels.back_recv);
-		let set_index    = select.recv(&channels.set_index_recv);
-		let remove       = select.recv(&channels.remove_recv);
-		let remove_range = select.recv(&channels.remove_range_recv);
-		let shutdown     = select.recv(&channels.shutdown);
+		let mut select = Select::new();
+
+		// INVARIANT:
+		// The order these are selected MUST match
+		// order of the `Msg` enum variants.
+		select.recv(&channels.toggle_recv);
+		select.recv(&channels.play_recv);
+		select.recv(&channels.pause_recv);
+		select.recv(&channels.clear_recv);
+		select.recv(&channels.repeat_recv);
+		select.recv(&channels.shuffle_recv);
+		select.recv(&channels.volume_recv);
+		select.recv(&channels.restore_recv);
+		select.recv(&channels.add_recv);
+		select.recv(&channels.seek_recv);
+		select.recv(&channels.next_recv);
+		select.recv(&channels.previous_recv);
+		select.recv(&channels.skip_recv);
+		select.recv(&channels.back_recv);
+		select.recv(&channels.set_index_recv);
+		select.recv(&channels.remove_recv);
+		select.recv(&channels.remove_range_recv);
+
+		// 18 channels to select over, make sure we counted right :)
+		assert_eq!(Msg::COUNT, select.recv(&channels.shutdown));
 
 		// Loop, receiving signals and routing them
 		// to their appropriate handler function [fn_*()].
 		loop {
 			let signal = select.select();
-			match signal.index() {
-				toggle       => self.fn_toggle(),
-				play         => self.fn_play(),
-				pause        => self.fn_pause(),
-				clear        => self.fn_clear(),
-				repeat       => self.fn_repeat(),
-				shuffle      => self.fn_shuffle(),
-				volume       => self.fn_volume(),
-				restore      => self.fn_restore(),
-				add          => self.fn_add(),
-				seek         => self.fn_seek(),
-				next         => self.fn_next(),
-				previous     => self.fn_previous(),
-				skip         => self.fn_skip(),
-				back         => self.fn_back(),
-				set_index    => self.fn_set_index(),
-				remove       => self.fn_remove(),
-				remove_range => self.fn_remove_range(),
-				shutdown     => self.fn_shutdown(),
-
-				// We've exhausted all channel indices.
-				// Panic if we've missed one.
-				_ => unreachable!("{}", signal.index()),
+			match Msg::from_usize(signal.index()) {
+				Msg::Toggle      => self.fn_toggle(),
+				Msg::Play        => self.fn_play(),
+				Msg::Pause       => self.fn_pause(),
+				Msg::Clear       => self.fn_clear(),
+				Msg::Repeat      => self.fn_repeat(),
+				Msg::Shuffle     => self.fn_shuffle(),
+				Msg::Volume      => self.fn_volume(),
+				Msg::Restore     => self.fn_restore(),
+				Msg::Add         => self.fn_add(),
+				Msg::Seek        => self.fn_seek(),
+				Msg::Next        => self.fn_next(),
+				Msg::Previous    => self.fn_previous(),
+				Msg::Skip        => self.fn_skip(),
+				Msg::Back        => self.fn_back(),
+				Msg::SetIndex    => self.fn_set_index(),
+				Msg::Remove      => self.fn_remove(),
+				Msg::RemoveRange => self.fn_remove_range(),
+				Msg::Shutdown    => self.fn_shutdown(),
 			}
 		}
 	}
 
 	//---------------------------------------------------------------------------------------------------- Signal Handlers
 	#[inline]
-	fn fn_toggle(&mut self) { todo!() }
+	fn fn_toggle(&mut self) {
+		todo!()
+	}
+
 	#[inline]
-	fn fn_play(&mut self) { todo!() }
+	fn fn_play(&mut self) {
+		todo!()
+	}
+
 	#[inline]
-	fn fn_pause(&mut self) { todo!() }
+	fn fn_pause(&mut self) {
+		todo!()
+	}
+
 	#[inline]
-	fn fn_clear(&mut self) { todo!() }
+	fn fn_clear(&mut self) {
+		todo!()
+	}
+
 	#[inline]
-	fn fn_repeat(&mut self) { todo!() }
+	fn fn_repeat(&mut self) {
+		todo!()
+	}
+
 	#[inline]
-	fn fn_shuffle(&mut self) { todo!() }
+	fn fn_shuffle(&mut self) {
+		todo!()
+	}
+
 	#[inline]
-	fn fn_volume(&mut self) { todo!() }
+	fn fn_volume(&mut self) {
+		todo!()
+	}
+
 	#[inline]
-	fn fn_add(&mut self) { todo!() }
+	fn fn_add(&mut self) {
+		todo!()
+	}
+
 	#[inline]
-	fn fn_seek(&mut self) { todo!() }
+	fn fn_seek(&mut self) {
+		todo!()
+	}
+
 	#[inline]
-	fn fn_next(&mut self) { todo!() }
+	fn fn_next(&mut self) {
+		todo!()
+	}
+
 	#[inline]
-	fn fn_previous(&mut self) { todo!() }
+	fn fn_previous(&mut self) {
+		todo!()
+	}
+
 	#[inline]
-	fn fn_skip(&mut self) { todo!() }
+	fn fn_skip(&mut self) {
+		todo!()
+	}
+
 	#[inline]
-	fn fn_back(&mut self) { todo!() }
+	fn fn_back(&mut self) {
+		todo!()
+	}
+
 	#[inline]
-	fn fn_restore(&mut self) { todo!() }
+	fn fn_restore(&mut self) {
+		todo!()
+	}
+
 	#[inline]
-	fn fn_set_index(&mut self) { todo!() }
+	fn fn_set_index(&mut self) {
+		todo!()
+	}
+
 	#[inline]
-	fn fn_remove(&mut self) { todo!() }
+	fn fn_remove(&mut self) {
+		todo!()
+	}
+
 	#[inline]
-	fn fn_remove_range(&mut self) { todo!() }
+	fn fn_remove_range(&mut self) {
+		todo!()
+	}
+
 	#[cold]
 	#[inline(never)]
-	fn fn_shutdown(&mut self) { todo!() }
+	fn fn_shutdown(&mut self) {
+		todo!()
+	}
 }

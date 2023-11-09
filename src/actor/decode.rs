@@ -16,6 +16,7 @@ use std::{
 	},
 	collections::VecDeque,
 };
+use strum::EnumCount;
 
 //---------------------------------------------------------------------------------------------------- Constants
 // How many [AudioBuffer]'s is [Decode] allowed to hold locally?
@@ -37,11 +38,7 @@ pub(crate) struct Decode {
 	buffer: VecDeque<AudioBuffer<f32>>,
 }
 
-// See [src/internals/kernel.rs]'s [Channels]
-// for a comment on why this exists.
-//
-// TL;DR - this structs exists private to [Decode]
-// because [self] borrowing rules are too strict.
+// See [src/actor/kernel.rs]'s [Channels]
 struct Channels {
 	shutdown:    Receiver<()>,
 	to_audio:    Sender<AudioBuffer<f32>>,
@@ -51,6 +48,25 @@ struct Channels {
 }
 
 //---------------------------------------------------------------------------------------------------- Messages
+// See [src/actor/kernel.rs].
+#[repr(u8)]
+#[derive(Debug,Eq,PartialEq)]
+#[derive(EnumCount)]
+enum Msg {
+	FromAudio,
+	FromKernel,
+	Shutdown,
+}
+impl Msg {
+	const fn from_usize(u: usize) -> Self {
+		debug_assert!(u <= Msg::COUNT);
+
+		// SAFETY: repr(u8)
+		unsafe { std::mem::transmute(u as u8) }
+	}
+}
+
+//---------------------------------------------------------------------------------------------------- (Actual) Messages
 pub(crate) enum KernelToDecode {
 	// Convert this [Source] into a real
 	// [SourceInner] and start decoding it.
@@ -101,27 +117,41 @@ impl Decode {
 		// Create channels that we will
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
-		let from_audio = select.recv(&channels.from_audio);
-		let from_kernel = select.recv(&channels.from_kernel);
-		let shutdown    = select.recv(&channels.shutdown);
+
+		// INVARIANT:
+		// The order these are selected MUST match
+		// order of the `Msg` enum variants.
+		select.recv(&channels.from_audio);
+		select.recv(&channels.from_kernel);
+
+		assert_eq!(Msg::COUNT, select.recv(&channels.shutdown));
 
 		// Loop, receiving signals and routing them
 		// to their appropriate handler function [fn_*()].
 		loop {
 			let signal = select.select();
-			match signal.index() {
-				from_audio => self.fn_from_audio(),
-				from_kernel => self.fn_from_kernel(),
-				shutdown    => self.fn_shutdown(),
+			match Msg::from_usize(signal.index()) {
+				Msg::FromAudio  => self.fn_from_audio(),
+				Msg::FromKernel => self.fn_from_kernel(),
+				Msg::Shutdown   => self.fn_shutdown(),
 			}
 		}
 	}
 
 	//---------------------------------------------------------------------------------------------------- Signal Handlers
 	#[inline]
-	fn fn_from_audio(&mut self) {}
+	fn fn_from_audio(&mut self) {
+		todo!()
+	}
+
 	#[inline]
-	fn fn_from_kernel(&mut self) {}
-	#[inline]
-	fn fn_shutdown(&mut self) {}
+	fn fn_from_kernel(&mut self) {
+		todo!()
+	}
+
+	#[cold]
+	#[inline(never)]
+	fn fn_shutdown(&mut self) {
+		todo!()
+	}
 }
