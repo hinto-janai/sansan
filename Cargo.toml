@@ -38,7 +38,7 @@ lpt      = { version = "0.1.0" }
 
 ## Optional libraries.
 bincode      = { version = "2.0.0-rc.3", features = ["derive"], optional = true }
-serde        = { version = "1.0.190", features = ["derive", "rc"], optional = true }
+serde        = { version = "1.0.192", features = ["derive", "rc"], optional = true }
 log          = { version = "0.4.20", features = ["serde"], optional = true }
 env_logger   = { version = "0.10.0", optional = true }
 
@@ -53,7 +53,7 @@ strum        = { version = "0.25.0", features = ["derive", "phf"] }
 paste        = { version = "1.0.14" }
 
 ### Audio libraries.
-audio_thread_priority = { version = "0.27.1" }
+audio_thread_priority = { version = "0.30.0" }
 cubeb     = { version = "0.10.3" }
 souvlaki  = { version = "0.6.1" }
 symphonia = { version = "0.5.3", features = ["all"] }

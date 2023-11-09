@@ -102,7 +102,7 @@ pub(crate) struct Channels<QueueData: Clone> {
 // This solely exists so that the big
 // match below when selecting and receiving
 // over message is a little more type safe,
-// and also so maintenence is easier
+// and also so maintenance is easier
 // (new msg variant not added will compile-error).
 #[repr(u8)]
 #[derive(Debug,Eq,PartialEq)]
