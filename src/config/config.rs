@@ -14,19 +14,19 @@ use crate::{
 // #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 // #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug)]
+/// TODO
 pub struct Config<QueueData, CallbackSender>
 where
 	QueueData: Clone,
 	CallbackSender: SansanSender<()>,
 {
-	// Callbacks
+	/// TODO
 	pub callbacks: Option<Callbacks<QueueData, CallbackSender>>,
 
-	// AudioState
+	/// TODO
 	pub audio_state: AudioStateConfig,
 
-
-	// Restore
+	/// TODO
 	pub restore: Option<AudioState<QueueData>>,
 
 	// // Filesystem
@@ -50,6 +50,7 @@ where
 	QueueData: Clone,
 	CallbackSender: SansanSender<()>,
 {
+	/// TODO
 	pub const DEFAULT: Self = Self {
 		callbacks:   None,
 		audio_state: AudioStateConfig::DEFAULT,

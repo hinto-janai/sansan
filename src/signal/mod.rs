@@ -1,3 +1,5 @@
+//! Engine signals
+
 mod add;
 pub use add::{Add,AddError};
 

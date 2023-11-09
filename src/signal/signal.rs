@@ -10,7 +10,8 @@ use crate::signal::{
 };
 
 //---------------------------------------------------------------------------------------------------- Signal
-#[derive(Debug)]
+/// TODO
+//
 // INVARIANT
 //
 // [Signal] must _not_ implement [Clone].
@@ -30,6 +31,7 @@ use crate::signal::{
 //
 // The `&mut self` signatures in [Signal] and [Engine] functions
 // reflect that when using [Signal], it must be mutually exclusive.
+#[derive(Debug)]
 pub struct Signal<QueueData>
 where
 	QueueData: Clone

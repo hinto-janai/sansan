@@ -18,6 +18,7 @@ use std::sync::{
 };
 
 //---------------------------------------------------------------------------------------------------- Engine
+/// TODO
 #[derive(Debug)]
 pub struct Engine<QueueData, CallbackSender>
 where
@@ -55,6 +56,7 @@ where
 	QueueData: Clone + Send + Sync + 'static,
 	CallbackSender: SansanSender<()>,
 {
+	/// TODO
 	pub fn init(config: Config<QueueData, CallbackSender>) -> Result<Self, EngineInitError> {
 		use crossbeam::channel::{bounded,unbounded};
 
@@ -243,11 +245,14 @@ where
 	}
 
 	#[inline]
+	/// TODO
 	pub fn audio_state_reader(&self) -> AudioStateReader<QueueData> {
 		AudioStateReader::clone(&self.audio)
 	}
 
 	#[inline]
+	/// TODO
+	//
 	// INVARIANT
 	//
 	// The `Engine`'s channel <-> return system relies
@@ -262,11 +267,13 @@ where
 	}
 
 	#[inline]
+	/// TODO
 	pub fn shutdown(self) {
 		todo!()
 	}
 
 	#[inline]
+	/// TODO
 	pub fn shutdown_blocking(self) {
 		todo!()
 	}

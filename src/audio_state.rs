@@ -11,6 +11,7 @@ use std::{
 };
 
 //---------------------------------------------------------------------------------------------------- AudioStateReader
+/// TODO
 #[derive(Clone,Debug)]
 pub struct AudioStateReader<QueueData: Clone>(pub(crate) Reader<AudioState<QueueData>>);
 
@@ -20,12 +21,14 @@ where
 	QueueData: Clone,
 {
 	#[inline]
-	fn get(&self) -> AudioStateSnapshot<QueueData> {
+	/// TODO
+	pub fn get(&self) -> AudioStateSnapshot<QueueData> {
 		AudioStateSnapshot(self.0.head_spin())
 	}
 }
 
 //---------------------------------------------------------------------------------------------------- AudioState
+/// TODO
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq)]
@@ -39,9 +42,10 @@ where
 	/// Are we playing audio right now?
 	pub playing: bool,
 
-	/// Repeat mode.
+	/// Current repeat mode.
 	pub repeat: Repeat,
 
+	/// Current volume level.
 	pub volume: Volume,
 
 	/// The currently playing index in the queue.
@@ -53,6 +57,7 @@ impl<QueueData> AudioState<QueueData>
 where
 	QueueData: Clone,
 {
+	/// TODO
 	pub const DUMMY: Self = Self {
 		queue: VecDeque::new(),
 		playing: false,

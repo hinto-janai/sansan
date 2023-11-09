@@ -47,7 +47,6 @@ arrayvec     = { version = "0.7.4" }
 crossbeam    = { version = "0.8.2", features = ["crossbeam-channel"] }
 #once_cell    = { version = "1.18.0" }
 rand         = { version = "0.8.5", features = ["small_rng"] }
-#strum        = { version = "0.25.0", features = ["derive"] }
 thiserror    = { version = "1.0.50" }
 seq-macro    = { version = "0.3.5" }
 strum        = { version = "0.25.0", features = ["derive", "phf"] }

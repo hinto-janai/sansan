@@ -1,3 +1,5 @@
+//! Engine configuration
+
 mod audio_state;
 pub use audio_state::*;
 

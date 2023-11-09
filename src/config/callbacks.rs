@@ -9,6 +9,7 @@ use std::{
 };
 
 //---------------------------------------------------------------------------------------------------- Callback
+/// TODO
 pub enum Callback<QueueData, CallbackSender>
 where
 	QueueData: Clone,
@@ -136,9 +137,13 @@ where
 	QueueData: Clone,
 	CallbackSender: SansanSender<()>
 {
+	/// TODO
 	pub next:      Vec<Callback<QueueData, CallbackSender>>,
+	/// TODO
 	pub queue_end: Vec<Callback<QueueData, CallbackSender>>,
+	/// TODO
 	pub repeat:    Vec<Callback<QueueData, CallbackSender>>,
+	/// TODO
 	pub elapsed:   Vec<(Callback<QueueData, CallbackSender>, Duration)>,
 }
 
@@ -193,21 +198,25 @@ where
 		}
 	}
 
+	/// TODO
 	pub fn next(&mut self, callback: Callback<QueueData, CallbackSender>) -> &mut Self {
 		self.next.push(callback);
 		self
 	}
 
+	/// TODO
 	pub fn queue_end(&mut self, callback: Callback<QueueData, CallbackSender>) -> &mut Self {
 		self.queue_end.push(callback);
 		self
 	}
 
+	/// TODO
 	pub fn repeat(&mut self, callback: Callback<QueueData, CallbackSender>) -> &mut Self {
 		self.repeat.push(callback);
 		self
 	}
 
+	/// TODO
 	pub fn elapsed(&mut self, callback: Callback<QueueData, CallbackSender>, duration: Duration) -> &mut Self {
 		self.elapsed.push((callback, duration));
 		self

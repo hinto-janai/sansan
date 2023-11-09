@@ -26,29 +26,21 @@ macro_rules! impl_const {
 }
 
 impl Volume {
-	const MAX_F32: f32 = 1.0;
-	const MIN_F32: f32 = 0.0;
-	const DEFAULT_F32: f32 = 0.25;
-
 	/// ```rust
 	/// # use sansan::signal::*;
 	/// assert_eq!(Volume::MAX.inner(), 1.0);
 	/// ```
-	pub const MAX: Self = Self(Self::MAX_F32);
+	pub const MAX: Self = Self(1.0);
 	/// ```rust
 	/// # use sansan::signal::*;
 	/// assert_eq!(Volume::MIN.inner(), 0.0);
 	/// ```
-	pub const MIN: Self = Self(Self::MIN_F32);
+	pub const MIN: Self = Self(0.0);
 	/// ```rust
 	/// # use sansan::signal::*;
 	/// assert_eq!(Volume::DEFAULT.inner(), 0.25);
 	/// ```
-	pub const DEFAULT: Self = Self(Self::DEFAULT_F32);
-
-	seq_macro::seq!(N in 0..=100 {
-		impl_const!(N);
-	});
+	pub const DEFAULT: Self = Self(0.25);
 
 	#[inline]
 	/// Create a new [`Volume`] from a [`f32`].
@@ -144,6 +136,10 @@ impl Volume {
 	pub const fn inner(&self) -> f32 {
 		self.0
 	}
+
+	seq_macro::seq!(N in 0..=100 {
+		impl_const!(N);
+	});
 }
 
 impl Default for Volume {

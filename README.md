@@ -8,20 +8,25 @@
 
 ## About
 `sansan` is for:
-- Queue-based, real-time _music_ playback
+- Queue-based, real-time music playback
 - Live queue reading/writing without blocking
 - OS media control integration
 
 `sansan` is not:
 - A general purpose audio playback library
-- A music metadata library
+- A metadata library
 
 `sansan` is built with music players in-mind - it is meant to be the part
 of the system that handles the real-time audio decoding/playback,
 while exposing an audio state read/write API that is non-blocking.
 
 Although `sansan` _can_ be used for general purpose audio playback,
-it does not include general purpose audio APIs like mixing, filters, etc.
+it does not include general purpose audio APIs like mixing, filters, multiple tracks, etc.
+
+## Documentation
+The book at [`https://sansan.cat`](https://sansan.cat) is the main user documentation. It holds all the information needed to get started with `sansan` - what things there are, what they do, how to use them.
+
+The library documentation at [`https://docs.rs/sansan`](https://docs.rs/sansan) is the API reference, documenting inputs and outputs and other note-worthy things about the API, although, it does not contain detailed commentary on usage, how things work together, etc.
 
 ## Example
 For more example usage of `sansan`, see [`examples/`](examples).
@@ -94,11 +99,6 @@ let audio_state: AudioState<()> = reader.get();
 assert_eq!(audio_state.playing, false);
 assert_eq!(audio_state.queue.len(), 0);
 ```
-
-## Documentation
-The book at [`https://sansan.cat`](https://sansan.cat) is the main user documentation. It holds all the information needed to get started with `sansan` - what things there are, what they do, how to use them.
-
-The library documentation at [`https://docs.rs/sansan`](https://docs.rs/sansan) is the API reference, documenting inputs and outputs and other note-worthy things about the API, although, it does not contain detailed commentary on usage, how things work together, etc.
 
 ## Design
 `sansan`'s abstract design is documented in [`DESIGN.md`](DESIGN.md).
