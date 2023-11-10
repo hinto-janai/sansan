@@ -3,7 +3,7 @@ use std::thread::JoinHandle;
 use crossbeam::channel::{Sender, Receiver, Select};
 use crate::audio_state::{AudioState,AudioStatePatch};
 use crate::actor::decode::{KernelToDecode,DecodeToKernel};
-use crate::actor::audio::{KernelToAudio,AudioToKernel};
+use crate::actor::audio::AudioToKernel;
 use crate::signal::{
 	Clear,
 	Repeat,
@@ -29,9 +29,11 @@ use crate::signal::{
 };
 use std::sync::{
 	Arc,
+	Barrier,
 	atomic::AtomicBool,
 };
 use strum::EnumCount;
+use crate::macros::{send,recv};
 
 //---------------------------------------------------------------------------------------------------- Kernel
 #[derive(Debug)]
@@ -42,7 +44,16 @@ where
 	audio_state: someday::Writer<AudioState<QueueData>, AudioStatePatch>,
 	playing: Arc<AtomicBool>,
 	audio_ready_to_recv: Arc<AtomicBool>,
+
+	shutdown_wait: Arc<Barrier>,
 }
+
+//---------------------------------------------------------------------------------------------------- Msg
+// These are message [Kernel] can
+// send to the other actors.
+
+/// Discard all of your current audio buffers.
+pub(crate) struct DiscardCurrentAudio;
 
 //---------------------------------------------------------------------------------------------------- Recv
 // TL;DR - this structs exists because [self] borrowing rules are too strict
@@ -59,9 +70,13 @@ where
 pub(crate) struct Channels<QueueData: Clone> {
 	// Shutdown signal.
 	pub(crate) shutdown: Receiver<()>,
+	pub(crate) shutdown_hang: Receiver<()>,
+	pub(crate) shutdown_audio: Sender<()>,
+	pub(crate) shutdown_decode: Sender<()>,
+	pub(crate) shutdown_done: Sender<()>,
 
 	// [Audio]
-	pub(crate) to_audio:   Sender<KernelToAudio>,
+	pub(crate) to_audio:   Sender<DiscardCurrentAudio>,
 	pub(crate) from_audio: Receiver<AudioToKernel>,
 
 	// [Decode]
@@ -126,6 +141,7 @@ enum Msg {
 	Remove,
 	RemoveRange,
 	Shutdown,
+	ShutdownHang,
 }
 impl Msg {
 	const fn from_usize(u: usize) -> Self {
@@ -145,6 +161,7 @@ where
 	pub(crate) fn init(
 		playing:             Arc<AtomicBool>,
 		audio_ready_to_recv: Arc<AtomicBool>,
+		shutdown_wait:       Arc<Barrier>,
 		audio_state:         someday::Writer<AudioState<QueueData>, AudioStatePatch>,
 		channels:            Channels<QueueData>,
 	) -> Result<JoinHandle<()>, std::io::Error> {
@@ -152,6 +169,7 @@ where
 			playing,
 			audio_state,
 			audio_ready_to_recv,
+			shutdown_wait,
 		};
 
 		std::thread::Builder::new()
@@ -185,33 +203,47 @@ where
 		select.recv(&channels.set_index_recv);
 		select.recv(&channels.remove_recv);
 		select.recv(&channels.remove_range_recv);
+		select.recv(&channels.shutdown);
 
-		// 18 channels to select over, make sure we counted right :)
-		assert_eq!(Msg::COUNT, select.recv(&channels.shutdown));
+		// 19 channels to select over, make sure we counted right :)
+		assert_eq!(Msg::COUNT, select.recv(&channels.shutdown_hang));
 
 		// Loop, receiving signals and routing them
 		// to their appropriate handler function [fn_*()].
 		loop {
 			let signal = select.select();
 			match Msg::from_usize(signal.index()) {
-				Msg::Toggle      => self.fn_toggle(),
-				Msg::Play        => self.fn_play(),
-				Msg::Pause       => self.fn_pause(),
-				Msg::Clear       => self.fn_clear(),
-				Msg::Repeat      => self.fn_repeat(),
-				Msg::Shuffle     => self.fn_shuffle(),
-				Msg::Volume      => self.fn_volume(),
-				Msg::Restore     => self.fn_restore(),
-				Msg::Add         => self.fn_add(),
-				Msg::Seek        => self.fn_seek(),
-				Msg::Next        => self.fn_next(),
-				Msg::Previous    => self.fn_previous(),
-				Msg::Skip        => self.fn_skip(),
-				Msg::Back        => self.fn_back(),
-				Msg::SetIndex    => self.fn_set_index(),
-				Msg::Remove      => self.fn_remove(),
-				Msg::RemoveRange => self.fn_remove_range(),
-				Msg::Shutdown    => self.fn_shutdown(),
+				Msg::Toggle       => self.fn_toggle(),
+				Msg::Play         => self.fn_play(),
+				Msg::Pause        => self.fn_pause(),
+				Msg::Clear        => self.fn_clear(),
+				Msg::Repeat       => self.fn_repeat(),
+				Msg::Shuffle      => self.fn_shuffle(),
+				Msg::Volume       => self.fn_volume(),
+				Msg::Restore      => self.fn_restore(),
+				Msg::Add          => self.fn_add(),
+				Msg::Seek         => self.fn_seek(),
+				Msg::Next         => self.fn_next(),
+				Msg::Previous     => self.fn_previous(),
+				Msg::Skip         => self.fn_skip(),
+				Msg::Back         => self.fn_back(),
+				Msg::SetIndex     => self.fn_set_index(),
+				Msg::Remove       => self.fn_remove(),
+				Msg::RemoveRange  => self.fn_remove_range(),
+				Msg::Shutdown     => {
+					// Wait until all threads are ready to shutdown.
+					self.shutdown_wait.wait();
+					// Exit loop (thus, the thread).
+					return;
+				}
+				// Same as shutdown but sends a message to a
+				// hanging [Engine] indicating we're done, which
+				// allows the caller to return.
+				Msg::ShutdownHang => {
+					self.shutdown_wait.wait();
+					send!(channels.shutdown_done, ());
+					return;
+				}
 			}
 		}
 	}

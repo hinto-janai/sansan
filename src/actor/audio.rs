@@ -9,8 +9,10 @@ use crate::{
 use symphonia::core::audio::AudioBuffer;
 use std::sync::{
 	Arc,
+	Barrier,
 	atomic::AtomicBool,
 };
+use crate::actor::kernel::DiscardCurrentAudio;
 
 //---------------------------------------------------------------------------------------------------- Constants
 // AUDIO_BUFFER_LEN is the buffer size of the channel
@@ -30,6 +32,7 @@ pub(crate) const AUDIO_BUFFER_LEN: usize = 64;
 pub(crate) struct Audio {
 	playing:       Arc<AtomicBool>,
 	ready_to_recv: Arc<AtomicBool>,
+	shutdown_wait: Arc<Barrier>,
 }
 
 //---------------------------------------------------------------------------------------------------- Channels
@@ -37,11 +40,11 @@ pub(crate) struct Audio {
 struct Channels {
 	shutdown: Receiver<()>,
 
-	to_decode:   Sender<AudioToDecode>,
+	to_decode:   Sender<TookAudioBuffer>,
 	from_decode: Receiver<AudioBuffer<f32>>, // Only 1 msg, no enum required
 
 	to_kernel:   Sender<AudioToKernel>,
-	from_kernel: Receiver<KernelToAudio>,
+	from_kernel: Receiver<DiscardCurrentAudio>,
 }
 
 //---------------------------------------------------------------------------------------------------- Msg
@@ -64,14 +67,14 @@ impl Msg {
 }
 
 //---------------------------------------------------------------------------------------------------- (Actual) Messages
-pub(crate) enum AudioToDecode {
-	// We (Audio) took out an audio buffer from
-	// the channel, please send another one :)
-	TookAudioBuffer,
-}
-
-pub(crate) enum KernelToAudio {
-}
+// Audio -> Decode
+//
+// There's only 1 message variant,
+// so this is a ZST struct, not an enum.
+//
+// We (Audio) took out an audio buffer from
+// the channel, please send another one :)
+pub(crate) struct TookAudioBuffer;
 
 pub(crate) enum AudioToKernel {
 }
@@ -82,11 +85,12 @@ impl Audio {
 	pub(crate) fn init(
 		playing:       Arc<AtomicBool>,
 		ready_to_recv: Arc<AtomicBool>,
+		shutdown_wait: Arc<Barrier>,
 		shutdown:      Receiver<()>,
-		to_decode:     Sender<AudioToDecode>,
+		to_decode:     Sender<TookAudioBuffer>,
 		from_decode:   Receiver<AudioBuffer<f32>>,
 		to_kernel:     Sender<AudioToKernel>,
-		from_kernel:   Receiver<KernelToAudio>,
+		from_kernel:   Receiver<DiscardCurrentAudio>,
 	) -> Result<JoinHandle<()>, std::io::Error> {
 		let channels = Channels {
 			shutdown,
@@ -99,6 +103,7 @@ impl Audio {
 		let this = Audio {
 			playing,
 			ready_to_recv,
+			shutdown_wait,
 		};
 
 		std::thread::Builder::new()
@@ -126,27 +131,36 @@ impl Audio {
 			let signal = select.select();
 
 			match Msg::from_usize(signal.index()) {
-				Msg::FromDecode => self.fn_from_decode(),
-				Msg::FromKernel => self.fn_from_kernel(),
-				Msg::Shutdown   => self.fn_shutdown(),
+				Msg::FromDecode => {
+					let audio = channels.from_decode.try_recv().unwrap();
+					self.fn_play_audio_buffer(audio);
+				},
+				Msg::FromKernel => {
+					channels.from_kernel.try_recv().unwrap();
+					self.fn_discard_audio();
+				},
+				Msg::Shutdown => {
+					// Wait until all threads are ready to shutdown.
+					self.shutdown_wait.wait();
+					// Exit loop (thus, the thread).
+					return;
+				},
 			}
 		}
 	}
 
-	//---------------------------------------------------------------------------------------------------- Signal Handlers
+	//---------------------------------------------------------------------------------------------------- Function Handlers
+	// Function Handlers.
+	//
+	// These are the functions invoked in response
+	// to exact messages/signals from the other actors.
+
 	#[inline]
-	fn fn_from_decode(&mut self) {
+	fn fn_play_audio_buffer(&mut self, audio: AudioBuffer<f32>) {
 		todo!();
 	}
 
 	#[inline]
-	fn fn_from_kernel(&mut self) {
-		todo!();
-	}
-
-	#[cold]
-	#[inline(never)]
-	fn fn_shutdown(&mut self) {
-		todo!();
+	fn fn_discard_audio(&mut self) {
 	}
 }

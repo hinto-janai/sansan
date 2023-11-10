@@ -121,13 +121,13 @@ This table summarizes the **audio-specific** libraries used by `sansan` and thei
 | `rubato`                | `0.14.1` | [HEnquist](https://github.com/HEnquist/rubato)              | Audio resampling
 
 ## Supported Targets
-Only 64-bit (`x86_64`, `ARM64`, etc) are supported. 32-bit targets may work but are not tested on.
+Only 64-bit targets (`x86_64`, `ARM64`, etc) are supported.
+
+32-bit targets may work but are not tested on.
 
 - Windows (WASAPI)
 - macOS (CoreAudio)
 - Linux (PulseAudio)
-
-See [`cubeb-rs`](https://github.com/mozilla/cubeb-rs) for more details.
 
 ## Supported Audio
 `sansan` uses [`symphonia`](https://github.com/pdeljanov/Symphonia) for audio decoding & metadata.

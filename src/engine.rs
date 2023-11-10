@@ -11,11 +11,29 @@ use crate::actor::{
 	kernel::Kernel,
 };
 use crate::channel::SansanSender;
+use crossbeam::channel::{Sender,Receiver};
 use symphonia::core::audio::AudioBuffer;
 use std::sync::{
 	Arc,
+	Barrier,
 	atomic::AtomicBool,
 };
+use crate::macros::{send,recv};
+
+//---------------------------------------------------------------------------------------------------- Constants
+// Total count of all the "actors" in our system.
+//
+// [0] Audio
+// [1] Decode
+// [2] Kernel
+// [3] MediaControl
+// [4] Pool
+// [5] Gc
+// [6] Cb
+// [7] Log
+//
+// TODO: finalize all actors
+const ACTOR_COUNT: usize = 3;
 
 //---------------------------------------------------------------------------------------------------- Engine
 /// TODO
@@ -30,24 +48,14 @@ where
 	signal: Signal<QueueData>,
 	config: Config<QueueData, CallbackSender>,
 
-	// Handles of all the internal actors (threads).
-	//
-	// [0] Audio
-	// [1] Decode
-	// [2] Kernel
-	// [3] MediaControl
-	// [4] Pool
-	// [5] Gc
-	// [6] Cb
-	// [7] Log
-	//
-	// This could be an array since the length
-	// is known, although [Box] is used so that
-	// moving [Engine] only needs to copy [Box] internals.
-	internals: Box<[(
-		JoinHandle<()>,                // Thread join handle
-		crossbeam::channel::Sender<()> // Shutdown signal channel
-	)]>,
+	// Signal to [Kernel] to tell all of our internal
+	// actors (threads) to start shutting down.
+	shutdown: Sender<()>,
+	// Same as above, but for [shutdown_hang()].
+	shutdown_hang: Sender<()>,
+	// [Kernel] telling us the shutdown
+	// process has been completed.
+	shutdown_done: Receiver<()>,
 }
 
 //---------------------------------------------------------------------------------------------------- Engine Impl
@@ -63,6 +71,15 @@ where
 		// Initialize the `AudioStateReader`.
 		let (audio_state_reader, audio_state_writer) = someday::new(AudioState::DUMMY);
 		let audio_state_reader = AudioStateReader(audio_state_reader);
+
+		// Initialize the "Shutdown Barrier".
+		//
+		// All threads will wait on this barrier before exiting.
+		// This is done to prevent a scenario where a thread has
+		// exited and dropped a channel, while another thread
+		// hasn't yet exited and has [send()]'ed a message,
+		// causing a panic.
+		let shutdown_wait = Arc::new(Barrier::new(ACTOR_COUNT));
 
 		// Initialize all the channels between [Kernel] <-> [Signal].
 		//
@@ -166,9 +183,10 @@ where
 
 		// Spawn [Audio]
 		let (a_shutdown, shutdown) = bounded(1);
-		let audio = Audio::init(
+		Audio::init(
 			Arc::clone(&playing),
 			Arc::clone(&audio_ready_to_recv),
+			Arc::clone(&shutdown_wait),
 			shutdown,
 			a_to_d,
 			a_from_d,
@@ -180,8 +198,9 @@ where
 		let (d_to_k,     k_from_d) = unbounded();
 		let (k_to_d,     d_from_k) = unbounded();
 		let (d_shutdown, shutdown) = bounded(1);
-		let decode = Decode::init(
+		Decode::init(
 			Arc::clone(&audio_ready_to_recv),
+			Arc::clone(&shutdown_wait),
 			shutdown,
 			d_to_a,
 			d_from_a,
@@ -190,9 +209,15 @@ where
 		)?;
 
 		// Spawn [Kernel]
-		let (k_shutdown, shutdown) = bounded(1);
+		let (shutdown, k_shutdown)  = bounded(1);
+		let (shutdown_hang, k_shutdown_hang) = bounded(0);
+		let (k_shutdown_done, shutdown_done) = bounded(0);
 		let channels = crate::actor::kernel::Channels {
-			shutdown,
+			shutdown: k_shutdown,
+			shutdown_hang: k_shutdown_hang,
+			shutdown_audio: a_shutdown,
+			shutdown_decode: d_shutdown,
+			shutdown_done: k_shutdown_done,
 			toggle_recv,
 			play_recv,
 			pause_recv,
@@ -224,9 +249,10 @@ where
 			remove_range_send: k_remove_range_send,
 			remove_range_recv: k_remove_range_recv,
 		};
-		let kernel = Kernel::<QueueData>::init(
+		Kernel::<QueueData>::init(
 			playing,
 			audio_ready_to_recv,
+			shutdown_wait,
 			audio_state_writer,
 			channels,
 		)?;
@@ -236,11 +262,9 @@ where
 			signal,
 			config,
 
-			internals: Box::new([
-				(audio,  a_shutdown),
-				(decode, d_shutdown),
-				(kernel, k_shutdown),
-			]),
+			shutdown,
+			shutdown_hang,
+			shutdown_done,
 		})
 	}
 
@@ -269,13 +293,19 @@ where
 	#[inline]
 	/// TODO
 	pub fn shutdown(self) {
-		todo!()
+		// Tell [Kernel] to shutdown,
+		// and to not notify us.
+		send!(self.shutdown, ());
 	}
 
 	#[inline]
 	/// TODO
 	pub fn shutdown_blocking(self) {
-		todo!()
+		// Tell [Kernel] to shutdown,
+		// and to tell us when it's done.
+		send!(self.shutdown_hang, ());
+		// Hang until [Kernel] responds.
+		recv!(self.shutdown_done);
 	}
 }
 

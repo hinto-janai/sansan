@@ -8,10 +8,11 @@ use crate::{
 	audio_state::{AudioState,AudioStatePatch},
 };
 use symphonia::core::audio::AudioBuffer;
-use crate::actor::audio::AudioToDecode;
+use crate::actor::audio::TookAudioBuffer;
 use std::{
 	sync::{
 		Arc,
+		Barrier,
 		atomic::AtomicBool,
 	},
 	collections::VecDeque,
@@ -36,13 +37,14 @@ const DECODE_BUFFER_LEN: usize = 16_000;
 pub(crate) struct Decode {
 	audio_ready_to_recv: Arc<AtomicBool>,
 	buffer: VecDeque<AudioBuffer<f32>>,
+	shutdown_wait: Arc<Barrier>,
 }
 
 // See [src/actor/kernel.rs]'s [Channels]
 struct Channels {
 	shutdown:    Receiver<()>,
 	to_audio:    Sender<AudioBuffer<f32>>,
-	from_audio:  Receiver<AudioToDecode>,
+	from_audio:  Receiver<TookAudioBuffer>,
 	to_kernel:   Sender<DecodeToKernel>,
 	from_kernel: Receiver<KernelToDecode>,
 }
@@ -88,9 +90,10 @@ impl Decode {
 	//---------------------------------------------------------------------------------------------------- Init
 	pub(crate) fn init(
 		audio_ready_to_recv: Arc<AtomicBool>,
+		shutdown_wait:       Arc<Barrier>,
 		shutdown:            Receiver<()>,
 		to_audio:            Sender<AudioBuffer<f32>>,
-		from_audio:          Receiver<AudioToDecode>,
+		from_audio:          Receiver<TookAudioBuffer>,
 		to_kernel:           Sender<DecodeToKernel>,
 		from_kernel:         Receiver<KernelToDecode>,
 	) -> Result<JoinHandle<()>, std::io::Error> {
@@ -104,6 +107,7 @@ impl Decode {
 
 		let this = Decode {
 			audio_ready_to_recv,
+			shutdown_wait,
 			buffer: VecDeque::with_capacity(DECODE_BUFFER_LEN),
 		};
 
@@ -133,7 +137,12 @@ impl Decode {
 			match Msg::from_usize(signal.index()) {
 				Msg::FromAudio  => self.fn_from_audio(),
 				Msg::FromKernel => self.fn_from_kernel(),
-				Msg::Shutdown   => self.fn_shutdown(),
+				Msg::Shutdown   => {
+					// Wait until all threads are ready to shutdown.
+					self.shutdown_wait.wait();
+					// Exit loop (thus, the thread).
+					return;
+				},
 			}
 		}
 	}
