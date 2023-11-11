@@ -1,4 +1,6 @@
-//! Engine configuration
+//! [`Engine`] configuration
+#[allow(unused_imports)] // docs
+use crate::Engine;
 
 mod audio_state;
 pub use audio_state::*;

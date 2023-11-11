@@ -1,9 +1,13 @@
-//! `sansan`
+//! Real-time music engine.
 //!
-//! Real-time audio engine.
+//! This is the API reference documentation for [`sansan`](https://github.com/hinto-janai/sansan),
+//! meant to solely document inputs/outputs and other note-worthy things.
 //!
-//! LP - 2019-09-05 - 1995
-//! CD - 2019-09-18 - 19918
+//! This documentation does not contain detailed commentary on usage.
+//!
+//! See [`sansan.cat`](https://sansan.cat) for a user-guide and
+//! [`examples/`](https://github.com/hinto-janai/sansan/tree/main/examples)
+//! for small example programs.
 
 //---------------------------------------------------------------------------------------------------- Lints
 #![allow(

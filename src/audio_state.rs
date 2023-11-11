@@ -89,9 +89,9 @@ pub struct Track<QueueData> {
 	/// TODO
 	pub data: QueueData,
 	/// TODO
-	pub elapsed: RuntimeMilli,
+	pub elapsed: f32,
 	/// TODO
-	pub runtime: RuntimeMilli,
+	pub runtime: f32,
 }
 
 //---------------------------------------------------------------------------------------------------- AudioStateSnapshot

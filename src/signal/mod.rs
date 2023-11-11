@@ -1,4 +1,6 @@
-//! Engine signals
+//! [`Engine`] signals
+#[allow(unused_imports)] // docs
+use crate::Engine;
 
 mod add;
 pub use add::{Add,AddError};

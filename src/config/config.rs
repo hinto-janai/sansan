@@ -32,23 +32,25 @@ where
 	pub callbacks: Option<Callbacks<QueueData, CallbackSender>>,
 
 	/// TODO
-	pub audio_state: AudioStateConfig,
+	pub restore: Option<AudioState<QueueData>>,
 
 	/// TODO
-	pub restore: Option<AudioState<QueueData>>,
+	pub audio_state: AudioStateConfig,
 
 	// // Filesystem
 	// file_open_error_behavior: FileOpenErrorBehavior,
 	// file_probe_error_behavior: FileProbeErrorBehavior,
 
 	// // Audio
-	audio_output_error_behavior: AudioErrorBehavior,
-	audio_seek_error_behavior: AudioErrorBehavior,
-	audio_decode_behavior: AudioErrorBehavior,
+	/// TODO
+	pub audio_output_error_behavior: AudioErrorBehavior,
+	/// TODO
+	pub audio_seek_error_behavior: AudioErrorBehavior,
+	/// TODO
+	pub audio_decode_error_behavior: AudioErrorBehavior,
 
 	// // Media Controls
 	// media_controls: bool,
-	_q: PhantomData<QueueData>,
 }
 
 //---------------------------------------------------------------------------------------------------- AudioOutputErrorBehavior
@@ -132,15 +134,26 @@ where
 	QueueData: Clone,
 	CallbackSender: SansanSender<()>,
 {
-	/// TODO
+	/// Return a reasonable default [`Config`].
+	///
+	/// ```rust
+	/// # use sansan::config::*;
+	/// Config::<(), ()> {
+	/// 	callbacks:                   None,
+	/// 	restore:                     None,
+	/// 	audio_state:                 AudioStateConfig::DEFAULT,
+	/// 	audio_output_error_behavior: AudioErrorBehavior::DEFAULT,
+	/// 	audio_seek_error_behavior:   AudioErrorBehavior::DEFAULT,
+	/// 	audio_decode_behavior:       AudioErrorBehavior::DEFAULT,
+	/// };
+	/// ```
 	pub const DEFAULT: Self = Self {
 		callbacks:                   None,
 		audio_state:                 AudioStateConfig::DEFAULT,
 		restore:                     None,
 		audio_output_error_behavior: AudioErrorBehavior::DEFAULT,
 		audio_seek_error_behavior:   AudioErrorBehavior::DEFAULT,
-		audio_decode_behavior:       AudioErrorBehavior::DEFAULT,
-		_q:                          PhantomData,
+		audio_decode_error_behavior: AudioErrorBehavior::DEFAULT,
 	};
 }
 
