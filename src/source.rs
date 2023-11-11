@@ -46,7 +46,6 @@ const MEDIA_SOURCE_STREAM_OPTIONS: MediaSourceStreamOptions = MediaSourceStreamO
 //---------------------------------------------------------------------------------------------------- Source
 #[allow(unused_imports)] // docs
 use crate::AudioStateReader;
-#[non_exhaustive]
 #[derive(Debug,Clone,PartialEq,PartialOrd)]
 /// Audio source
 ///
@@ -370,7 +369,6 @@ impl From<symphonia::core::errors::Error> for DecoderError {
 }
 
 //---------------------------------------------------------------------------------------------------- SourcePath
-#[non_exhaustive]
 #[derive(Debug,Clone,PartialEq,PartialOrd)]
 /// [`Path`] variant of a [`Source`]
 ///
@@ -451,7 +449,6 @@ impl From<String> for SourcePath {
 }
 
 //---------------------------------------------------------------------------------------------------- SourceBytes
-#[non_exhaustive]
 #[derive(Debug,Clone,PartialEq,PartialOrd)]
 /// Bytes variant of a [`Source`]
 ///

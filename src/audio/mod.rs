@@ -4,7 +4,7 @@ pub use output::AudioOutputError;
 pub(crate) mod resampler;
 
 // Output backends.
-mod cubeb;
+pub(crate) mod cubeb;
 
 // Resampler backends.
-mod rubato;
+pub(crate) mod rubato;

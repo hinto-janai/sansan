@@ -13,6 +13,13 @@ use std::sync::{
 	atomic::AtomicBool,
 };
 use crate::actor::kernel::DiscardCurrentAudio;
+use crate::audio::{
+	output::AudioOutput,
+	resampler::Resampler,
+	cubeb::Cubeb,
+	rubato::Rubato,
+};
+use crate::macros::{send,recv};
 
 //---------------------------------------------------------------------------------------------------- Constants
 // AUDIO_BUFFER_LEN is the buffer size of the channel
@@ -29,16 +36,23 @@ pub(crate) const AUDIO_BUFFER_LEN: usize = 64;
 
 //---------------------------------------------------------------------------------------------------- Audio
 #[derive(Debug)]
-pub(crate) struct Audio {
+pub(crate) struct Audio<Output>
+where
+	Output: AudioOutput,
+{
+	playing_local: bool,
 	playing:       Arc<AtomicBool>,
 	ready_to_recv: Arc<AtomicBool>,
 	shutdown_wait: Arc<Barrier>,
+	output: Output
 }
 
 //---------------------------------------------------------------------------------------------------- Channels
 // See [src/actor/kernel.rs]'s [Channels]
 struct Channels {
 	shutdown: Receiver<()>,
+
+	to_gc:       Sender<AudioBuffer<f32>>,
 
 	to_decode:   Sender<TookAudioBuffer>,
 	from_decode: Receiver<AudioBuffer<f32>>, // Only 1 msg, no enum required
@@ -80,38 +94,56 @@ pub(crate) enum AudioToKernel {
 }
 
 //---------------------------------------------------------------------------------------------------- Audio Impl
-impl Audio {
+impl<Output> Audio<Output>
+where
+	Output: AudioOutput,
+{
 	//---------------------------------------------------------------------------------------------------- Init
+	#[cold]
+	#[inline(never)]
 	pub(crate) fn init(
 		playing:       Arc<AtomicBool>,
 		ready_to_recv: Arc<AtomicBool>,
 		shutdown_wait: Arc<Barrier>,
 		shutdown:      Receiver<()>,
+		to_gc:         Sender<AudioBuffer<f32>>,
 		to_decode:     Sender<TookAudioBuffer>,
 		from_decode:   Receiver<AudioBuffer<f32>>,
 		to_kernel:     Sender<AudioToKernel>,
 		from_kernel:   Receiver<DiscardCurrentAudio>,
 	) -> Result<JoinHandle<()>, std::io::Error> {
-		let channels = Channels {
-			shutdown,
-			to_decode,
-			from_decode,
-			to_kernel,
-			from_kernel,
-		};
-
-		let this = Audio {
-			playing,
-			ready_to_recv,
-			shutdown_wait,
-		};
-
 		std::thread::Builder::new()
 			.name("Audio".into())
-			.spawn(move || Audio::main(this, channels))
+			.spawn(move || {
+				let channels = Channels {
+					shutdown,
+					to_gc,
+					to_decode,
+					from_decode,
+					to_kernel,
+					from_kernel,
+				};
+
+				// TODO:
+				// obtain audio output depending on user config.
+				// hang, try again, etc.
+				let output: Cubeb<Rubato> = Cubeb::dummy().unwrap();
+
+				let this = Audio {
+					playing_local: false,
+					playing,
+					ready_to_recv,
+					shutdown_wait,
+					output,
+				};
+
+				Audio::main(this, channels);
+			})
 	}
 
 	//---------------------------------------------------------------------------------------------------- Main Loop
+	#[cold]
+	#[inline(never)]
 	fn main(mut self, channels: Channels) {
 		// Create channels that we will
 		// be selecting/listening to for all time.
@@ -125,19 +157,40 @@ impl Audio {
 
 		assert_eq!(Msg::COUNT, select.recv(&channels.shutdown));
 
-		// Loop, receiving signals and routing them
-		// to their appropriate handler function [fn_*()].
 		loop {
-			let signal = select.select();
+			// If we're playing, check if we have samples to play.
+			if self.playing_local {
+				if let Ok(audio) = channels.from_decode.try_recv() {
+					self.fn_play_audio_buffer(audio, &channels.to_gc);
+				}
+			}
 
+			// Attempt to receive signal from other actors.
+			let signal = match select.try_select() {
+				Ok(s) => s,
+				_ => {
+					// If we're playing, continue to
+					// next iteration of loop so that
+					// we continue playing.
+					if self.playing_local {
+						continue;
+					// Else, hang until we receive
+					// a message from somebody.
+					} else {
+						select.select()
+					}
+				},
+			};
+
+			// Route signal to its appropriate handler function [fn_*()].
 			match Msg::from_usize(signal.index()) {
 				Msg::FromDecode => {
 					let audio = channels.from_decode.try_recv().unwrap();
-					self.fn_play_audio_buffer(audio);
+					self.fn_play_audio_buffer(audio, &channels.to_gc);
 				},
 				Msg::FromKernel => {
 					channels.from_kernel.try_recv().unwrap();
-					self.fn_discard_audio();
+					self.fn_discard_audio(&channels.from_decode, &channels.to_gc);
 				},
 				Msg::Shutdown => {
 					// Wait until all threads are ready to shutdown.
@@ -156,11 +209,27 @@ impl Audio {
 	// to exact messages/signals from the other actors.
 
 	#[inline]
-	fn fn_play_audio_buffer(&mut self, audio: AudioBuffer<f32>) {
-		todo!();
+	fn fn_play_audio_buffer(
+		&mut self,
+		audio: AudioBuffer<f32>,
+		to_gc: &Sender<AudioBuffer<f32>>
+	) {
+		// Write audio buffer (hangs).
+		if let Err(e) = self.output.write(audio, to_gc) {
+			// TODO: Send error the engine backchannel
+			// or discard depending on user config.
+			todo!();
+		}
 	}
 
 	#[inline]
-	fn fn_discard_audio(&mut self) {
+	fn fn_discard_audio(
+		&mut self,
+		from_decode: &Receiver<AudioBuffer<f32>>,
+		to_gc: &Sender<AudioBuffer<f32>>,
+	) {
+		while let Ok(audio) = from_decode.try_recv() {
+			send!(to_gc, audio);
+		}
 	}
 }

@@ -81,17 +81,23 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- Track
+/// TODO
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq)]
 pub struct Track<QueueData> {
+	/// TODO
 	pub data: QueueData,
+	/// TODO
 	pub elapsed: RuntimeMilli,
+	/// TODO
 	pub runtime: RuntimeMilli,
 }
 
 //---------------------------------------------------------------------------------------------------- AudioStateSnapshot
 // Wrapper around `someday::CommitRef` so that users don't have to handle `someday` types.
+//
+/// TODO
 pub struct AudioStateSnapshot<QueueData: Clone>(CommitRef<AudioState<QueueData>>);
 
 impl<QueueData> std::ops::Deref for AudioStateSnapshot<QueueData>

@@ -41,9 +41,9 @@ pub enum AudioOutputError {
 	/// The audio format is invalid or unsupported
 	InvalidFormat,
 
-	#[error("failed to write bytes to the audio stream: {0}")]
+	#[error("failed to write bytes to the audio stream")]
 	/// Failed to write bytes to the audio stream
-	Write(#[from] std::io::Error),
+	Write,
 
 	#[error("audio data specification contains an invalid/unsupported channel layout")]
 	/// The audio data's specification contains an invalid/unsupported channel layout
@@ -87,7 +87,7 @@ where
 	/// Invariants:
 	/// 1. `audio` may be a zero amount of frames (silence)
 	/// 2. `audio` may need to be resampled
-	fn write(&mut self, audio: AudioBuffer<f32>, gc: Sender<AudioBuffer<f32>>) -> Result<(), AudioOutputError>;
+	fn write(&mut self, audio: AudioBuffer<f32>, gc: &Sender<AudioBuffer<f32>>) -> Result<(), AudioOutputError>;
 
 	/// Flush all the current audio in the internal buffer (if any).
 	///
@@ -160,14 +160,14 @@ where
 		}
 	}
 
-	///// Create a "fake" dummy connection to the audio hardware/server.
-	// fn dummy() -> Result<Self, AudioOutputError> {
-	// 	let spec = SignalSpec {
-	// 		// INVARIANT: Must be non-zero.
-	// 		rate: 44_100,
-	// 		// This also counts a mono speaker.
-	// 		channels: Channels::FRONT_LEFT,
-	// 	};
-	// 	Self::try_open("", spec, 4096, false, None)
-	// }
+	/// Create a "fake" dummy connection to the audio hardware/server.
+	fn dummy() -> Result<Self, AudioOutputError> {
+		let spec = SignalSpec {
+			// INVARIANT: Must be non-zero.
+			rate: 44_100,
+			// This also counts a mono speaker.
+			channels: Channels::FRONT_LEFT,
+		};
+		Self::try_open("", spec, 4096, false, None)
+	}
 }

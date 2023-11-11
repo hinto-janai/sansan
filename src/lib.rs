@@ -51,7 +51,10 @@
 
 //---------------------------------------------------------------------------------------------------- Public API
 mod audio_state;
-pub use audio_state::{AudioStateReader,AudioState};
+pub use audio_state::{
+    AudioStateReader,AudioState,
+    AudioStateSnapshot,Track,
+};
 
 mod engine;
 pub use engine::Engine;

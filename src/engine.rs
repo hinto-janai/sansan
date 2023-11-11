@@ -10,6 +10,10 @@ use crate::actor::{
 	decode::Decode,
 	kernel::Kernel,
 };
+use crate::audio::{
+	cubeb::Cubeb,
+	rubato::Rubato,
+};
 use crate::channel::SansanSender;
 use crossbeam::channel::{Sender,Receiver};
 use symphonia::core::audio::AudioBuffer;
@@ -65,6 +69,8 @@ where
 	CallbackSender: SansanSender<()>,
 {
 	/// TODO
+	#[cold]
+	#[inline(never)]
 	pub fn init(config: Config<QueueData, CallbackSender>) -> Result<Self, EngineInitError> {
 		use crossbeam::channel::{bounded,unbounded};
 
@@ -183,11 +189,13 @@ where
 
 		// Spawn [Audio]
 		let (a_shutdown, shutdown) = bounded(1);
-		Audio::init(
+		let (a_to_gc, gc_from_a)   = unbounded();
+		Audio::<Cubeb<Rubato>>::init(
 			Arc::clone(&playing),
 			Arc::clone(&audio_ready_to_recv),
 			Arc::clone(&shutdown_wait),
 			shutdown,
+			a_to_gc,
 			a_to_d,
 			a_from_d,
 			a_to_k,
@@ -290,7 +298,8 @@ where
 		&mut self.signal
 	}
 
-	#[inline]
+	#[cold]
+	#[inline(never)]
 	/// TODO
 	pub fn shutdown(self) {
 		// Tell [Kernel] to shutdown,
@@ -298,7 +307,8 @@ where
 		send!(self.shutdown, ());
 	}
 
-	#[inline]
+	#[cold]
+	#[inline(never)]
 	/// TODO
 	pub fn shutdown_blocking(self) {
 		// Tell [Kernel] to shutdown,
@@ -306,6 +316,19 @@ where
 		send!(self.shutdown_hang, ());
 		// Hang until [Kernel] responds.
 		recv!(self.shutdown_done);
+	}
+}
+
+//---------------------------------------------------------------------------------------------------- Drop
+impl<QueueData, CallbackSender> Drop for Engine<QueueData, CallbackSender>
+where
+	QueueData: Clone + Send + Sync + 'static,
+	CallbackSender: SansanSender<()>,
+{
+	#[cold]
+	#[inline(never)]
+	fn drop(&mut self) {
+		send!(self.shutdown, ());
 	}
 }
 
