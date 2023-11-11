@@ -14,6 +14,10 @@ use symphonia::core::audio::{AudioBuffer,SignalSpec, SampleBuffer,Signal};
 use cubeb::StereoFrame;
 use crossbeam::channel::{Sender,Receiver};
 use std::num::NonZeroUsize;
+use std::sync::{
+	Arc,
+	atomic::{AtomicBool,Ordering},
+};
 use crate::macros::{recv,send};
 
 //----------------------------------------------------------------------------------------------- Constants
@@ -28,7 +32,7 @@ const AUDIO_MILLISECOND_BUFFER_FALLBACK: usize = 20;
 
 //----------------------------------------------------------------------------------------------- Cubeb
 //
-struct Cubeb<R>
+pub(crate) struct Cubeb<R>
 where
 	R: Resampler,
 {
@@ -48,6 +52,22 @@ where
 	// The actual audio stream.
 	stream: cubeb::Stream<StereoFrame<f32>>,
 
+	// A mutable bool shared between the caller
+	// and the cubeb audio stream.
+	//
+	// cubeb will set this to `true` in cases
+	// of error, and the caller should be
+	// polling it and setting it to false
+	// when the error is ACK'ed.
+	//
+	// HACK:
+	// cubeb only provides 1 error type,
+	// we don't know which actions caused
+	// which errors, so we rely on this
+	// "something recently caused and error
+	// and i'm just gonna set this bool" hack.
+	error: Arc<AtomicBool>,
+
 	// The resampler.
 	resampler: Option<R>,
 
@@ -66,7 +86,7 @@ impl<R> AudioOutput for Cubeb<R>
 where
 	R: Resampler,
 {
-	fn write(&mut self, audio: AudioBuffer<f32>, gc: Sender<AudioBuffer<f32>>) -> Result<(), AudioOutputError> {
+	fn write(&mut self, audio: AudioBuffer<f32>, gc: &Sender<AudioBuffer<f32>>) -> Result<(), AudioOutputError> {
 		// 1. Return if empty audio
 		if audio.frames() == 0  {
 			return Ok(());
@@ -91,7 +111,12 @@ where
 				// Send garbage to GC.
 				send!(gc, audio);
 
-				Ok(())
+				if self.error.load(Ordering::Relaxed) {
+					self.error.store(false, Ordering::Relaxed);
+					Err(AudioOutputError::Write)
+				} else {
+					Ok(())
+				}
 			},
 
 			// We have a `Resampler`.
@@ -118,7 +143,12 @@ where
 				send!(gc, audio);
 				send!(gc, audio_buf);
 
-				Ok(())
+				if self.error.load(Ordering::Relaxed) {
+					self.error.store(false, Ordering::Relaxed);
+					Err(AudioOutputError::Write)
+				} else {
+					Ok(())
+				}
 			},
 		}
 	}
@@ -233,6 +263,8 @@ where
 		let (sender, receiver)           = crossbeam::channel::bounded(channel_len);
 		let (discard, discard_recv)      = crossbeam::channel::bounded(1);
 		let (drained_send, drained_recv) = crossbeam::channel::bounded(1);
+		let error       = Arc::new(AtomicBool::new(false));
+		let error_cubeb = Arc::clone(&error);
 
 		// The actual audio stream.
 		let mut builder = cubeb::StreamBuilder::<StereoFrame<f32>>::new();
@@ -264,8 +296,16 @@ where
 			// Cubeb calls this when the audio stream has changed
 			// states, e.g, play, pause, drained, error, etc.
 			.state_callback(move |state| {
-				if state == cubeb::State::Drained && drained_send.is_empty() {
-					send!(drained_send, ());
+				use cubeb::State as S;
+
+				match state {
+					S::Drained => {
+						if drained_send.is_empty() {
+							send!(drained_send, ());
+						}
+					},
+					S::Error => error_cubeb.store(true, Ordering::Relaxed),
+					_ => {},
 				}
 			});
 
@@ -311,6 +351,7 @@ where
 
 		Ok(Self {
 			stream,
+			error,
 			sender,
 			discard,
 			drained: drained_recv,
