@@ -144,7 +144,7 @@ where
 	/// 	audio_state:                 AudioStateConfig::DEFAULT,
 	/// 	audio_output_error_behavior: AudioErrorBehavior::DEFAULT,
 	/// 	audio_seek_error_behavior:   AudioErrorBehavior::DEFAULT,
-	/// 	audio_decode_behavior:       AudioErrorBehavior::DEFAULT,
+	/// 	audio_decode_error_behavior: AudioErrorBehavior::DEFAULT,
 	/// };
 	/// ```
 	pub const DEFAULT: Self = Self {

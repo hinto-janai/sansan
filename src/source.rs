@@ -64,11 +64,12 @@ use crate::AudioStateReader;
 /// # use std::path::*;
 /// let source = Source::from("/path/to/audio.flac");
 ///
-/// assert_eq!(source, Source::Path(
+/// assert_eq!(source, Source::Path((
 /// 	SourcePath::Static(
 /// 		Path::new("/path/to/audio.flac")
-/// 	)
-/// ));
+/// 	),
+/// 	None,
+/// )));
 /// ```
 /// This means _that_ [`Path`] will be loaded at the time of playback.
 ///
@@ -80,7 +81,10 @@ use crate::AudioStateReader;
 /// 	// include_bytes!("/lets/pretend/this/file/exists.mp3");
 /// 	&[]
 /// };
-/// static SOURCE: Source = Source::Bytes(SourceBytes::Static(AUDIO_BYTES));
+/// static SOURCE: Source = Source::Bytes((
+/// 	SourceBytes::Static(AUDIO_BYTES),
+/// 	None,
+/// ));
 ///
 /// // Runtime heap bytes.
 /// let audio_bytes: Vec<u8> = {
@@ -143,6 +147,18 @@ pub enum Source {
 	Bytes((SourceBytes, Option<SourceMetadata>)),
 }
 
+impl From<&'static str> for Source {
+	#[inline]
+	fn from(value: &'static str) -> Self {
+		Source::Path((value.into(), None))
+	}
+}
+impl From<String> for Source {
+	#[inline]
+	fn from(value: String) -> Self {
+		Source::Path((value.into(), None))
+	}
+}
 impl From<(&'static str, Option<SourceMetadata>)> for Source {
 	#[inline]
 	fn from(value: (&'static str, Option<SourceMetadata>)) -> Self {
@@ -187,6 +203,7 @@ pub enum SourceMetadata {
 }
 
 impl SourceMetadata {
+	/// TODO
 	pub const DEFAULT: Self = Self::Static {
 		artist_name:   None,
 		album_title:   None,
@@ -194,40 +211,56 @@ impl SourceMetadata {
 		cover_path:    None,
 		total_runtime: None,
 	};
-	fn artist_name(&self) -> Option<&str> {
+
+	/// TODO
+	pub fn artist_name(&self) -> Option<&str> {
 		match self {
 			Self::Owned  { artist_name, .. } => artist_name.as_deref(),
 			Self::Static { artist_name, .. } => artist_name.as_deref(),
 			Self::Arc    { artist_name, .. } => artist_name.as_deref(),
 		}
 	}
-	fn album_title(&self) -> Option<&str> {
+
+	/// TODO
+	pub fn album_title(&self) -> Option<&str> {
 		match self {
 			Self::Owned  { album_title, .. } => album_title.as_deref(),
 			Self::Static { album_title, .. } => album_title.as_deref(),
 			Self::Arc    { album_title, .. } => album_title.as_deref(),
 		}
 	}
-	fn track_title(&self) -> Option<&str> {
+
+	/// TODO
+	pub fn track_title(&self) -> Option<&str> {
 		match self {
 			Self::Owned  { track_title, .. } => track_title.as_deref(),
 			Self::Static { track_title, .. } => track_title.as_deref(),
 			Self::Arc    { track_title, .. } => track_title.as_deref(),
 		}
 	}
-	fn cover_path(&self) -> Option<&Path> {
+
+	/// TODO
+	pub fn cover_path(&self) -> Option<&Path> {
 		match self {
 			Self::Owned  { cover_path, .. } => cover_path.as_deref(),
 			Self::Static { cover_path, .. } => cover_path.as_deref(),
 			Self::Arc    { cover_path, .. } => cover_path.as_deref(),
 		}
 	}
-	fn total_runtime(&self) -> Option<Duration> {
+
+	/// TODO
+	pub fn total_runtime(&self) -> Option<Duration> {
 		match self {
 			Self::Owned  { total_runtime, .. } => *total_runtime,
 			Self::Static { total_runtime, .. } => *total_runtime,
 			Self::Arc    { total_runtime, .. } => *total_runtime,
 		}
+	}
+}
+
+impl Default for SourceMetadata {
+	fn default() -> Self {
+		Self::DEFAULT
 	}
 }
 
@@ -475,6 +508,12 @@ macro_rules! impl_source_path_path {
 					SourcePath::$enum(path)
 				}
 			}
+			impl From<$path> for Source {
+				#[inline]
+				fn from(source: $path) -> Self {
+					Source::Path((SourcePath::$enum(source), None))
+				}
+			}
 			impl From<($path, Option<SourceMetadata>)> for Source {
 				#[inline]
 				fn from(source: ($path, Option<SourceMetadata>)) -> Self {
@@ -548,6 +587,12 @@ macro_rules! impl_source_bytes {
 				#[inline]
 				fn from(bytes: $bytes) -> Self {
 					SourceBytes::$enum(bytes)
+				}
+			}
+			impl From<$bytes> for Source {
+				#[inline]
+				fn from(source: $bytes) -> Self {
+					Source::Bytes((SourceBytes::$enum(source), None))
 				}
 			}
 			impl From<($bytes, Option<SourceMetadata>)> for Source {
