@@ -32,16 +32,16 @@ use crate::signal::{
 // The `&mut self` signatures in [Signal] and [Engine] functions
 // reflect that when using [Signal], it must be mutually exclusive.
 #[derive(Debug)]
-pub struct Signal<QueueData>
+pub struct Signal<TrackData>
 where
-	QueueData: Clone
+	TrackData: Clone
 {
 	// Signals that return `()`.
 	pub(crate) toggle_send:       Sender<()>,
 	pub(crate) play_send:         Sender<()>,
 	pub(crate) pause_send:        Sender<()>,
 	pub(crate) clear_send:        Sender<Clear>,
-	pub(crate) restore_send:      Sender<AudioState<QueueData>>,
+	pub(crate) restore_send:      Sender<AudioState<TrackData>>,
 	pub(crate) repeat_send:       Sender<Repeat>,
 	pub(crate) shuffle_send:      Sender<Shuffle>,
 	pub(crate) volume_send:       Sender<Volume>,
@@ -68,9 +68,9 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- Signal Impl
-impl<QueueData> Signal<QueueData>
+impl<TrackData> Signal<TrackData>
 where
-	QueueData: Clone
+	TrackData: Clone
 {
 	// SAFETY: The [Kernel] should always be listening.
 	// it is a logic error for [send()] or [recv()] to panic,
@@ -107,7 +107,7 @@ where
 
 	#[inline]
 	///
-	fn restore(&mut self, restore: AudioState<QueueData>) {
+	fn restore(&mut self, restore: AudioState<TrackData>) {
 		self.restore_send.send(restore).unwrap();
 	}
 

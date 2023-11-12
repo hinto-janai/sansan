@@ -42,15 +42,15 @@ const ACTOR_COUNT: usize = 3;
 //---------------------------------------------------------------------------------------------------- Engine
 /// TODO
 #[derive(Debug)]
-pub struct Engine<QueueData, CallbackSender>
+pub struct Engine<TrackData, CallbackSender>
 where
-	QueueData: Clone + Send + Sync + 'static,
+	TrackData: Clone + Send + Sync + 'static,
 	CallbackSender: SansanSender<()>,
 {
 	// Data and objects.
-	audio:  AudioStateReader<QueueData>,
-	signal: Signal<QueueData>,
-	config: Config<QueueData, CallbackSender>,
+	audio:  AudioStateReader<TrackData>,
+	signal: Signal<TrackData>,
+	config: Config<TrackData, CallbackSender>,
 
 	// Signal to [Kernel] to tell all of our internal
 	// actors (threads) to start shutting down.
@@ -63,15 +63,15 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- Engine Impl
-impl<QueueData, CallbackSender> Engine<QueueData, CallbackSender>
+impl<TrackData, CallbackSender> Engine<TrackData, CallbackSender>
 where
-	QueueData: Clone + Send + Sync + 'static,
+	TrackData: Clone + Send + Sync + 'static,
 	CallbackSender: SansanSender<()>,
 {
 	/// TODO
 	#[cold]
 	#[inline(never)]
-	pub fn init(config: Config<QueueData, CallbackSender>) -> Result<Self, EngineInitError> {
+	pub fn init(config: Config<TrackData, CallbackSender>) -> Result<Self, EngineInitError> {
 		use crossbeam::channel::{bounded,unbounded};
 
 		// Initialize the `AudioStateReader`.
@@ -257,7 +257,7 @@ where
 			remove_range_send: k_remove_range_send,
 			remove_range_recv: k_remove_range_recv,
 		};
-		Kernel::<QueueData>::init(
+		Kernel::<TrackData>::init(
 			playing,
 			audio_ready_to_recv,
 			shutdown_wait,
@@ -278,7 +278,7 @@ where
 
 	#[inline]
 	/// TODO
-	pub fn audio_state_reader(&self) -> AudioStateReader<QueueData> {
+	pub fn audio_state_reader(&self) -> AudioStateReader<TrackData> {
 		AudioStateReader::clone(&self.audio)
 	}
 
@@ -294,7 +294,7 @@ where
 	//
 	// There is no "routing" so-to-speak so we must
 	// ensure the caller also `.recv()`'s the return value.
-	pub fn signal(&mut self) -> &mut Signal<QueueData> {
+	pub fn signal(&mut self) -> &mut Signal<TrackData> {
 		&mut self.signal
 	}
 
@@ -320,9 +320,9 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- Drop
-impl<QueueData, CallbackSender> Drop for Engine<QueueData, CallbackSender>
+impl<TrackData, CallbackSender> Drop for Engine<TrackData, CallbackSender>
 where
-	QueueData: Clone + Send + Sync + 'static,
+	TrackData: Clone + Send + Sync + 'static,
 	CallbackSender: SansanSender<()>,
 {
 	#[cold]

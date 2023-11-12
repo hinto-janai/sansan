@@ -1,5 +1,6 @@
 //---------------------------------------------------------------------------------------------------- Use
 use std::{
+	time::Duration,
 	io::Cursor,
 	fs::File,
 	path::{Path,PathBuf},
@@ -116,9 +117,7 @@ use crate::AudioStateReader;
 /// [`From`] is also implemented for common smart pointers around these types.
 ///
 /// For example:
-/// - `Cow<'static, Path>` -> `SourcePath::Cow` -> `Source`
 /// - `Arc<Path>` -> `SourcePath::Arc` -> `Source`
-/// - `Cow<'static, [u8]>` -> `SourceBytes::Cow` -> `Source`
 /// - `Arc<[u8]>` -> `SourceBytes::Arc` -> `Source`
 ///
 /// ```rust
@@ -127,46 +126,107 @@ use crate::AudioStateReader;
 /// //--- paths
 /// static AUDIO_PATH: &str = "/static/path/to/audio.flac";
 ///
-/// let cow: Cow<'static, Path> = Cow::Borrowed(Path::new(AUDIO_PATH));
 /// let arc: Arc<Path> = Arc::from(Path::new(AUDIO_PATH));
-///
-/// let cow_path: Source = Source::from(cow);
 /// let arc_path: Source = Source::from(arc);
 ///
 /// //--- bytes
 /// static AUDIO_BYTES: &[u8] = &[0,1,2,3];
 ///
-/// let cow: Cow<'static, [u8]> = Cow::Borrowed(AUDIO_BYTES);
 /// let arc: Arc<[u8]> = Arc::from(AUDIO_BYTES);
-///
-/// let cow_bytes: Source = Source::from(cow);
 /// let arc_bytes: Source = Source::from(arc);
 /// ```
 pub enum Source {
 	/// TODO
-	Path(SourcePath),
+	Path((SourcePath, Option<SourceMetadata>)),
+
 	/// TODO
-	Bytes(SourceBytes),
+	Bytes((SourceBytes, Option<SourceMetadata>)),
 }
 
-impl From<&'static str> for Source {
+impl From<(&'static str, Option<SourceMetadata>)> for Source {
 	#[inline]
-	fn from(value: &'static str) -> Self {
-		Source::Path(value.into())
+	fn from(value: (&'static str, Option<SourceMetadata>)) -> Self {
+		Source::Path((value.0.into(), value.1))
 	}
 }
-impl From<String> for Source {
+impl From<(String, Option<SourceMetadata>)> for Source {
 	#[inline]
-	fn from(value: String) -> Self {
-		Source::Path(value.into())
+	fn from(value: (String, Option<SourceMetadata>)) -> Self {
+		Source::Path((value.0.into(), value.1))
 	}
 }
-impl From<Cow<'static, str>> for Source {
-	#[inline]
-	fn from(value: Cow<'static, str>) -> Self {
-		match value {
-			Cow::Borrowed(s) => Source::Path(s.into()),
-			Cow::Owned(s)    => Source::Path(s.into()),
+
+//---------------------------------------------------------------------------------------------------- SourceMetadata
+/// TODO
+#[derive(Debug,Clone,PartialEq,PartialOrd)]
+pub enum SourceMetadata {
+	#[allow(missing_docs)]
+	Owned {
+		artist_name:   Option<String>,
+		album_title:   Option<String>,
+		track_title:   Option<String>,
+		cover_path:    Option<PathBuf>,
+		total_runtime: Option<Duration>
+	},
+	#[allow(missing_docs)]
+	Static {
+		artist_name:   Option<&'static str>,
+		album_title:   Option<&'static str>,
+		track_title:   Option<&'static str>,
+		cover_path:    Option<&'static Path>,
+		total_runtime: Option<Duration>
+	},
+	#[allow(missing_docs)]
+	Arc {
+		artist_name:   Option<Arc<str>>,
+		album_title:   Option<Arc<str>>,
+		track_title:   Option<Arc<str>>,
+		cover_path:    Option<Arc<Path>>,
+		total_runtime: Option<Duration>
+	},
+}
+
+impl SourceMetadata {
+	pub const DEFAULT: Self = Self::Static {
+		artist_name:   None,
+		album_title:   None,
+		track_title:   None,
+		cover_path:    None,
+		total_runtime: None,
+	};
+	fn artist_name(&self) -> Option<&str> {
+		match self {
+			Self::Owned  { artist_name, .. } => artist_name.as_deref(),
+			Self::Static { artist_name, .. } => artist_name.as_deref(),
+			Self::Arc    { artist_name, .. } => artist_name.as_deref(),
+		}
+	}
+	fn album_title(&self) -> Option<&str> {
+		match self {
+			Self::Owned  { album_title, .. } => album_title.as_deref(),
+			Self::Static { album_title, .. } => album_title.as_deref(),
+			Self::Arc    { album_title, .. } => album_title.as_deref(),
+		}
+	}
+	fn track_title(&self) -> Option<&str> {
+		match self {
+			Self::Owned  { track_title, .. } => track_title.as_deref(),
+			Self::Static { track_title, .. } => track_title.as_deref(),
+			Self::Arc    { track_title, .. } => track_title.as_deref(),
+		}
+	}
+	fn cover_path(&self) -> Option<&Path> {
+		match self {
+			Self::Owned  { cover_path, .. } => cover_path.as_deref(),
+			Self::Static { cover_path, .. } => cover_path.as_deref(),
+			Self::Arc    { cover_path, .. } => cover_path.as_deref(),
+		}
+	}
+	fn total_runtime(&self) -> Option<Duration> {
+		match self {
+			Self::Owned  { total_runtime, .. } => *total_runtime,
+			Self::Static { total_runtime, .. } => *total_runtime,
+			Self::Arc    { total_runtime, .. } => *total_runtime,
 		}
 	}
 }
@@ -267,7 +327,7 @@ impl TryInto<SourceInner> for Source {
 	fn try_into(self) -> Result<SourceInner, Self::Error> {
 		match self {
 			Self::Path(path) => {
-				let file = File::open(path)?;
+				let file = File::open(path.0)?;
 				let mss = MediaSourceStream::new(
 					Box::new(file),
 					MEDIA_SOURCE_STREAM_OPTIONS,
@@ -275,7 +335,7 @@ impl TryInto<SourceInner> for Source {
 				mss.try_into()
 			},
 			Self::Bytes(bytes) => {
-				let cursor = Cursor::new(bytes);
+				let cursor = Cursor::new(bytes.0);
 				let mss = MediaSourceStream::new(
 					Box::new(cursor),
 					MEDIA_SOURCE_STREAM_OPTIONS,
@@ -380,10 +440,8 @@ impl From<symphonia::core::errors::Error> for DecoderError {
 /// # use std::{sync::*,borrow::*,path::*};
 /// static AUDIO_PATH: &str = "/static/path/to/audio.flac";
 ///
-/// let cow: Cow<'static, Path> = Cow::Borrowed(Path::new(AUDIO_PATH));
 /// let arc: Arc<Path> = Arc::from(Path::new(AUDIO_PATH));
 ///
-/// let cow_path:    Source = Source::from(cow);
 /// let arc_path:    Source = Source::from(arc);
 /// let owned_path:  Source = Source::from(PathBuf::from(AUDIO_PATH));
 /// let static_path: Source = Source::from(Path::new(AUDIO_PATH));
@@ -394,8 +452,6 @@ pub enum SourcePath {
 	/// TODO
 	Static(&'static Path),
 	/// TODO
-	Cow(Cow<'static, Path>),
-	/// TODO
 	Arc(Arc<Path>),
 }
 
@@ -405,7 +461,6 @@ impl AsRef<Path> for SourcePath {
 		match self {
 			Self::Owned(p)  => p,
 			Self::Static(p) => p,
-			Self::Cow(p)    => p,
 			Self::Arc(p)    => p,
 		}
 	}
@@ -420,10 +475,10 @@ macro_rules! impl_source_path_path {
 					SourcePath::$enum(path)
 				}
 			}
-			impl From<$path> for Source {
+			impl From<($path, Option<SourceMetadata>)> for Source {
 				#[inline]
-				fn from(path: $path) -> Self {
-					Source::Path(SourcePath::$enum(path))
+				fn from(source: ($path, Option<SourceMetadata>)) -> Self {
+					Source::Path((SourcePath::$enum(source.0), source.1))
 				}
 			}
 		)*
@@ -432,7 +487,6 @@ macro_rules! impl_source_path_path {
 impl_source_path_path! {
 	Owned     => PathBuf,
 	Static    => &'static Path,
-	Cow       => Cow<'static, Path>,
 	Arc       => Arc<Path>,
 }
 impl From<&'static str> for SourcePath {
@@ -461,10 +515,8 @@ impl From<String> for SourcePath {
 /// # use std::{sync::*,borrow::*,path::*};
 /// static AUDIO_BYTES: &[u8] = &[0,1,2,3];
 ///
-/// let cow: Cow<'static, [u8]> = Cow::Borrowed(AUDIO_BYTES);
 /// let arc: Arc<[u8]> = Arc::from(AUDIO_BYTES);
 ///
-/// let cow_bytes:    Source = Source::from(cow);
 /// let arc_bytes:    Source = Source::from(arc);
 /// let owned_bytes:  Source = Source::from(AUDIO_BYTES.to_vec());
 /// let static_bytes: Source = Source::from(AUDIO_BYTES);
@@ -475,8 +527,6 @@ pub enum SourceBytes {
 	/// TODO
 	Static(&'static [u8]),
 	/// TODO
-	Cow(Cow<'static, [u8]>),
-	/// TODO
 	Arc(Arc<[u8]>),
 }
 
@@ -486,7 +536,6 @@ impl AsRef<[u8]> for SourceBytes {
 		match self {
 			Self::Owned(b)  => b,
 			Self::Static(b) => b,
-			Self::Cow(b)    => b,
 			Self::Arc(b)    => b,
 		}
 	}
@@ -501,10 +550,10 @@ macro_rules! impl_source_bytes {
 					SourceBytes::$enum(bytes)
 				}
 			}
-			impl From<$bytes> for Source {
+			impl From<($bytes, Option<SourceMetadata>)> for Source {
 				#[inline]
-				fn from(bytes: $bytes) -> Self {
-					Source::Bytes(SourceBytes::$enum(bytes))
+				fn from(source: ($bytes, Option<SourceMetadata>)) -> Self {
+					Source::Bytes((SourceBytes::$enum(source.0), source.1))
 				}
 			}
 		)*
@@ -512,7 +561,6 @@ macro_rules! impl_source_bytes {
 }
 impl_source_bytes! {
 	Static => &'static [u8],
-	Cow    => Cow<'static, [u8]>,
 	Arc    => Arc<[u8]>,
 	Owned  => Vec<u8>,
 }

@@ -23,16 +23,16 @@ use strum::{
 // #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug)]
 /// TODO
-pub struct Config<QueueData, CallbackSender>
+pub struct Config<TrackData, CallbackSender>
 where
-	QueueData: Clone,
+	TrackData: Clone,
 	CallbackSender: SansanSender<()>,
 {
 	/// TODO
-	pub callbacks: Option<Callbacks<QueueData, CallbackSender>>,
+	pub callbacks: Option<Callbacks<TrackData, CallbackSender>>,
 
 	/// TODO
-	pub restore: Option<AudioState<QueueData>>,
+	pub restore: Option<AudioState<TrackData>>,
 
 	/// TODO
 	pub audio_state: AudioStateConfig,
@@ -129,9 +129,9 @@ impl Default for AudioErrorBehavior {
 }
 
 //---------------------------------------------------------------------------------------------------- Config Impl
-impl<QueueData, CallbackSender> Config<QueueData, CallbackSender>
+impl<TrackData, CallbackSender> Config<TrackData, CallbackSender>
 where
-	QueueData: Clone,
+	TrackData: Clone,
 	CallbackSender: SansanSender<()>,
 {
 	/// Return a reasonable default [`Config`].
@@ -157,9 +157,9 @@ where
 	};
 }
 
-impl<QueueData, CallbackSender> Default for Config<QueueData, CallbackSender>
+impl<TrackData, CallbackSender> Default for Config<TrackData, CallbackSender>
 where
-	QueueData: Clone,
+	TrackData: Clone,
 	CallbackSender: SansanSender<()>,
 {
 	fn default() -> Self {

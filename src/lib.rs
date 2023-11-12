@@ -19,10 +19,10 @@
 #![deny(
     nonstandard_style,
     deprecated,
+    missing_docs,
 )]
 
 #![forbid(
-    missing_docs,
     unused_mut,
     unused_unsafe,
     future_incompatible,
@@ -66,7 +66,7 @@ pub use engine::Engine;
 mod source;
 pub use source::{
 	Source,SourcePath,SourceBytes,
-	SourceError,DecoderError,
+	SourceError,DecoderError,SourceMetadata,
 };
 
 pub mod channel;

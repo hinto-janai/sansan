@@ -10,15 +10,17 @@
 `sansan` is for:
 - Queue-based, real-time music playback
 - Live queue reading/writing without blocking
+- Audio metadata reading (`ID3/Vorbis` tags)
 - OS media control integration
 
 `sansan` is not:
 - A general purpose audio playback library
-- A metadata library
 
 `sansan` is built with music players in-mind - it is meant to be the part
 of the system that handles the real-time audio decoding/playback,
 while exposing an audio state read/write API that is non-blocking.
+
+Other nice to haves are also included, such as OS media control integration and metadata tag reading.
 
 Although `sansan` _can_ be used for general purpose audio playback,
 it does not include general purpose audio APIs like mixing, filters, multiple tracks, etc.

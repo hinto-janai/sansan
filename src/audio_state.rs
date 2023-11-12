@@ -13,16 +13,16 @@ use std::{
 //---------------------------------------------------------------------------------------------------- AudioStateReader
 /// TODO
 #[derive(Clone,Debug)]
-pub struct AudioStateReader<QueueData: Clone>(pub(crate) Reader<AudioState<QueueData>>);
+pub struct AudioStateReader<TrackData: Clone>(pub(crate) Reader<AudioState<TrackData>>);
 
 //---------------------------------------------------------------------------------------------------- AudioStateReader Impl
-impl<QueueData> AudioStateReader<QueueData>
+impl<TrackData> AudioStateReader<TrackData>
 where
-	QueueData: Clone,
+	TrackData: Clone,
 {
 	#[inline]
 	/// TODO
-	pub fn get(&self) -> AudioStateSnapshot<QueueData> {
+	pub fn get(&self) -> AudioStateSnapshot<TrackData> {
 		AudioStateSnapshot(self.0.head_spin())
 	}
 }
@@ -32,12 +32,12 @@ where
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq)]
-pub struct AudioState<QueueData>
+pub struct AudioState<TrackData>
 where
-	QueueData: Clone,
+	TrackData: Clone,
 {
 	/// The current song queue.
-	pub queue: VecDeque<Track<QueueData>>,
+	pub queue: VecDeque<Track<TrackData>>,
 
 	/// Are we playing audio right now?
 	pub playing: bool,
@@ -49,20 +49,20 @@ where
 	pub volume: Volume,
 
 	/// The currently playing index in the queue.
-	pub current: Option<Track<QueueData>>,
+	pub current: Option<Track<TrackData>>,
 }
 
 //---------------------------------------------------------------------------------------------------- AudioState Impl
-impl<QueueData> AudioState<QueueData>
+impl<TrackData> AudioState<TrackData>
 where
-	QueueData: Clone,
+	TrackData: Clone,
 {
 	/// TODO
 	pub const DUMMY: Self = Self {
-		queue: VecDeque::new(),
+		queue:   VecDeque::new(),
 		playing: false,
-		repeat: Repeat,
-		volume: Volume::DEFAULT,
+		repeat:  Repeat,
+		volume:  Volume::DEFAULT,
 		current: None,
 	};
 }
@@ -71,9 +71,9 @@ where
 // TODO: just for trait bounds
 #[derive(Debug)]
 pub(crate) struct AudioStatePatch;
-impl<QueueData> someday::Apply<AudioStatePatch> for AudioState<QueueData>
+impl<TrackData> someday::Apply<AudioStatePatch> for AudioState<TrackData>
 where
-	QueueData: Clone,
+	TrackData: Clone,
 {
 	fn apply(patch: &mut AudioStatePatch, writer: &mut Self, reader: &Self) {
 		todo!();
@@ -85,38 +85,38 @@ where
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq)]
-pub struct Track<QueueData> {
+pub struct Track<TrackData> {
 	/// TODO
-	pub data: QueueData,
+	pub data: TrackData,
 	/// TODO
-	pub elapsed: f32,
+	pub elapsed_runtime: f32,
 	/// TODO
-	pub runtime: f32,
+	pub total_runtime: f32,
 }
 
 //---------------------------------------------------------------------------------------------------- AudioStateSnapshot
 // Wrapper around `someday::CommitRef` so that users don't have to handle `someday` types.
 //
 /// TODO
-pub struct AudioStateSnapshot<QueueData: Clone>(CommitRef<AudioState<QueueData>>);
+pub struct AudioStateSnapshot<TrackData: Clone>(CommitRef<AudioState<TrackData>>);
 
-impl<QueueData> std::ops::Deref for AudioStateSnapshot<QueueData>
+impl<TrackData> std::ops::Deref for AudioStateSnapshot<TrackData>
 where
-	QueueData: Clone,
+	TrackData: Clone,
 {
-	type Target = AudioState<QueueData>;
+	type Target = AudioState<TrackData>;
 	#[inline]
 	fn deref(&self) -> &Self::Target {
 		&self.0
 	}
 }
 
-impl<QueueData> AsRef<AudioState<QueueData>> for AudioStateSnapshot<QueueData>
+impl<TrackData> AsRef<AudioState<TrackData>> for AudioStateSnapshot<TrackData>
 where
-	QueueData: Clone,
+	TrackData: Clone,
 {
 	#[inline]
-	fn as_ref(&self) -> &AudioState<QueueData> {
+	fn as_ref(&self) -> &AudioState<TrackData> {
 		&self.0
 	}
 }

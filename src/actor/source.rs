@@ -17,7 +17,7 @@ use symphonia::core::{
 use symphonia::default::{
 	get_probe,get_codecs,
 };
-use crate::source::Source;
+use crate::{source::Source, MediaControlMetadata};
 
 //---------------------------------------------------------------------------------------------------- Constants
 // `symphonia` format options.
@@ -140,7 +140,7 @@ impl TryInto<SourceInner> for Source {
 	fn try_into(self) -> Result<SourceInner, Self::Error> {
 		match self {
 			Self::Path(path) => {
-				let file = File::open(path)?;
+				let file = File::open(path.0)?;
 				let mss = MediaSourceStream::new(
 					Box::new(file),
 					MEDIA_SOURCE_STREAM_OPTIONS,
@@ -148,7 +148,7 @@ impl TryInto<SourceInner> for Source {
 				mss.try_into()
 			},
 			Self::Bytes(bytes) => {
-				let cursor = Cursor::new(bytes);
+				let cursor = Cursor::new(bytes.0);
 				let mss = MediaSourceStream::new(
 					Box::new(cursor),
 					MEDIA_SOURCE_STREAM_OPTIONS,
