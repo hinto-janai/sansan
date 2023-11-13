@@ -96,6 +96,7 @@ where
 /// ```rust
 /// # use sansan::*;
 /// # use sansan::config::*;
+/// # use sansan::state::*;
 /// # use std::sync::{*,atomic::*};
 /// // Create an empty `Callbacks`.
 /// let mut callbacks = Callbacks::new();

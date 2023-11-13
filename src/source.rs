@@ -64,6 +64,7 @@ use crate::state::AudioStateReader;
 /// The most common use-case will be a file on disk, using `Source::Path`:
 /// ```rust
 /// # use sansan::*;
+/// # use sansan::source::*;
 /// # use std::path::*;
 /// let source = Source::from("/path/to/audio.flac");
 ///
@@ -79,6 +80,7 @@ use crate::state::AudioStateReader;
 /// Another option is using the bytes of the audio directly, using `Source::Byte`:
 /// ```rust
 /// # use sansan::*;
+/// # use sansan::source::*;
 /// // Static bytes.
 /// static AUDIO_BYTES: &'static [u8] = {
 ///     // include_bytes!("/lets/pretend/this/file/exists.mp3");
@@ -108,6 +110,7 @@ use crate::state::AudioStateReader;
 ///
 /// ```rust
 /// # use sansan::*;
+/// # use sansan::source::*;
 /// let static_path: Source = Source::from("/static/path/to/audio.flac");
 /// let owned_path:  Source = Source::from("/static/path/to/audio.flac".to_string());
 ///
@@ -129,6 +132,7 @@ use crate::state::AudioStateReader;
 ///
 /// ```rust
 /// # use sansan::*;
+/// # use sansan::source::*;
 /// # use std::{sync::*,borrow::*,path::*};
 /// //--- paths
 /// static AUDIO_PATH: &str = "/static/path/to/audio.flac";
@@ -391,6 +395,7 @@ impl TryInto<SourceInner> for Source {
 /// See [`Source`] for more details.
 /// ```
 /// # use sansan::*;
+/// # use sansan::source::*;
 /// # use std::{sync::*,borrow::*,path::*};
 /// static AUDIO_PATH: &str = "/static/path/to/audio.flac";
 ///
@@ -472,6 +477,7 @@ impl From<String> for SourcePath {
 ///
 /// ```rust
 /// # use sansan::*;
+/// # use sansan::source::*;
 /// # use std::{sync::*,borrow::*,path::*};
 /// static AUDIO_BYTES: &[u8] = &[0,1,2,3];
 ///
