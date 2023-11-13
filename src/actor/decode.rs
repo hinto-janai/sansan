@@ -7,7 +7,7 @@ use crate::{
 	source::{Source, SourceInner},
 	state::{AudioState,AudioStatePatch},
 	actor::audio::TookAudioBuffer,
-	macros::{recv,send},
+	macros::{recv,send,debug2},
 };
 use symphonia::core::audio::AudioBuffer;
 use std::{
@@ -148,6 +148,7 @@ impl Decode {
 				0 => self.fn_audio_took_buffer(),
 				1 => self.msg_from_kernel(recv!(channels.from_kernel)),
 				2 => {
+					debug2!("Debug - shutting down");
 					// Wait until all threads are ready to shutdown.
 					self.shutdown_wait.wait();
 					// Exit loop (thus, the thread).

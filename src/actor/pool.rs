@@ -6,7 +6,7 @@ use crate::{
 	source::Source,
 	state::{Track,ValidTrackData},
 	actor::audio::TookAudioBuffer,
-	macros::{recv,send},
+	macros::{recv,send,debug2},
 };
 use symphonia::core::audio::AudioBuffer;
 use std::{
@@ -113,6 +113,7 @@ impl<TrackData: ValidTrackData> Pool<TrackData> {
 				0 => self.fn_from_decode(&channels),
 				1 => self.fn_from_kernel(&channels),
 				2 => {
+					debug2!("Pool - shutting down");
 					// Wait until all threads are ready to shutdown.
 					self.shutdown_wait.wait();
 					// Exit loop (thus, the thread).

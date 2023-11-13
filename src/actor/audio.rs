@@ -19,7 +19,7 @@ use crate::audio::{
 	cubeb::Cubeb,
 	rubato::Rubato,
 };
-use crate::macros::{send,recv};
+use crate::macros::{send,recv,debug2};
 
 //---------------------------------------------------------------------------------------------------- Constants
 // AUDIO_BUFFER_LEN is the buffer size of the channel
@@ -209,6 +209,7 @@ where
 
 				// Shutdown.
 				2 => {
+					debug2!("Audio - shutting down");
 					// Wait until all threads are ready to shutdown.
 					self.shutdown_wait.wait();
 					// Exit loop (thus, the thread).

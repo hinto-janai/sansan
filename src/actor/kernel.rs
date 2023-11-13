@@ -2,7 +2,7 @@
 use std::thread::JoinHandle;
 use crossbeam::channel::{Sender, Receiver, Select};
 use crate::{
-	macros::{send,recv},
+	macros::{send,recv,debug2},
 	state::{AudioState,AudioStatePatch,ValidTrackData},
 	actor::{
 		decode::{KernelToDecode,DecodeToKernel},
@@ -243,6 +243,7 @@ where
 				Msg::Remove       => self.fn_remove(),
 				Msg::RemoveRange  => self.fn_remove_range(),
 				Msg::Shutdown     => {
+					debug2!("Kernel - shutting down");
 					// Tell all actors to shutdown.
 					for actor in channels.shutdown_actor.iter() {
 						send!(actor, ());
@@ -256,6 +257,7 @@ where
 				// hanging [Engine] indicating we're done, which
 				// allows the caller to return.
 				Msg::ShutdownHang => {
+					debug2!("Kernel - shutting down (hang)");
 					for actor in channels.shutdown_actor.iter() {
 						send!(actor, ());
 					}

@@ -22,41 +22,41 @@ pub(crate) use send;
 // mode or if the log feature is enabled.
 
 macro_rules! error2 {
-    ($($arg:tt)+) => {
-        #[cfg(any(feature = "log"), (debug_assertions))]
+    ($($arg:tt)+) => {{
+        #[cfg(feature = "log")]
         ::log::error!($($arg)+);
-    };
+    }};
 }
 pub(crate) use error2;
 
 macro_rules! warn2 {
-    ($($arg:tt)+) => {
-        #[cfg(any(feature = "log"), (debug_assertions))]
+    ($($arg:tt)+) => {{
+        #[cfg(feature = "log")]
         ::log::warn!($($arg)+);
-    };
+    }};
 }
 pub(crate) use warn2;
 
 macro_rules! info2 {
-    ($($arg:tt)+) => {
-        #[cfg(any(feature = "log"), (debug_assertions))]
+    ($($arg:tt)+) => {{
+        #[cfg(feature = "log")]
         ::log::info!($($arg)+);
-    };
+    }};
 }
 pub(crate) use info2;
 
 macro_rules! debug2 {
-    ($($arg:tt)+) => {
-        #[cfg(any(feature = "log"), (debug_assertions))]
+    ($($arg:tt)+) => {{
+        #[cfg(feature = "log")]
         ::log::debug!($($arg)+);
-    };
+    }};
 }
 pub(crate) use debug2;
 
 macro_rules! trace2 {
-    ($($arg:tt)+) => {
-        #[cfg(any(feature = "log"), (debug_assertions))]
+    ($($arg:tt)+) => {{
+        #[cfg(feature = "log")]
         ::log::trace!($($arg)+);
-    };
+    }};
 }
 pub(crate) use trace2;

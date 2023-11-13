@@ -9,6 +9,7 @@ use crate::{
 		decode::Decode,
 		kernel::Kernel,
 		pool::Pool,
+		gc::Gc,
 	},
 	audio::{cubeb::Cubeb,rubato::Rubato},
 	channel::SansanSender,
@@ -28,10 +29,10 @@ use std::sync::{
 // [0] Audio
 // [1] Decode
 // [2] Kernel
-// [3] MediaControl
-// [4] Pool
-// [5] GarbageCollector
-// [6] Caller
+// [3] Pool
+// [4] Caller
+// [5] Mc (Media Control)
+// [6] Gc (Garbage Collector)
 //
 // TODO: finalize all actors
 pub(crate) const ACTOR_COUNT: usize = 3;
@@ -184,7 +185,7 @@ where
 		let playing             = Arc::new(AtomicBool::new(false));
 		let audio_ready_to_recv = Arc::new(AtomicBool::new(false));
 
-		// Spawn [Audio]
+		//-------------------------------------------------------------- Spawn [Audio]
 		let (a_shutdown, shutdown) = bounded(1);
 		let (a_to_gc, gc_from_a)   = unbounded();
 		Audio::<Cubeb<Rubato>>::init(crate::actor::audio::InitArgs {
@@ -197,9 +198,9 @@ where
 			from_decode:   a_from_d,
 			to_kernel:     a_to_k,
 			from_kernel:   a_from_k,
-		})?;
+		}).expect("sansan [Engine] - could not spawn [Audio] thread");
 
-		// Spawn [Decode]
+		//-------------------------------------------------------------- Spawn [Decode]
 		let (d_to_k,     k_from_d) = unbounded();
 		let (k_to_d,     d_from_k) = unbounded();
 		let (d_shutdown, shutdown) = bounded(1);
@@ -215,9 +216,9 @@ where
 			from_audio:          d_from_a,
 			to_kernel:           d_to_k,
 			from_kernel:         d_from_k,
-		})?;
+		}).expect("sansan [Engine] - could not spawn [Decode] thread");
 
-		// Spawn [Pool]
+		//-------------------------------------------------------------- Spawn [Pool]
 		let (p_shutdown, shutdown) = bounded(1);
 		let (p_to_k,    k_from_p)  = bounded(1);
 		let (k_to_p,    p_from_k)  = bounded(1);
@@ -232,10 +233,21 @@ where
 			from_kernel:   p_from_k,
 			to_gc_decode:  p_to_gc_d,
 			to_gc_kernel:  p_to_gc_k,
-		})?;
+		}).expect("sansan [Engine] - could not spawn [Pool] thread");
 
-		// Spawn [Kernel]
-		let (shutdown, k_shutdown)  = bounded(1);
+		//-------------------------------------------------------------- Spawn [Gc]
+		let (gc_shutdown, shutdown)  = bounded(1);
+		let (k_to_gc,     gc_from_k) = unbounded();
+		Gc::<TrackData>::init(Gc {
+			shutdown_wait: Arc::clone(&shutdown_wait),
+			shutdown,
+			from_audio: gc_from_a,
+			from_decode: gc_from_d,
+			from_kernel: gc_from_k,
+		}).expect("sansan [Engine] - could not spawn [Gc] thread");
+
+		//-------------------------------------------------------------- Spawn [Kernel]
+		let (shutdown, k_shutdown)           = bounded(1);
 		let (shutdown_hang, k_shutdown_hang) = bounded(0);
 		let (k_shutdown_done, shutdown_done) = bounded(0);
 		let channels = crate::actor::kernel::Channels {
@@ -245,6 +257,7 @@ where
 			shutdown_actor: Box::new([
 				a_shutdown,
 				d_shutdown,
+				gc_shutdown,
 			]),
 			toggle_recv,
 			play_recv,
@@ -280,11 +293,12 @@ where
 		Kernel::<TrackData>::init(crate::actor::kernel::InitArgs {
 			playing,
 			audio_ready_to_recv,
-			shutdown_wait,
+			shutdown_wait: Arc::clone(&shutdown_wait),
 			audio_state: audio_state_writer,
 			channels,
-		})?;
+		}).expect("sansan [Engine] - could not spawn [Kernel] thread");
 
+		//-------------------------------------------------------------- Return
 		Ok(Self {
 			audio: audio_state_reader,
 			signal,

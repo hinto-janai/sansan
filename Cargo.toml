@@ -39,6 +39,11 @@ opt-level = 1
 [features]
 default = ["serde"]
 
+[dev-dependencies]
+bincode = { version = "2.0.0-rc.3", features = ["derive"]  }
+serde   = { version = "1.0.192", features = ["derive", "rc"] }
+log     = { version = "0.4.20", features = ["serde"] }
+
 [dependencies]
 ### Personal libraries.
 someday  = { version = "0.0.4" }
