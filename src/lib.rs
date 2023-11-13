@@ -9,6 +9,8 @@
 //! [`examples/`](https://github.com/hinto-janai/sansan/tree/main/examples)
 //! for small example programs.
 
+#![doc(html_logo_url = "https://raw.githubusercontent.com/hinto-janai/sansan/main/assets/img/icon_640_640.png")]
+
 //---------------------------------------------------------------------------------------------------- Lints
 #![allow(
     clippy::len_zero,
