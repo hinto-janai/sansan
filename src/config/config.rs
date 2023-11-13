@@ -7,7 +7,7 @@ use crate::{
 	},
 	engine::Engine,
 	channel::SansanSender,
-	audio_state::AudioState,
+	audio_state::{AudioState,ValidTrackData},
 };
 use strum::{
 	AsRefStr,
@@ -25,7 +25,7 @@ use strum::{
 /// TODO
 pub struct Config<TrackData, CallbackSender>
 where
-	TrackData: Clone,
+	TrackData: ValidTrackData,
 	CallbackSender: SansanSender<()>,
 {
 	/// TODO
@@ -131,7 +131,7 @@ impl Default for AudioErrorBehavior {
 //---------------------------------------------------------------------------------------------------- Config Impl
 impl<TrackData, CallbackSender> Config<TrackData, CallbackSender>
 where
-	TrackData: Clone,
+	TrackData: ValidTrackData,
 	CallbackSender: SansanSender<()>,
 {
 	/// Return a reasonable default [`Config`].
@@ -159,7 +159,7 @@ where
 
 impl<TrackData, CallbackSender> Default for Config<TrackData, CallbackSender>
 where
-	TrackData: Clone,
+	TrackData: ValidTrackData,
 	CallbackSender: SansanSender<()>,
 {
 	fn default() -> Self {

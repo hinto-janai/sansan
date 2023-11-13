@@ -1,6 +1,6 @@
 //---------------------------------------------------------------------------------------------------- use
 use crate::{
-	audio_state::AudioState,
+	audio_state::{AudioState,ValidTrackData},
 	channel::SansanSender,
 };
 use std::{
@@ -12,7 +12,7 @@ use std::{
 /// TODO
 pub enum Callback<TrackData, CallbackSender>
 where
-	TrackData: Clone,
+	TrackData: ValidTrackData,
 	CallbackSender: SansanSender<()>,
 {
 	/// Dynamically dispatched function
@@ -26,7 +26,7 @@ where
 //---------------------------------------------------------------------------------------------------- Callback Impl
 impl<TrackData, CallbackSender> Callback<TrackData, CallbackSender>
 	where
-	TrackData: Clone,
+	TrackData: ValidTrackData,
 	CallbackSender: SansanSender<()>,
 {
 	#[inline]
@@ -49,7 +49,7 @@ impl<TrackData, CallbackSender> Callback<TrackData, CallbackSender>
 //---------------------------------------------------------------------------------------------------- Callback Trait Impl
 impl<TrackData, CallbackSender> From<Box<dyn FnMut(&AudioState<TrackData>) + Send + Sync + 'static>> for Callback<TrackData, CallbackSender>
 where
-	TrackData: Clone,
+	TrackData: ValidTrackData,
 	CallbackSender: SansanSender<()>,
 {
 	fn from(b: Box<dyn FnMut(&AudioState<TrackData>) + Send + Sync + 'static>) -> Self {
@@ -59,7 +59,7 @@ where
 
 impl<TrackData, CallbackSender> From<CallbackSender> for Callback<TrackData, CallbackSender>
 where
-	TrackData: Clone,
+	TrackData: ValidTrackData,
 	CallbackSender: SansanSender<()>,
 {
 	fn from(c: CallbackSender) -> Self {
@@ -69,7 +69,7 @@ where
 
 impl<TrackData, CallbackSender> From<fn(&AudioState<TrackData>)> for Callback<TrackData, CallbackSender>
 where
-	TrackData: Clone,
+	TrackData: ValidTrackData,
 	CallbackSender: SansanSender<()>,
 {
 	fn from(f: fn(&AudioState<TrackData>)) -> Self {
@@ -79,7 +79,7 @@ where
 
 impl<TrackData, CallbackSender> std::fmt::Debug for Callback<TrackData, CallbackSender>
 where
-	TrackData: Clone,
+	TrackData: ValidTrackData,
 	CallbackSender: SansanSender<()>,
 {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -134,7 +134,7 @@ where
 /// ```
 pub struct Callbacks<TrackData, CallbackSender>
 where
-	TrackData: Clone,
+	TrackData: ValidTrackData,
 	CallbackSender: SansanSender<()>
 {
 	/// TODO
@@ -150,7 +150,7 @@ where
 //---------------------------------------------------------------------------------------------------- Callbacks Impl
 impl<TrackData, CallbackSender> Callbacks<TrackData, CallbackSender>
 where
-	TrackData: Clone,
+	TrackData: ValidTrackData,
 	CallbackSender: SansanSender<()>,
 {
 	/// A fresh [`Self`] with no callbacks, same as [`Self::new()`]
@@ -226,7 +226,7 @@ where
 //---------------------------------------------------------------------------------------------------- Callbacks Trait Impl
 impl<TrackData, CallbackSender> Default for Callbacks<TrackData, CallbackSender>
 where
-	TrackData: Clone,
+	TrackData: ValidTrackData,
 	CallbackSender: SansanSender<()>,
 {
 	#[inline]

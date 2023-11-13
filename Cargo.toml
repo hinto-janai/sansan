@@ -12,6 +12,16 @@ readme         = "README.md"
 license        = "MIT"
 description    = "Real-time music engine"
 
+# Exclude files when uploading to crate.io
+exclude = [
+	".github",
+	"assets",
+	"book",
+	"examples",
+	"DESIGN.md",
+	"deny.toml",
+]
+
 [package.metadata.docs.rs]
 all-features = true
 

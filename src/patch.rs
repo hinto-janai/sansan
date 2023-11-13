@@ -6,7 +6,7 @@ use crate::signal;
 
 //---------------------------------------------------------------------------------------------------- PatchClear
 // The [Patch]'s that can be applied to [AudioState] via [someday::Writer].
-pub(crate) enum AudioStatePatch<TrackData: Clone> {
+pub(crate) enum AudioStatePatch<TrackData: ValidTrackData> {
 	// 1. [playing] boolean should be reversed under the condition
 	//    that we are actually playing something, aka, [current] is [Some]
 	Toggle,
@@ -40,7 +40,7 @@ pub(crate) enum AudioStatePatch<TrackData: Clone> {
 }
 
 //---------------------------------------------------------------------------------------------------- Apply Impl
-impl<TrackData: Clone> Apply<AudioStatePatch<TrackData>> for AudioState<TrackData> {
+impl<TrackData: ValidTrackData> Apply<AudioStatePatch<TrackData>> for AudioState<TrackData> {
 	#[inline]
 	fn apply(patch: &mut AudioStatePatch<TrackData>, writer: &mut Self, _: &Self) {
 		use AudioStatePatch as P;

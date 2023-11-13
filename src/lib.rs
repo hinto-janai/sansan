@@ -58,6 +58,7 @@ mod audio_state;
 pub use audio_state::{
     AudioStateReader,AudioState,
     AudioStateSnapshot,Track,
+	ValidTrackData,
 };
 
 mod engine;
@@ -78,7 +79,7 @@ mod audio;
 pub use audio::AudioOutputError;
 
 mod actor;
-mod patch;
+// mod patch;
 mod macros;
 
 //----------------------------------------------------------------------------------------------------

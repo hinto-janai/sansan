@@ -94,6 +94,19 @@ pub(crate) enum AudioToKernel {
 }
 
 //---------------------------------------------------------------------------------------------------- Audio Impl
+pub(crate) struct InitArgs {
+	pub(crate) playing:       Arc<AtomicBool>,
+	pub(crate) ready_to_recv: Arc<AtomicBool>,
+	pub(crate) shutdown_wait: Arc<Barrier>,
+	pub(crate) shutdown:      Receiver<()>,
+	pub(crate) to_gc:         Sender<AudioBuffer<f32>>,
+	pub(crate) to_decode:     Sender<TookAudioBuffer>,
+	pub(crate) from_decode:   Receiver<AudioBuffer<f32>>,
+	pub(crate) to_kernel:     Sender<AudioToKernel>,
+	pub(crate) from_kernel:   Receiver<DiscardCurrentAudio>,
+}
+
+//---------------------------------------------------------------------------------------------------- Audio Impl
 impl<Output> Audio<Output>
 where
 	Output: AudioOutput,
@@ -101,17 +114,19 @@ where
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]
-	pub(crate) fn init(
-		playing:       Arc<AtomicBool>,
-		ready_to_recv: Arc<AtomicBool>,
-		shutdown_wait: Arc<Barrier>,
-		shutdown:      Receiver<()>,
-		to_gc:         Sender<AudioBuffer<f32>>,
-		to_decode:     Sender<TookAudioBuffer>,
-		from_decode:   Receiver<AudioBuffer<f32>>,
-		to_kernel:     Sender<AudioToKernel>,
-		from_kernel:   Receiver<DiscardCurrentAudio>,
-	) -> Result<JoinHandle<()>, std::io::Error> {
+	pub(crate) fn init(args: InitArgs) -> Result<JoinHandle<()>, std::io::Error> {
+		let InitArgs {
+			playing,
+			ready_to_recv,
+			shutdown_wait,
+			shutdown,
+			to_gc,
+			to_decode,
+			from_decode,
+			to_kernel,
+			from_kernel,
+		} = args;
+
 		std::thread::Builder::new()
 			.name("Audio".into())
 			.spawn(move || {

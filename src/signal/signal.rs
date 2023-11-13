@@ -1,5 +1,5 @@
 //---------------------------------------------------------------------------------------------------- Use
-use crate::audio_state::AudioState;
+use crate::audio_state::{AudioState,ValidTrackData};
 use crate::source::Source;
 use crossbeam::channel::{Sender,Receiver,bounded,unbounded};
 use crate::signal::{
@@ -34,7 +34,7 @@ use crate::signal::{
 #[derive(Debug)]
 pub struct Signal<TrackData>
 where
-	TrackData: Clone
+	TrackData: ValidTrackData
 {
 	// Signals that return `()`.
 	pub(crate) toggle_send:       Sender<()>,
@@ -70,7 +70,7 @@ where
 //---------------------------------------------------------------------------------------------------- Signal Impl
 impl<TrackData> Signal<TrackData>
 where
-	TrackData: Clone
+	TrackData: ValidTrackData
 {
 	// SAFETY: The [Kernel] should always be listening.
 	// it is a logic error for [send()] or [recv()] to panic,

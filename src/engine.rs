@@ -1,21 +1,19 @@
 //---------------------------------------------------------------------------------------------------- Use
 use std::thread::JoinHandle;
-use crate::audio_state::{
-	AudioStateReader,AudioState,
+use crate::{
+	audio_state::{AudioStateReader,AudioState,ValidTrackData},
+	signal::Signal,
+	config::Config,
+	actor::{
+		audio::{Audio,AUDIO_BUFFER_LEN},
+		decode::Decode,
+		kernel::Kernel,
+		pool::Pool,
+	},
+	audio::{cubeb::Cubeb,rubato::Rubato},
+	channel::SansanSender,
+	macros::{send,recv},
 };
-use crate::signal::Signal;
-use crate::config::Config;
-use crate::actor::{
-	audio::{Audio,AUDIO_BUFFER_LEN},
-	decode::Decode,
-	kernel::Kernel,
-	pool::Pool,
-};
-use crate::audio::{
-	cubeb::Cubeb,
-	rubato::Rubato,
-};
-use crate::channel::SansanSender;
 use crossbeam::channel::{Sender,Receiver};
 use symphonia::core::audio::AudioBuffer;
 use std::sync::{
@@ -23,7 +21,6 @@ use std::sync::{
 	Barrier,
 	atomic::AtomicBool,
 };
-use crate::macros::{send,recv};
 
 //---------------------------------------------------------------------------------------------------- Constants
 // Total count of all the "actors" in our system.
@@ -44,7 +41,7 @@ pub(crate) const ACTOR_COUNT: usize = 3;
 #[derive(Debug)]
 pub struct Engine<TrackData, CallbackSender>
 where
-	TrackData: Clone + Send + Sync + 'static,
+	TrackData: ValidTrackData,
 	CallbackSender: SansanSender<()>,
 {
 	// Data and objects.
@@ -65,7 +62,7 @@ where
 //---------------------------------------------------------------------------------------------------- Engine Impl
 impl<TrackData, CallbackSender> Engine<TrackData, CallbackSender>
 where
-	TrackData: Clone + Send + Sync + 'static,
+	TrackData: ValidTrackData,
 	CallbackSender: SansanSender<()>,
 {
 	/// TODO
@@ -190,17 +187,17 @@ where
 		// Spawn [Audio]
 		let (a_shutdown, shutdown) = bounded(1);
 		let (a_to_gc, gc_from_a)   = unbounded();
-		Audio::<Cubeb<Rubato>>::init(
-			Arc::clone(&playing),
-			Arc::clone(&audio_ready_to_recv),
-			Arc::clone(&shutdown_wait),
-			shutdown,
-			a_to_gc,
-			a_to_d,
-			a_from_d,
-			a_to_k,
-			a_from_k,
-		)?;
+		Audio::<Cubeb<Rubato>>::init(crate::actor::audio::InitArgs {
+			playing:       Arc::clone(&playing),
+			ready_to_recv: Arc::clone(&audio_ready_to_recv),
+			shutdown_wait: Arc::clone(&shutdown_wait),
+			shutdown:      shutdown,
+			to_gc:         a_to_gc,
+			to_decode:     a_to_d,
+			from_decode:   a_from_d,
+			to_kernel:     a_to_k,
+			from_kernel:   a_from_k,
+		})?;
 
 		// Spawn [Decode]
 		let (d_to_k,     k_from_d) = unbounded();
@@ -208,17 +205,17 @@ where
 		let (d_shutdown, shutdown) = bounded(1);
 		let (d_to_p,     p_from_d) = bounded(1);
 		let (p_to_d,     d_from_p) = bounded(1);
-		Decode::init(
-			Arc::clone(&audio_ready_to_recv),
-			Arc::clone(&shutdown_wait),
+		Decode::init(crate::actor::decode::InitArgs {
+			audio_ready_to_recv: Arc::clone(&audio_ready_to_recv),
+			shutdown_wait:       Arc::clone(&shutdown_wait),
 			shutdown,
-			d_to_p,
-			d_from_p,
-			d_to_a,
-			d_from_a,
-			d_to_k,
-			d_from_k,
-		)?;
+			to_pool:             d_to_p,
+			from_pool:           d_from_p,
+			to_audio:            d_to_a,
+			from_audio:          d_from_a,
+			to_kernel:           d_to_k,
+			from_kernel:         d_from_k,
+		})?;
 
 		// Spawn [Pool]
 		let (p_shutdown, shutdown) = bounded(1);
@@ -226,16 +223,16 @@ where
 		let (k_to_p,    p_from_k)  = bounded(1);
 		let (p_to_gc_d, gc_from_d) = unbounded();
 		let (p_to_gc_k, gc_from_k) = unbounded();
-		Pool::<TrackData>::init(
-			Arc::clone(&shutdown_wait),
+		Pool::<TrackData>::init(crate::actor::pool::InitArgs {
+			shutdown_wait: Arc::clone(&shutdown_wait),
 			shutdown,
-			p_to_d,
-			p_from_d,
-			p_to_k,
-			p_from_k,
-			p_to_gc_d,
-			p_to_gc_k,
-		)?;
+			to_decode:     p_to_d,
+			from_decode:   p_from_d,
+			to_kernel:     p_to_k,
+			from_kernel:   p_from_k,
+			to_gc_decode:  p_to_gc_d,
+			to_gc_kernel:  p_to_gc_k,
+		})?;
 
 		// Spawn [Kernel]
 		let (shutdown, k_shutdown)  = bounded(1);
@@ -280,13 +277,13 @@ where
 			remove_range_send: k_remove_range_send,
 			remove_range_recv: k_remove_range_recv,
 		};
-		Kernel::<TrackData>::init(
+		Kernel::<TrackData>::init(crate::actor::kernel::InitArgs {
 			playing,
 			audio_ready_to_recv,
 			shutdown_wait,
-			audio_state_writer,
+			audio_state: audio_state_writer,
 			channels,
-		)?;
+		})?;
 
 		Ok(Self {
 			audio: audio_state_reader,
@@ -345,7 +342,7 @@ where
 //---------------------------------------------------------------------------------------------------- Drop
 impl<TrackData, CallbackSender> Drop for Engine<TrackData, CallbackSender>
 where
-	TrackData: Clone + Send + Sync + 'static,
+	TrackData: ValidTrackData,
 	CallbackSender: SansanSender<()>,
 {
 	#[cold]

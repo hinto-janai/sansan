@@ -4,7 +4,7 @@ use crossbeam::channel::{Receiver, Select, Sender};
 use crate::{
 	signal,
 	source::Source,
-	audio_state::Track,
+	audio_state::{Track,ValidTrackData},
 	actor::audio::TookAudioBuffer,
 	macros::{recv,send},
 };
@@ -22,13 +22,13 @@ use strum::EnumCount;
 //---------------------------------------------------------------------------------------------------- Constants
 
 //---------------------------------------------------------------------------------------------------- Pool
-pub(crate) struct Pool<TrackData: Clone + Send + Sync + 'static> {
+pub(crate) struct Pool<TrackData: ValidTrackData> {
 	shutdown_wait: Arc<Barrier>,
 	_p: PhantomData<TrackData>,
 }
 
 // See [src/actor/kernel.rs]'s [Channels]
-struct Channels<TrackData: Clone + Send + Sync + 'static> {
+struct Channels<TrackData: ValidTrackData> {
 	shutdown:     Receiver<()>,
 	to_decode:    Sender<VecDeque<AudioBuffer<f32>>>,
 	from_decode:  Receiver<VecDeque<AudioBuffer<f32>>>,
@@ -40,19 +40,33 @@ struct Channels<TrackData: Clone + Send + Sync + 'static> {
 
 //---------------------------------------------------------------------------------------------------- (Actual) Messages
 
+//---------------------------------------------------------------------------------------------------- InitArgs
+pub(crate) struct InitArgs<TrackData: ValidTrackData> {
+	pub(crate) shutdown_wait: Arc<Barrier>,
+	pub(crate) shutdown:      Receiver<()>,
+	pub(crate) to_decode:     Sender<VecDeque<AudioBuffer<f32>>>,
+	pub(crate) from_decode:   Receiver<VecDeque<AudioBuffer<f32>>>,
+	pub(crate) to_kernel:     Sender<VecDeque<Track<TrackData>>>,
+	pub(crate) from_kernel:   Receiver<VecDeque<Track<TrackData>>>,
+	pub(crate) to_gc_decode:  Sender<AudioBuffer<f32>>,
+	pub(crate) to_gc_kernel:  Sender<Track<TrackData>>,
+}
+
 //---------------------------------------------------------------------------------------------------- Pool Impl
-impl<TrackData: Clone + Send + Sync + 'static> Pool<TrackData> {
+impl<TrackData: ValidTrackData> Pool<TrackData> {
 	//---------------------------------------------------------------------------------------------------- Init
-	pub(crate) fn init(
-		shutdown_wait: Arc<Barrier>,
-		shutdown:      Receiver<()>,
-		to_decode:     Sender<VecDeque<AudioBuffer<f32>>>,
-		from_decode:   Receiver<VecDeque<AudioBuffer<f32>>>,
-		to_kernel:     Sender<VecDeque<Track<TrackData>>>,
-		from_kernel:   Receiver<VecDeque<Track<TrackData>>>,
-		to_gc_decode:  Sender<AudioBuffer<f32>>,
-		to_gc_kernel:  Sender<Track<TrackData>>,
-	) -> Result<JoinHandle<()>, std::io::Error> {
+	pub(crate) fn init(args: InitArgs<TrackData>) -> Result<JoinHandle<()>, std::io::Error> {
+		let InitArgs {
+			shutdown_wait,
+			shutdown,
+			to_decode,
+			from_decode,
+			to_kernel,
+			from_kernel,
+			to_gc_decode,
+			to_gc_kernel,
+		} = args;
+
 		// INVARIANT:
 		// Decode relies on the fact that on the very
 		// first `.recv()`, there will already be a

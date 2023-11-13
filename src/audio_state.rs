@@ -13,12 +13,12 @@ use std::{
 //---------------------------------------------------------------------------------------------------- AudioStateReader
 /// TODO
 #[derive(Clone,Debug)]
-pub struct AudioStateReader<TrackData: Clone>(pub(crate) Reader<AudioState<TrackData>>);
+pub struct AudioStateReader<TrackData: ValidTrackData>(pub(crate) Reader<AudioState<TrackData>>);
 
 //---------------------------------------------------------------------------------------------------- AudioStateReader Impl
 impl<TrackData> AudioStateReader<TrackData>
 where
-	TrackData: Clone,
+	TrackData: ValidTrackData,
 {
 	#[inline]
 	/// TODO
@@ -34,7 +34,7 @@ where
 #[derive(Clone,Debug,PartialEq)]
 pub struct AudioState<TrackData>
 where
-	TrackData: Clone,
+	TrackData: ValidTrackData,
 {
 	/// The current song queue.
 	pub queue: VecDeque<Track<TrackData>>,
@@ -55,7 +55,7 @@ where
 //---------------------------------------------------------------------------------------------------- AudioState Impl
 impl<TrackData> AudioState<TrackData>
 where
-	TrackData: Clone,
+	TrackData: ValidTrackData,
 {
 	/// TODO
 	pub const DUMMY: Self = Self {
@@ -73,12 +73,21 @@ where
 pub(crate) struct AudioStatePatch;
 impl<TrackData> someday::Apply<AudioStatePatch> for AudioState<TrackData>
 where
-	TrackData: Clone,
+	TrackData: ValidTrackData,
 {
 	fn apply(patch: &mut AudioStatePatch, writer: &mut Self, reader: &Self) {
 		todo!();
 	}
 }
+
+//---------------------------------------------------------------------------------------------------- Types
+/// TODO
+pub trait ValidTrackData: Clone + Send + Sync + 'static {}
+
+impl<T> ValidTrackData for T
+where
+	T: Clone + Send + Sync + 'static
+{}
 
 //---------------------------------------------------------------------------------------------------- Track
 /// TODO
@@ -98,11 +107,11 @@ pub struct Track<TrackData> {
 // Wrapper around `someday::CommitRef` so that users don't have to handle `someday` types.
 //
 /// TODO
-pub struct AudioStateSnapshot<TrackData: Clone>(CommitRef<AudioState<TrackData>>);
+pub struct AudioStateSnapshot<TrackData: ValidTrackData>(CommitRef<AudioState<TrackData>>);
 
 impl<TrackData> std::ops::Deref for AudioStateSnapshot<TrackData>
 where
-	TrackData: Clone,
+	TrackData: ValidTrackData,
 {
 	type Target = AudioState<TrackData>;
 	#[inline]
@@ -113,7 +122,7 @@ where
 
 impl<TrackData> AsRef<AudioState<TrackData>> for AudioStateSnapshot<TrackData>
 where
-	TrackData: Clone,
+	TrackData: ValidTrackData,
 {
 	#[inline]
 	fn as_ref(&self) -> &AudioState<TrackData> {

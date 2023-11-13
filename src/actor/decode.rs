@@ -80,19 +80,34 @@ pub(crate) enum DecodeToPool {
 }
 
 //---------------------------------------------------------------------------------------------------- Decode Impl
+pub(crate) struct InitArgs {
+	pub(crate) audio_ready_to_recv: Arc<AtomicBool>,
+	pub(crate) shutdown_wait:       Arc<Barrier>,
+	pub(crate) shutdown:            Receiver<()>,
+	pub(crate) to_pool:             Sender<VecDeque<AudioBuffer<f32>>>,
+	pub(crate) from_pool:           Receiver<VecDeque<AudioBuffer<f32>>>,
+	pub(crate) to_audio:            Sender<AudioBuffer<f32>>,
+	pub(crate) from_audio:          Receiver<TookAudioBuffer>,
+	pub(crate) to_kernel:           Sender<DecodeToKernel>,
+	pub(crate) from_kernel:         Receiver<KernelToDecode>,
+}
+
+//---------------------------------------------------------------------------------------------------- Decode Impl
 impl Decode {
 	//---------------------------------------------------------------------------------------------------- Init
-	pub(crate) fn init(
-		audio_ready_to_recv: Arc<AtomicBool>,
-		shutdown_wait:       Arc<Barrier>,
-		shutdown:            Receiver<()>,
-		to_pool:             Sender<VecDeque<AudioBuffer<f32>>>,
-		from_pool:           Receiver<VecDeque<AudioBuffer<f32>>>,
-		to_audio:            Sender<AudioBuffer<f32>>,
-		from_audio:          Receiver<TookAudioBuffer>,
-		to_kernel:           Sender<DecodeToKernel>,
-		from_kernel:         Receiver<KernelToDecode>,
-	) -> Result<JoinHandle<()>, std::io::Error> {
+	pub(crate) fn init(args: InitArgs) -> Result<JoinHandle<()>, std::io::Error> {
+		let InitArgs {
+			audio_ready_to_recv,
+			shutdown_wait,
+			shutdown,
+			to_pool,
+			from_pool,
+			to_audio,
+			from_audio,
+			to_kernel,
+			from_kernel,
+		} = args;
+
 		let channels = Channels {
 			shutdown,
 			to_audio,

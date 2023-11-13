@@ -1,31 +1,36 @@
 //---------------------------------------------------------------------------------------------------- Use
 use std::thread::JoinHandle;
 use crossbeam::channel::{Sender, Receiver, Select};
-use crate::audio_state::{AudioState,AudioStatePatch};
-use crate::actor::decode::{KernelToDecode,DecodeToKernel};
-use crate::actor::audio::AudioToKernel;
-use crate::signal::{
-	Clear,
-	Repeat,
-	Shuffle,
-	Volume,
-	Add,
-	AddError,
-	Seek,
-	SeekError,
-	NextError,
-	Previous,
-	PreviousError,
-	Skip,
-	SkipError,
-	Back,
-	BackError,
-	SetIndex,
-	SetIndexError,
-	Remove,
-	RemoveError,
-	RemoveRange,
-	RemoveRangeError,
+use crate::{
+	macros::{send,recv},
+	audio_state::{AudioState,AudioStatePatch,ValidTrackData},
+	actor::{
+		decode::{KernelToDecode,DecodeToKernel},
+		audio::AudioToKernel,
+	},
+	signal::{
+		Clear,
+		Repeat,
+		Shuffle,
+		Volume,
+		Add,
+		AddError,
+		Seek,
+		SeekError,
+		NextError,
+		Previous,
+		PreviousError,
+		Skip,
+		SkipError,
+		Back,
+		BackError,
+		SetIndex,
+		SetIndexError,
+		Remove,
+		RemoveError,
+		RemoveRange,
+		RemoveRangeError,
+	},
 };
 use std::sync::{
 	Arc,
@@ -33,11 +38,10 @@ use std::sync::{
 	atomic::AtomicBool,
 };
 use strum::EnumCount;
-use crate::macros::{send,recv};
 
 //---------------------------------------------------------------------------------------------------- Kernel
 #[derive(Debug)]
-pub(crate) struct Kernel<TrackData: Clone> {
+pub(crate) struct Kernel<TrackData: ValidTrackData> {
 	audio_state: someday::Writer<AudioState<TrackData>, AudioStatePatch>,
 	playing: Arc<AtomicBool>,
 	audio_ready_to_recv: Arc<AtomicBool>,
@@ -63,7 +67,7 @@ pub(crate) struct DiscardCurrentAudio;
 // but since they're both behind [self], Rust complains, so the
 // receive channels are in this one-off [Recv] instead of within
 // [Kernel] as fields.
-pub(crate) struct Channels<TrackData: Clone> {
+pub(crate) struct Channels<TrackData: ValidTrackData> {
 	// Shutdown signal.
 	pub(crate) shutdown: Receiver<()>,
 	pub(crate) shutdown_hang: Receiver<()>,
@@ -150,18 +154,29 @@ impl Msg {
 }
 
 //---------------------------------------------------------------------------------------------------- Kernel Impl
+pub(crate) struct InitArgs<TrackData: ValidTrackData> {
+	pub(crate) playing:             Arc<AtomicBool>,
+	pub(crate) audio_ready_to_recv: Arc<AtomicBool>,
+	pub(crate) shutdown_wait:       Arc<Barrier>,
+	pub(crate) audio_state:         someday::Writer<AudioState<TrackData>, AudioStatePatch>,
+	pub(crate) channels:            Channels<TrackData>,
+}
+
+//---------------------------------------------------------------------------------------------------- Kernel Impl
 impl<TrackData> Kernel<TrackData>
 where
-	TrackData: Clone + Send + Sync + 'static
+	TrackData: ValidTrackData
 {
 	//---------------------------------------------------------------------------------------------------- Init
-	pub(crate) fn init(
-		playing:             Arc<AtomicBool>,
-		audio_ready_to_recv: Arc<AtomicBool>,
-		shutdown_wait:       Arc<Barrier>,
-		audio_state:         someday::Writer<AudioState<TrackData>, AudioStatePatch>,
-		channels:            Channels<TrackData>,
-	) -> Result<JoinHandle<()>, std::io::Error> {
+	pub(crate) fn init(args: InitArgs<TrackData>) -> Result<JoinHandle<()>, std::io::Error> {
+		let InitArgs {
+			playing,
+			audio_ready_to_recv,
+			shutdown_wait,
+			audio_state,
+			channels,
+		} = args;
+
 		let this = Kernel {
 			playing,
 			audio_state,
