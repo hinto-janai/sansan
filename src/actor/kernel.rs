@@ -3,7 +3,7 @@ use std::thread::JoinHandle;
 use crossbeam::channel::{Sender, Receiver, Select};
 use crate::{
 	macros::{send,recv},
-	audio_state::{AudioState,AudioStatePatch,ValidTrackData},
+	state::{AudioState,AudioStatePatch,ValidTrackData},
 	actor::{
 		decode::{KernelToDecode,DecodeToKernel},
 		audio::AudioToKernel,

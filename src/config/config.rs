@@ -3,11 +3,11 @@ use std::marker::PhantomData;
 use crate::{
 	config::{
 		callbacks::Callbacks,
-		audio_state::AudioStateConfig,
+		state::AudioStateConfig,
 	},
 	engine::Engine,
 	channel::SansanSender,
-	audio_state::{AudioState,ValidTrackData},
+	state::{AudioState,ValidTrackData},
 };
 use strum::{
 	AsRefStr,

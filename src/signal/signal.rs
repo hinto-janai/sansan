@@ -1,5 +1,5 @@
 //---------------------------------------------------------------------------------------------------- Use
-use crate::audio_state::{AudioState,ValidTrackData};
+use crate::state::{AudioState,ValidTrackData};
 use crate::source::Source;
 use crossbeam::channel::{Sender,Receiver,bounded,unbounded};
 use crate::signal::{

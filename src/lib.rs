@@ -54,29 +54,32 @@
 )]
 
 //---------------------------------------------------------------------------------------------------- Public API
-mod audio_state;
-pub use audio_state::{
-    AudioStateReader,AudioState,
-    AudioStateSnapshot,Track,
-	ValidTrackData,
-};
+/// TODO
+pub mod state;
+// pub use state::{
+//     AudioStateReader,AudioState,
+//     AudioStateSnapshot,Track,
+// 	ValidTrackData,
+// };
 
 mod engine;
 pub use engine::Engine;
 
-mod source;
-pub use source::{
-	Source,SourcePath,SourceBytes,
-	SourceError,DecoderError,SourceMetadata,
-};
+/// TODO
+pub mod source;
+// pub use source::{
+	// Source,SourcePath,SourceBytes,
+	// SourceError,DecoderError,SourceMetadata,
+// };
 
 pub mod channel;
 pub mod config;
 pub mod signal;
+/// TODO
+pub mod error;
 
 //---------------------------------------------------------------------------------------------------- Private Usage
 mod audio;
-pub use audio::AudioOutputError;
 
 mod actor;
 // mod patch;

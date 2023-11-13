@@ -5,7 +5,7 @@ use crate::{
 	channel,
 	signal,
 	source::{Source, SourceInner},
-	audio_state::{AudioState,AudioStatePatch},
+	state::{AudioState,AudioStatePatch},
 	actor::audio::TookAudioBuffer,
 	macros::{recv,send},
 };

@@ -1,4 +1,5 @@
 //---------------------------------------------------------------------------------------------------- Use
+use crate::error::SourceError;
 use std::{
 	time::Duration,
 	io::Cursor,
@@ -46,7 +47,7 @@ const MEDIA_SOURCE_STREAM_OPTIONS: MediaSourceStreamOptions = MediaSourceStreamO
 
 //---------------------------------------------------------------------------------------------------- Source
 #[allow(unused_imports)] // docs
-use crate::AudioStateReader;
+use crate::state::AudioStateReader;
 #[derive(Debug,Clone,PartialEq,PartialOrd)]
 /// Audio source
 ///
@@ -375,88 +376,6 @@ impl TryInto<SourceInner> for Source {
 				);
 				mss.try_into()
 			},
-		}
-	}
-}
-
-//---------------------------------------------------------------------------------------------------- Source Errors
-#[derive(thiserror::Error, Debug)]
-/// Errors when loading a [`Source`]
-///
-/// This `enum` represents all the potential errors that can
-/// occur when attempting to load a [`Source`] into a viable
-/// audio container.
-///
-/// This includes things like:
-/// - The data not actually be audio
-/// - File IO errors (non-existent PATH, lacking-permissions, etc)
-/// - Unsupported audio codec
-pub enum SourceError {
-	#[error("failed to open file: {0}")]
-	/// Error occurred while reading a [`File`] (most likely missing)
-	File(#[from] std::io::Error),
-
-	#[error("failed to probe audio data: {0}")]
-	/// Error occurred while attempting to probe the audio data
-	Probe(#[from] symphonia::core::errors::Error),
-
-	#[error("failed to create codec decoder: {0}")]
-	/// Error occurred while creating a decoder for the audio codec
-	Decoder(#[from] DecoderError),
-
-	#[error("failed to find track within the codec")]
-	/// The audio codec did not specify a track
-	Track,
-
-	#[error("failed to find the codecs sample rate")]
-	/// The audio codec did not specify a sample rate
-	SampleRate,
-
-	#[error("failed to find codec time")]
-	/// The audio codec did not include a timebase
-	TimeBase,
-
-	#[error("failed to find codec n_frames")]
-    /// The audio codec did not specify the number of frames
-	Frames,
-}
-
-#[derive(thiserror::Error, Debug)]
-/// Errors when decoding a [`Source`]
-///
-/// This `enum` represents all the potential errors that can
-/// occur when attempting to decode an audio [`Source`].
-pub enum DecoderError {
-	#[error("the audio data contained malformed data")]
-	/// The audio data contained malformed data
-    Decode(&'static str),
-
-	#[error("codec/container is not supported")]
-	/// Codec/container is not supported
-    Unsupported(&'static str),
-
-	#[error("a limit was reached while decoding")]
-	/// A limit was reached while decoding
-    Limit(&'static str),
-
-	#[error("decoding io error")]
-	/// Unknown IO error
-    Io(#[from] std::io::Error),
-
-	#[error("unknown decoding error")]
-	/// Unknown decoding error
-	Unknown,
-}
-
-impl From<symphonia::core::errors::Error> for DecoderError {
-	fn from(value: symphonia::core::errors::Error) -> Self {
-		use symphonia::core::errors::Error as E;
-		match value {
-			E::DecodeError(s) => Self::Decode(s),
-			E::Unsupported(s) => Self::Unsupported(s),
-			E::LimitError(s)  => Self::Limit(s),
-			E::IoError(s)     => Self::Io(s),
-			_ => Self::Unknown,
 		}
 	}
 }

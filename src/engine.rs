@@ -1,7 +1,7 @@
 //---------------------------------------------------------------------------------------------------- Use
 use std::thread::JoinHandle;
 use crate::{
-	audio_state::{AudioStateReader,AudioState,ValidTrackData},
+	state::{AudioStateReader,AudioState,ValidTrackData},
 	signal::Signal,
 	config::Config,
 	actor::{

@@ -8,8 +8,11 @@
 // TODO: channel stereo support message
 
 //----------------------------------------------------------------------------------------------- use
-use crate::audio::output::{AudioOutput,AudioOutputError};
-use crate::audio::resampler::Resampler;
+use crate::{
+	audio::output::AudioOutput,
+	audio::resampler::Resampler,
+	error::AudioOutputError,
+};
 use symphonia::core::audio::{AudioBuffer,SignalSpec, SampleBuffer,Signal};
 use cubeb::StereoFrame;
 use crossbeam::channel::{Sender,Receiver};

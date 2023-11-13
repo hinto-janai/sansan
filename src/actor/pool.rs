@@ -4,7 +4,7 @@ use crossbeam::channel::{Receiver, Select, Sender};
 use crate::{
 	signal,
 	source::Source,
-	audio_state::{Track,ValidTrackData},
+	state::{Track,ValidTrackData},
 	actor::audio::TookAudioBuffer,
 	macros::{recv,send},
 };
