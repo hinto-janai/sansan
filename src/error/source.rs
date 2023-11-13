@@ -1,6 +1,7 @@
 //---------------------------------------------------------------------------------------------------- Source Errors
 #[allow(unused_imports)] // docs
 use crate::source::Source;
+
 #[derive(thiserror::Error, Debug)]
 /// Errors when loading a [`Source`]
 ///
@@ -14,7 +15,7 @@ use crate::source::Source;
 /// - Unsupported audio codec
 pub enum SourceError {
 	#[error("failed to open file: {0}")]
-	/// Error occurred while reading a [`File`] (most likely missing)
+	/// Error occurred while reading a [`std::fs::File`] (most likely missing)
 	File(#[from] std::io::Error),
 
 	#[error("failed to probe audio data: {0}")]

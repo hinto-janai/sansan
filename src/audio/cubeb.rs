@@ -127,11 +127,11 @@ where
 			// preferred sample rate was not equal to the input
 			// audio spec. Assuming all future audio buffers
 			// have the sample spec, we need to resample this.
-			Some(mut resampler) => {
+			Some(resampler) => {
 				// Resample.
 				let mut audio_buf = audio.make_equivalent();
 				audio.convert::<f32>(&mut audio_buf);
-				let raw = R::resample(&mut resampler, &audio_buf);
+				let raw = resampler.resample(&audio_buf);
 
 				// Send audio data to cubeb.
 				// Duplicate channel data if mono, else split left/right.

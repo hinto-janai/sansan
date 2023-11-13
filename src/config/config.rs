@@ -139,12 +139,12 @@ where
 	/// ```rust
 	/// # use sansan::config::*;
 	/// Config::<(), ()> {
-	/// 	callbacks:                   None,
-	/// 	restore:                     None,
-	/// 	audio_state:                 AudioStateConfig::DEFAULT,
-	/// 	audio_output_error_behavior: AudioErrorBehavior::DEFAULT,
-	/// 	audio_seek_error_behavior:   AudioErrorBehavior::DEFAULT,
-	/// 	audio_decode_error_behavior: AudioErrorBehavior::DEFAULT,
+	///     callbacks:                   None,
+	///     restore:                     None,
+	///     audio_state:                 AudioStateConfig::DEFAULT,
+	///     audio_output_error_behavior: AudioErrorBehavior::DEFAULT,
+	///     audio_seek_error_behavior:   AudioErrorBehavior::DEFAULT,
+	///     audio_decode_error_behavior: AudioErrorBehavior::DEFAULT,
 	/// };
 	/// ```
 	pub const DEFAULT: Self = Self {

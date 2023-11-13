@@ -6,7 +6,6 @@ use std::{
 	fs::File,
 	path::{Path,PathBuf},
 	sync::Arc,
-	borrow::Cow,
 };
 use symphonia::core::{
 	formats::{FormatReader,FormatOptions},
@@ -19,6 +18,9 @@ use symphonia::core::{
 use symphonia::default::{
 	get_probe,get_codecs,
 };
+
+#[allow(unused_imports)] // docs
+use crate::state::AudioState;
 
 //---------------------------------------------------------------------------------------------------- Constants
 // `symphonia` format options.
@@ -66,10 +68,10 @@ use crate::state::AudioStateReader;
 /// let source = Source::from("/path/to/audio.flac");
 ///
 /// assert_eq!(source, Source::Path((
-/// 	SourcePath::Static(
-/// 		Path::new("/path/to/audio.flac")
-/// 	),
-/// 	None,
+///     SourcePath::Static(
+///         Path::new("/path/to/audio.flac")
+///     ),
+///     None,
 /// )));
 /// ```
 /// This means _that_ [`Path`] will be loaded at the time of playback.
@@ -79,18 +81,18 @@ use crate::state::AudioStateReader;
 /// # use sansan::*;
 /// // Static bytes.
 /// static AUDIO_BYTES: &'static [u8] = {
-/// 	// include_bytes!("/lets/pretend/this/file/exists.mp3");
-/// 	&[]
+///     // include_bytes!("/lets/pretend/this/file/exists.mp3");
+///     &[]
 /// };
 /// static SOURCE: Source = Source::Bytes((
-/// 	SourceBytes::Static(AUDIO_BYTES),
-/// 	None,
+///     SourceBytes::Static(AUDIO_BYTES),
+///     None,
 /// ));
 ///
 /// // Runtime heap bytes.
 /// let audio_bytes: Vec<u8> = {
-/// 	// std::fs::read("/lets/pretend/this/file/exists.mp3").unwrap();
-/// 	vec![]
+///     // std::fs::read("/lets/pretend/this/file/exists.mp3").unwrap();
+///     vec![]
 /// };
 /// let source: Source = Source::from(audio_bytes);
 /// ```

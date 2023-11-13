@@ -191,7 +191,7 @@ where
 			playing:       Arc::clone(&playing),
 			ready_to_recv: Arc::clone(&audio_ready_to_recv),
 			shutdown_wait: Arc::clone(&shutdown_wait),
-			shutdown:      shutdown,
+			shutdown,
 			to_gc:         a_to_gc,
 			to_decode:     a_to_d,
 			from_decode:   a_from_d,

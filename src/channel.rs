@@ -32,10 +32,10 @@
 //!
 //! // Send a channel message every 1 second.
 //! callbacks.elapsed(
-//! 	// This takes in anything that implements `SansanSender`,
-//! 	// which `std::sync::mpsc::Sender` does.
-//! 	Callback::Channel(send),
-//! 	std::time::Duration::from_secs(1),
+//!     // This takes in anything that implements `SansanSender`,
+//!     // which `std::sync::mpsc::Sender` does.
+//!     Callback::Channel(send),
+//!     std::time::Duration::from_secs(1),
 //! );
 //! ```
 

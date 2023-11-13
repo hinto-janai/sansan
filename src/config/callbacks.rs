@@ -39,9 +39,9 @@ impl<TrackData, CallbackSender> Callback<TrackData, CallbackSender>
 	/// message `()`, acting as a notification.
 	pub(crate) fn call(&mut self, audio_state: &AudioState<TrackData>) {
 		match self {
-			Self::Dynamic(x) => { let _ = x(audio_state); },
+			Self::Dynamic(x) => { x(audio_state); },
 			Self::Channel(x) => { let _ = x.try_send(()); },
-			Self::Pointer(x) => { let _ = x(audio_state); },
+			Self::Pointer(x) => { x(audio_state); },
 		}
 	}
 }
@@ -107,9 +107,9 @@ where
 /// let queue_ended = Arc::new(AtomicBool::new(false));
 /// let clone = Arc::clone(&queue_ended);
 /// callbacks.queue_end(Callback::Dynamic(
-/// 	Box::new(move |audio_state: &AudioState<()>| {
-/// 		clone.store(true, Ordering::Relaxed)
-/// 	})
+///     Box::new(move |audio_state: &AudioState<()>| {
+///         clone.store(true, Ordering::Relaxed)
+///     })
 /// ));
 ///
 /// // Add a function pointer callback that:
@@ -118,9 +118,9 @@ where
 /// // - Mutates global state (stdout and atomic)
 /// static REPEATS: AtomicUsize = AtomicUsize::new(0);
 /// fn repeat(audio_state: &AudioState<()>) {
-/// 	println!("repeating queue/track");
-/// 	println!("current audio state: {audio_state:#?}");
-/// 	REPEATS.fetch_add(1, Ordering::Relaxed);
+///     println!("repeating queue/track");
+///     println!("current audio state: {audio_state:#?}");
+///     REPEATS.fetch_add(1, Ordering::Relaxed);
 /// }
 /// callbacks.next(Callback::Pointer(repeat));
 ///
