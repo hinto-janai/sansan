@@ -1,3 +1,0 @@
-[submodule "external/Symphonia"]
-	path = external/Symphonia
-	url = git@github.com:hinto-janai/Symphonia.git

@@ -32,12 +32,11 @@ use crate::macros::{send,recv};
 // [2] Kernel
 // [3] MediaControl
 // [4] Pool
-// [5] Gc
-// [6] Cb
-// [7] Log
+// [5] GarbageCollector
+// [6] Caller
 //
 // TODO: finalize all actors
-const ACTOR_COUNT: usize = 3;
+pub(crate) const ACTOR_COUNT: usize = 3;
 
 //---------------------------------------------------------------------------------------------------- Engine
 /// TODO
@@ -223,9 +222,11 @@ where
 		let channels = crate::actor::kernel::Channels {
 			shutdown: k_shutdown,
 			shutdown_hang: k_shutdown_hang,
-			shutdown_audio: a_shutdown,
-			shutdown_decode: d_shutdown,
 			shutdown_done: k_shutdown_done,
+			shutdown_actor: Box::new([
+				a_shutdown,
+				d_shutdown,
+			]),
 			toggle_recv,
 			play_recv,
 			pause_recv,
@@ -276,13 +277,13 @@ where
 		})
 	}
 
-	#[inline]
+	#[inline(always)]
 	/// TODO
-	pub fn audio_state_reader(&self) -> AudioStateReader<TrackData> {
+	pub fn reader(&self) -> AudioStateReader<TrackData> {
 		AudioStateReader::clone(&self.audio)
 	}
 
-	#[inline]
+	#[inline(always)]
 	/// TODO
 	//
 	// INVARIANT

@@ -44,7 +44,6 @@ where
 	audio_state: someday::Writer<AudioState<QueueData>, AudioStatePatch>,
 	playing: Arc<AtomicBool>,
 	audio_ready_to_recv: Arc<AtomicBool>,
-
 	shutdown_wait: Arc<Barrier>,
 }
 
@@ -71,9 +70,10 @@ pub(crate) struct Channels<QueueData: Clone> {
 	// Shutdown signal.
 	pub(crate) shutdown: Receiver<()>,
 	pub(crate) shutdown_hang: Receiver<()>,
-	pub(crate) shutdown_audio: Sender<()>,
-	pub(crate) shutdown_decode: Sender<()>,
 	pub(crate) shutdown_done: Sender<()>,
+	// Excluding [Kernel] itself, these are
+	// the shutdown channels for all the actors.
+	pub(crate) shutdown_actor: Box<[Sender<()>]>,
 
 	// [Audio]
 	pub(crate) to_audio:   Sender<DiscardCurrentAudio>,
@@ -231,19 +231,26 @@ where
 				Msg::Remove       => self.fn_remove(),
 				Msg::RemoveRange  => self.fn_remove_range(),
 				Msg::Shutdown     => {
+					// Tell all actors to shutdown.
+					for actor in channels.shutdown_actor.iter() {
+						send!(actor, ());
+					}
 					// Wait until all threads are ready to shutdown.
 					self.shutdown_wait.wait();
 					// Exit loop (thus, the thread).
 					return;
-				}
+				},
 				// Same as shutdown but sends a message to a
 				// hanging [Engine] indicating we're done, which
 				// allows the caller to return.
 				Msg::ShutdownHang => {
+					for actor in channels.shutdown_actor.iter() {
+						send!(actor, ());
+					}
 					self.shutdown_wait.wait();
 					send!(channels.shutdown_done, ());
 					return;
-				}
+				},
 			}
 		}
 	}
