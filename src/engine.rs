@@ -9,6 +9,7 @@ use crate::actor::{
 	audio::{Audio,AUDIO_BUFFER_LEN},
 	decode::Decode,
 	kernel::Kernel,
+	pool::Pool,
 };
 use crate::audio::{
 	cubeb::Cubeb,
@@ -205,14 +206,35 @@ where
 		let (d_to_k,     k_from_d) = unbounded();
 		let (k_to_d,     d_from_k) = unbounded();
 		let (d_shutdown, shutdown) = bounded(1);
+		let (d_to_p,     p_from_d) = bounded(1);
+		let (p_to_d,     d_from_p) = bounded(1);
 		Decode::init(
 			Arc::clone(&audio_ready_to_recv),
 			Arc::clone(&shutdown_wait),
 			shutdown,
+			d_to_p,
+			d_from_p,
 			d_to_a,
 			d_from_a,
 			d_to_k,
 			d_from_k,
+		)?;
+
+		// Spawn [Pool]
+		let (p_shutdown, shutdown) = bounded(1);
+		let (p_to_k,    k_from_p)  = bounded(1);
+		let (k_to_p,    p_from_k)  = bounded(1);
+		let (p_to_gc_d, gc_from_d) = unbounded();
+		let (p_to_gc_k, gc_from_k) = unbounded();
+		Pool::<TrackData>::init(
+			Arc::clone(&shutdown_wait),
+			shutdown,
+			p_to_d,
+			p_from_d,
+			p_to_k,
+			p_from_k,
+			p_to_gc_d,
+			p_to_gc_k,
 		)?;
 
 		// Spawn [Kernel]
