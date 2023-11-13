@@ -37,11 +37,8 @@ use crate::macros::{send,recv};
 
 //---------------------------------------------------------------------------------------------------- Kernel
 #[derive(Debug)]
-pub(crate) struct Kernel<QueueData>
-where
-	QueueData: Clone
-{
-	audio_state: someday::Writer<AudioState<QueueData>, AudioStatePatch>,
+pub(crate) struct Kernel<TrackData: Clone> {
+	audio_state: someday::Writer<AudioState<TrackData>, AudioStatePatch>,
 	playing: Arc<AtomicBool>,
 	audio_ready_to_recv: Arc<AtomicBool>,
 	shutdown_wait: Arc<Barrier>,
@@ -66,7 +63,7 @@ pub(crate) struct DiscardCurrentAudio;
 // but since they're both behind [self], Rust complains, so the
 // receive channels are in this one-off [Recv] instead of within
 // [Kernel] as fields.
-pub(crate) struct Channels<QueueData: Clone> {
+pub(crate) struct Channels<TrackData: Clone> {
 	// Shutdown signal.
 	pub(crate) shutdown: Receiver<()>,
 	pub(crate) shutdown_hang: Receiver<()>,
@@ -91,7 +88,7 @@ pub(crate) struct Channels<QueueData: Clone> {
 	pub(crate) repeat_recv:  Receiver<Repeat>,
 	pub(crate) shuffle_recv: Receiver<Shuffle>,
 	pub(crate) volume_recv:  Receiver<Volume>,
-	pub(crate) restore_recv: Receiver<AudioState<QueueData>>,
+	pub(crate) restore_recv: Receiver<AudioState<TrackData>>,
 
 	// // Signals that return `Result<T, E>`.
 	pub(crate) add_send:          Sender<Result<(), AddError>>,
@@ -153,17 +150,17 @@ impl Msg {
 }
 
 //---------------------------------------------------------------------------------------------------- Kernel Impl
-impl<QueueData> Kernel<QueueData>
+impl<TrackData> Kernel<TrackData>
 where
-	QueueData: Clone + Send + Sync + 'static
+	TrackData: Clone + Send + Sync + 'static
 {
 	//---------------------------------------------------------------------------------------------------- Init
 	pub(crate) fn init(
 		playing:             Arc<AtomicBool>,
 		audio_ready_to_recv: Arc<AtomicBool>,
 		shutdown_wait:       Arc<Barrier>,
-		audio_state:         someday::Writer<AudioState<QueueData>, AudioStatePatch>,
-		channels:            Channels<QueueData>,
+		audio_state:         someday::Writer<AudioState<TrackData>, AudioStatePatch>,
+		channels:            Channels<TrackData>,
 	) -> Result<JoinHandle<()>, std::io::Error> {
 		let this = Kernel {
 			playing,
@@ -178,7 +175,7 @@ where
 	}
 
 	//---------------------------------------------------------------------------------------------------- Main Loop
-	fn main(mut self, channels: Channels<QueueData>) {
+	fn main(mut self, channels: Channels<TrackData>) {
 		// Create channels that we will
 		// be selecting/listening to for all time.
 		let mut select = Select::new();
@@ -255,7 +252,16 @@ where
 		}
 	}
 
+	//---------------------------------------------------------------------------------------------------- Message Routing
+	// These are the functions that map message
+	// enums to the their proper signal handler.
+
 	//---------------------------------------------------------------------------------------------------- Signal Handlers
+	// Function Handlers.
+	//
+	// These are the functions invoked in response
+	// to exact messages/signals from the other actors.
+
 	#[inline]
 	fn fn_toggle(&mut self) {
 		todo!()

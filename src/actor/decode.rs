@@ -4,11 +4,12 @@ use crossbeam::channel::{Receiver, Select, Sender};
 use crate::{
 	channel,
 	signal,
-	source::Source,
+	source::{Source, SourceInner},
 	audio_state::{AudioState,AudioStatePatch},
+	actor::audio::TookAudioBuffer,
+	macros::{recv,send},
 };
 use symphonia::core::audio::AudioBuffer;
-use crate::actor::audio::TookAudioBuffer;
 use std::{
 	sync::{
 		Arc,
@@ -31,13 +32,16 @@ use strum::EnumCount;
 //
 // [Decode] only pre-loads 1 song in advance,
 // so this should never actually resize.
-const DECODE_BUFFER_LEN: usize = 16_000;
+pub(crate) const DECODE_BUFFER_LEN: usize = 16_000;
 
 //---------------------------------------------------------------------------------------------------- Decode
 pub(crate) struct Decode {
 	audio_ready_to_recv: Arc<AtomicBool>,
-	buffer: VecDeque<AudioBuffer<f32>>,
-	shutdown_wait: Arc<Barrier>,
+	buffer:              VecDeque<AudioBuffer<f32>>,
+	source:              Option<SourceInner>,
+	to_pool:             Sender<VecDeque<AudioBuffer<f32>>>,
+	from_pool:           Receiver<VecDeque<AudioBuffer<f32>>>,
+	shutdown_wait:       Arc<Barrier>,
 }
 
 // See [src/actor/kernel.rs]'s [Channels]
@@ -49,33 +53,20 @@ struct Channels {
 	from_kernel: Receiver<KernelToDecode>,
 }
 
-//---------------------------------------------------------------------------------------------------- Messages
-// See [src/actor/kernel.rs].
-#[repr(u8)]
-#[derive(Debug,Eq,PartialEq)]
-#[derive(EnumCount)]
-enum Msg {
-	FromAudio,
-	FromKernel,
-	Shutdown,
-}
-impl Msg {
-	const fn from_usize(u: usize) -> Self {
-		debug_assert!(u <= Msg::COUNT);
-
-		// SAFETY: repr(u8)
-		unsafe { std::mem::transmute(u as u8) }
-	}
-}
-
 //---------------------------------------------------------------------------------------------------- (Actual) Messages
 pub(crate) enum KernelToDecode {
 	// Convert this [Source] into a real
 	// [SourceInner] and start decoding it.
+	//
+	// This also implicitly also means we
+	// should drop our old audio buffers.
 	NewSource(Source),
 	// Seek to this timestamp in the currently
 	// playing track and start decoding from there
 	Seek(signal::Seek),
+	// Clear all audio buffers, the current source,
+	// and stop decoding.
+	DiscardAudioAndStop,
 }
 
 pub(crate) enum DecodeToKernel {
@@ -85,6 +76,9 @@ pub(crate) enum DecodeToKernel {
 	SeekError,
 }
 
+pub(crate) enum DecodeToPool {
+}
+
 //---------------------------------------------------------------------------------------------------- Decode Impl
 impl Decode {
 	//---------------------------------------------------------------------------------------------------- Init
@@ -92,6 +86,8 @@ impl Decode {
 		audio_ready_to_recv: Arc<AtomicBool>,
 		shutdown_wait:       Arc<Barrier>,
 		shutdown:            Receiver<()>,
+		to_pool:             Sender<VecDeque<AudioBuffer<f32>>>,
+		from_pool:           Receiver<VecDeque<AudioBuffer<f32>>>,
 		to_audio:            Sender<AudioBuffer<f32>>,
 		from_audio:          Receiver<TookAudioBuffer>,
 		to_kernel:           Sender<DecodeToKernel>,
@@ -107,8 +103,11 @@ impl Decode {
 
 		let this = Decode {
 			audio_ready_to_recv,
-			shutdown_wait,
 			buffer: VecDeque::with_capacity(DECODE_BUFFER_LEN),
+			source: None,
+			to_pool,
+			from_pool,
+			shutdown_wait,
 		};
 
 		std::thread::Builder::new()
@@ -122,39 +121,75 @@ impl Decode {
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
 
-		// INVARIANT:
-		// The order these are selected MUST match
-		// order of the `Msg` enum variants.
-		select.recv(&channels.from_audio);
-		select.recv(&channels.from_kernel);
-
-		assert_eq!(Msg::COUNT, select.recv(&channels.shutdown));
+		/* [0] */ select.recv(&channels.from_audio);
+		/* [1] */ select.recv(&channels.from_kernel);
+		/* [2] */ select.recv(&channels.shutdown);
 
 		// Loop, receiving signals and routing them
 		// to their appropriate handler function [fn_*()].
 		loop {
 			let signal = select.select();
-			match Msg::from_usize(signal.index()) {
-				Msg::FromAudio  => self.fn_from_audio(),
-				Msg::FromKernel => self.fn_from_kernel(),
-				Msg::Shutdown   => {
+			match signal.index() {
+				0 => self.fn_audio_took_buffer(),
+				1 => self.msg_from_kernel(recv!(channels.from_kernel)),
+				2 => {
 					// Wait until all threads are ready to shutdown.
 					self.shutdown_wait.wait();
 					// Exit loop (thus, the thread).
 					return;
 				},
+
+				_ => unreachable!(),
 			}
 		}
 	}
 
-	//---------------------------------------------------------------------------------------------------- Signal Handlers
+	//---------------------------------------------------------------------------------------------------- Message Routing
+	// These are the functions that map message
+	// enums to the their proper signal handler.
 	#[inline]
-	fn fn_from_audio(&mut self) {
+	fn msg_from_kernel(&mut self, msg: KernelToDecode) {
+		use KernelToDecode as K;
+		match msg {
+			K::NewSource(source)   => self.fn_new_source(source),
+			K::Seek(seek)          => self.fn_seek(seek),
+			K::DiscardAudioAndStop => self.fn_discard_audio_and_stop(),
+		}
+	}
+
+	//---------------------------------------------------------------------------------------------------- Signal Handlers
+	// Function Handlers.
+	//
+	// These are the functions invoked in response
+	// to exact messages/signals from the other actors.
+
+	#[inline]
+	fn fn_audio_took_buffer(&mut self) {
 		todo!()
 	}
 
 	#[inline]
-	fn fn_from_kernel(&mut self) {
+	fn fn_new_source(&mut self, source: Source) {
+		match source.try_into() {
+			Ok(s) => {
+				self.swap_audio_buffer();
+				self.source = Some(s);
+			},
+
+			Err(e) => {
+				// Handle error, tell engine.
+				todo!()
+			}
+		}
+	}
+
+	#[inline]
+	fn fn_seek(&mut self, seek: signal::Seek) {
+		todo!()
+	}
+
+	#[inline]
+	fn fn_discard_audio_and_stop(&mut self) {
 		todo!()
 	}
 
@@ -162,5 +197,26 @@ impl Decode {
 	#[inline(never)]
 	fn fn_shutdown(&mut self) {
 		todo!()
+	}
+
+	//---------------------------------------------------------------------------------------------------- Misc
+	// These are common extracted functions
+	// used in the `fn_()` handlers above.
+
+	#[inline]
+	// Swap our current audio buffer
+	// with a fresh empty one from `Pool`.
+	fn swap_audio_buffer(&mut self) {
+		// INVARIANT:
+		// Pool must send 1 buffer on init such
+		// that this will immediately receive
+		// something on the very first call.
+		let mut buffer = recv!(self.from_pool);
+
+		// Swap our buffer with the fresh one.
+		std::mem::swap(&mut self.buffer, &mut buffer);
+
+		// Send the old one back for cleaning.
+		send!(self.to_pool, buffer);
 	}
 }

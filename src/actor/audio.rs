@@ -149,13 +149,9 @@ where
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
 
-		// INVARIANT:
-		// The order these are selected MUST match
-		// order of the `Msg` enum variants.
-		select.recv(&channels.from_decode);
-		select.recv(&channels.from_kernel);
-
-		assert_eq!(Msg::COUNT, select.recv(&channels.shutdown));
+		/* [0] */ select.recv(&channels.from_decode);
+		/* [1] */ select.recv(&channels.from_kernel);
+		/* [2] */ select.recv(&channels.shutdown);
 
 		loop {
 			// If we're playing, check if we have samples to play.
@@ -183,27 +179,38 @@ where
 			};
 
 			// Route signal to its appropriate handler function [fn_*()].
-			match Msg::from_usize(signal.index()) {
-				Msg::FromDecode => {
+			match signal.index() {
+				// From `Decode`.
+				0 => {
 					let audio = channels.from_decode.try_recv().unwrap();
 					self.fn_play_audio_buffer(audio, &channels.to_gc);
 				},
-				Msg::FromKernel => {
+
+				// From `Kernel`.
+				1 => {
 					channels.from_kernel.try_recv().unwrap();
 					self.fn_discard_audio(&channels.from_decode, &channels.to_gc);
 				},
-				Msg::Shutdown => {
+
+				// Shutdown.
+				2 => {
 					// Wait until all threads are ready to shutdown.
 					self.shutdown_wait.wait();
 					// Exit loop (thus, the thread).
 					return;
 				},
+
+				_ => unreachable!(),
 			}
 		}
 	}
 
-	//---------------------------------------------------------------------------------------------------- Function Handlers
-	// Function Handlers.
+	//---------------------------------------------------------------------------------------------------- Message Routing
+	// These are the functions that map message
+	// enums to the their proper signal handler.
+
+	//---------------------------------------------------------------------------------------------------- Signal Handlers
+	// Signal Handlers.
 	//
 	// These are the functions invoked in response
 	// to exact messages/signals from the other actors.
