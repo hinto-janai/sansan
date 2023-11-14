@@ -1,0 +1,13 @@
+[default]
+extend-ignore-identifiers-re = [
+	"seeked",
+	"Seeked",
+	"numer",
+]
+
+[files]
+extend-exclude = [
+	# Doc output.
+	"book/docs/",
+	"external/",
+]

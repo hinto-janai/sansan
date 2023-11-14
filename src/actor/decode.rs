@@ -38,7 +38,8 @@ pub(crate) const DECODE_BUFFER_LEN: usize = 16_000;
 pub(crate) struct Decode {
 	audio_ready_to_recv: Arc<AtomicBool>,
 	buffer:              VecDeque<AudioBuffer<f32>>,
-	source:              Option<SourceInner>,
+	source:              SourceInner,
+	done_decoding:       bool,
 	to_pool:             Sender<VecDeque<AudioBuffer<f32>>>,
 	from_pool:           Receiver<VecDeque<AudioBuffer<f32>>>,
 	shutdown_wait:       Arc<Barrier>,
@@ -47,6 +48,7 @@ pub(crate) struct Decode {
 // See [src/actor/kernel.rs]'s [Channels]
 struct Channels {
 	shutdown:    Receiver<()>,
+	to_gc:       Sender<SourceInner>,
 	to_audio:    Sender<AudioBuffer<f32>>,
 	from_audio:  Receiver<TookAudioBuffer>,
 	to_kernel:   Sender<DecodeToKernel>,
@@ -84,6 +86,7 @@ pub(crate) struct InitArgs {
 	pub(crate) audio_ready_to_recv: Arc<AtomicBool>,
 	pub(crate) shutdown_wait:       Arc<Barrier>,
 	pub(crate) shutdown:            Receiver<()>,
+	pub(crate) to_gc:               Sender<SourceInner>,
 	pub(crate) to_pool:             Sender<VecDeque<AudioBuffer<f32>>>,
 	pub(crate) from_pool:           Receiver<VecDeque<AudioBuffer<f32>>>,
 	pub(crate) to_audio:            Sender<AudioBuffer<f32>>,
@@ -100,6 +103,7 @@ impl Decode {
 			audio_ready_to_recv,
 			shutdown_wait,
 			shutdown,
+			to_gc,
 			to_pool,
 			from_pool,
 			to_audio,
@@ -110,6 +114,7 @@ impl Decode {
 
 		let channels = Channels {
 			shutdown,
+			to_gc,
 			to_audio,
 			from_audio,
 			to_kernel,
@@ -119,7 +124,8 @@ impl Decode {
 		let this = Decode {
 			audio_ready_to_recv,
 			buffer: VecDeque::with_capacity(DECODE_BUFFER_LEN),
-			source: None,
+			source: SourceInner::dummy(),
+			done_decoding: true,
 			to_pool,
 			from_pool,
 			shutdown_wait,
@@ -140,23 +146,101 @@ impl Decode {
 		/* [1] */ select.recv(&channels.from_kernel);
 		/* [2] */ select.recv(&channels.shutdown);
 
-		// Loop, receiving signals and routing them
-		// to their appropriate handler function [fn_*()].
+		// The "Decode" loop.
 		loop {
-			let signal = select.select();
-			match signal.index() {
-				0 => self.fn_audio_took_buffer(),
-				1 => self.msg_from_kernel(recv!(channels.from_kernel)),
-				2 => {
-					debug2!("Debug - shutting down");
-					// Wait until all threads are ready to shutdown.
-					self.shutdown_wait.wait();
-					// Exit loop (thus, the thread).
-					return;
+			// Listen to other actors.
+			let signal = match self.done_decoding {
+				false => select.try_select(), // Non-blocking
+				true  => Ok(select.select()), // Blocking
+			};
+
+			// Handle signals.
+			//
+			// This falls through and continues
+			// executing the below code.
+			if let Ok(signal) = signal {
+				match signal.index() {
+					0 => self.fn_audio_took_buffer(),
+					1 => self.msg_from_kernel(&channels),
+					2 => {
+						debug2!("Debug - shutting down");
+						// Wait until all threads are ready to shutdown.
+						self.shutdown_wait.wait();
+						// Exit loop (thus, the thread).
+						return;
+					},
+
+					_ => unreachable!(),
+				}
+			}
+
+			if self.done_decoding {
+				continue;
+			}
+
+			// Continue decoding our current [SourceInner].
+
+			let packet = match self.source.reader.next_packet() {
+				Ok(p) => p,
+
+				// We're done decoding.
+				// This "end of stream" error is currently the only way
+				// a [FormatReader] can indicate the media is complete.
+				Err(symphonia::core::errors::Error::IoError(_)) => {
+					self.done_decoding();
+					continue;
 				},
 
-				_ => unreachable!(),
-			}
+				// An actual error happened.
+				Err(error) => {
+					// TODO: handle error
+					todo!()
+				},
+			};
+
+			// Decode the packet into audio samples.
+			// match decoder.decode(&packet) {
+			// 	Ok(decoded) => {
+			// 		// Get the audio buffer specification. This is a description
+			// 		// of the decoded audio buffer's sample format and sample rate.
+			// 		let spec = *decoded.spec();
+
+			// 		// Get the capacity of the decoded buffer.
+			// 		let duration = decoded.capacity() as u64;
+
+			// 		if spec != self.output.spec || duration != self.output.duration {
+			// 			// If the spec/duration is different, we must re-open a
+			// 			// matching audio output device or audio will get weird.
+			// 			match AudioOutput::try_open(spec, duration) {
+			// 				Ok(o)  => self.output = o,
+
+			// 				// And if we couldn't, pause playback.
+			// 				Err(e) => {
+			// 					todo!();
+			// 					continue;
+			// 				},
+			// 			}
+			// 		}
+
+			// 		// Convert the buffer to `f32` and multiply
+			// 		// it by `0.0..1.0` to set volume levels.
+			// 		let volume = Volume::new(atomic_load!(VOLUME)).f32();
+			// 		let mut buf = AudioBuffer::<f32>::new(duration, spec);
+			// 		decoded.convert(&mut buf);
+			// 		buf.transform(|f| f * volume);
+
+			// 		// Write to audio output device.
+			// 		self.output.write(buf.as_audio_buffer_ref()).unwrap();
+
+			// 		// Set runtime timestamp.
+			// 		let new_time = timebase.calc_time(packet.ts);
+			// 		if time.seconds != new_time.seconds {
+			// 			*time = new_time;
+			// 		}
+			// 	}
+
+			// 	Err(err) => todo!(),
+			// }
 		}
 	}
 
@@ -164,10 +248,12 @@ impl Decode {
 	// These are the functions that map message
 	// enums to the their proper signal handler.
 	#[inline]
-	fn msg_from_kernel(&mut self, msg: KernelToDecode) {
+	fn msg_from_kernel(&mut self, channels: &Channels) {
+		let msg = recv!(channels.from_kernel);
+
 		use KernelToDecode as K;
 		match msg {
-			K::NewSource(source)   => self.fn_new_source(source),
+			K::NewSource(source)   => self.fn_new_source(source, &channels.to_gc),
 			K::Seek(seek)          => self.fn_seek(seek),
 			K::DiscardAudioAndStop => self.fn_discard_audio_and_stop(),
 		}
@@ -185,11 +271,12 @@ impl Decode {
 	}
 
 	#[inline]
-	fn fn_new_source(&mut self, source: Source) {
+	fn fn_new_source(&mut self, source: Source, to_gc: &Sender<SourceInner>) {
 		match source.try_into() {
-			Ok(s) => {
+			Ok(mut s) => {
 				self.swap_audio_buffer();
-				self.source = Some(s);
+				std::mem::swap(&mut self.source, &mut s);
+				send!(to_gc, s);
 			},
 
 			Err(e) => {
@@ -234,5 +321,10 @@ impl Decode {
 
 		// Send the old one back for cleaning.
 		send!(self.to_pool, buffer);
+	}
+
+	#[inline]
+	fn done_decoding(&mut self) {
+		self.done_decoding = true;
 	}
 }

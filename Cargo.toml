@@ -2,7 +2,7 @@
 name           = "sansan"
 version        = "0.0.0"
 edition        = "2021"
-authors        = ["hinto.janai <hinto.janai@protonmail.com>"]
+authors        = ["hinto-janai <hinto.janai@protonmail.com>"]
 homepage       = "https://sansan.cat"
 documentation  = "https://docs.rs/sansan"
 repository     = "https://github.com/hinto-janai/sansan"

@@ -201,15 +201,17 @@ where
 		}).expect("sansan [Engine] - could not spawn [Audio] thread");
 
 		//-------------------------------------------------------------- Spawn [Decode]
-		let (d_to_k,     k_from_d) = unbounded();
-		let (k_to_d,     d_from_k) = unbounded();
-		let (d_shutdown, shutdown) = bounded(1);
-		let (d_to_p,     p_from_d) = bounded(1);
-		let (p_to_d,     d_from_p) = bounded(1);
+		let (d_to_k,     k_from_d)  = unbounded();
+		let (k_to_d,     d_from_k)  = unbounded();
+		let (d_to_gc,    gc_from_d) = unbounded();
+		let (d_shutdown, shutdown)  = bounded(1);
+		let (d_to_p,     p_from_d)  = bounded(1);
+		let (p_to_d,     d_from_p)  = bounded(1);
 		Decode::init(crate::actor::decode::InitArgs {
 			audio_ready_to_recv: Arc::clone(&audio_ready_to_recv),
 			shutdown_wait:       Arc::clone(&shutdown_wait),
 			shutdown,
+			to_gc:               d_to_gc,
 			to_pool:             d_to_p,
 			from_pool:           d_from_p,
 			to_audio:            d_to_a,

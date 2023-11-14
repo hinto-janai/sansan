@@ -294,6 +294,63 @@ pub(crate) struct SourceInner {
 	pub(crate) total_time: Time,
 }
 
+impl SourceInner {
+	// Returns a dummy [SourceInner]
+	// that cannot actually be used.
+	//
+	// This exists so [Decode] does not
+	// have to keep an [Option<SourceInner>].
+	//
+	// INVARIANT:
+	// This must not actually be _used_, as in the
+	// trait functions must not be called as they
+	// all panic.
+	pub(crate) fn dummy() -> Self {
+		use symphonia::core::{
+			errors::Result,
+			formats::{Cue,SeekMode,SeekTo,SeekedTo,Track,Packet},
+			meta::Metadata,
+			codecs::{CodecParameters,CodecDescriptor,FinalizeResult},
+			audio::AudioBufferRef,
+		};
+
+		struct DummyReader;
+		impl FormatReader for DummyReader {
+			fn try_new(source: MediaSourceStream, options: &FormatOptions) -> Result<Self> { unreachable!() }
+			fn cues(&self) -> &[Cue] { unreachable!() }
+			fn metadata(&mut self) -> Metadata<'_> { unreachable!() }
+			fn seek(
+				&mut self,
+				mode: SeekMode,
+				to: SeekTo
+				) -> Result<SeekedTo> { unreachable!() }
+			fn tracks(&self) -> &[Track] { unreachable!() }
+			fn next_packet(&mut self) -> Result<Packet> { unreachable!() }
+			fn into_inner(self: Box<Self>) -> MediaSourceStream { unreachable!() }
+		}
+
+		struct DummyDecoder;
+		impl Decoder for DummyDecoder {
+			fn try_new(params: &symphonia::core::codecs::CodecParameters, options: &DecoderOptions) -> Result<Self> { unreachable!() }
+			fn supported_codecs() -> &'static [CodecDescriptor] { unreachable!() }
+			fn reset(&mut self) { unreachable!() }
+			fn codec_params(&self) -> &CodecParameters { unreachable!() }
+			fn decode(&mut self, packet: &Packet) -> Result<AudioBufferRef> { unreachable!() }
+			fn finalize(&mut self) -> FinalizeResult { unreachable!() }
+			fn last_decoded(&self) -> AudioBufferRef { unreachable!() }
+		}
+
+		Self {
+			reader:      Box::new(DummyReader),
+			decoder:     Box::new(DummyDecoder),
+			sample_rate: 0,
+			time:        Time { seconds: 0, frac: 0.0, },
+			timebase:    TimeBase { numer: 0, denom: 0 },
+			total_time:  Time { seconds: 0, frac: 0.0 },
+		}
+	}
+}
+
 //---------------------------------------------------------------------------------------------------- MediaSourceStream -> SourceInner
 impl TryFrom<MediaSourceStream> for SourceInner {
 	type Error = SourceError;
