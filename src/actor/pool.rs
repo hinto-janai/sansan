@@ -101,9 +101,9 @@ impl<TrackData: ValidTrackData> Pool<TrackData> {
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
 
-		/* [0] */ select.recv(&channels.from_decode);
-		/* [1] */ select.recv(&channels.from_kernel);
-		/* [2] */ select.recv(&channels.shutdown);
+		assert_eq!(0, select.recv(&channels.from_decode));
+		assert_eq!(1, select.recv(&channels.from_kernel));
+		assert_eq!(2, select.recv(&channels.shutdown));
 
 		// Loop, receiving signals and routing them
 		// to their appropriate handler function [fn_*()].

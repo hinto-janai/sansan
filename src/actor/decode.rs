@@ -142,9 +142,9 @@ impl Decode {
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
 
-		/* [0] */ select.recv(&channels.from_audio);
-		/* [1] */ select.recv(&channels.from_kernel);
-		/* [2] */ select.recv(&channels.shutdown);
+		assert_eq!(0, select.recv(&channels.from_audio));
+		assert_eq!(1, select.recv(&channels.from_kernel));
+		assert_eq!(2, select.recv(&channels.shutdown));
 
 		// The "Decode" loop.
 		loop {

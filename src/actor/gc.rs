@@ -35,10 +35,10 @@ impl<TrackData: ValidTrackData> Gc<TrackData> {
 	fn main(self) {
 		let mut select = Select::new();
 
-		/* [0] Audio    */ select.recv(&self.from_audio);
-		/* [1] Decode   */ select.recv(&self.from_decode);
-		/* [2] Kernel   */ select.recv(&self.from_kernel);
-		/* [3] Shutdown */ assert_eq!(select.recv(&self.shutdown), 3);
+		assert_eq!(0, select.recv(&self.from_audio));
+		assert_eq!(1, select.recv(&self.from_decode));
+		assert_eq!(2, select.recv(&self.from_kernel));
+		assert_eq!(3, select.recv(&self.shutdown));
 
 		// Reduce [Gc] to the lowest thread priority.
 		match lpt::lpt() {

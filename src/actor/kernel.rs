@@ -115,44 +115,6 @@ pub(crate) struct Channels<TrackData: ValidTrackData> {
 	pub(crate) remove_range_recv: Receiver<RemoveRange>,
 }
 
-// This solely exists so that the big
-// match below when selecting and receiving
-// over message is a little more type safe,
-// and also so maintenance is easier
-// (new msg variant not added will compile-error).
-#[repr(u8)]
-#[derive(Debug,Eq,PartialEq)]
-#[derive(EnumCount)]
-enum Msg {
-	Toggle,
-	Play,
-	Pause,
-	Clear,
-	Repeat,
-	Shuffle,
-	Volume,
-	Restore,
-	Add,
-	Seek,
-	Next,
-	Previous,
-	Skip,
-	Back,
-	SetIndex,
-	Remove,
-	RemoveRange,
-	Shutdown,
-	ShutdownHang,
-}
-impl Msg {
-	const fn from_usize(u: usize) -> Self {
-		debug_assert!(u <= Msg::COUNT);
-
-		// SAFETY: repr(u8)
-		unsafe { std::mem::transmute(u as u8) }
-	}
-}
-
 //---------------------------------------------------------------------------------------------------- Kernel Impl
 pub(crate) struct InitArgs<TrackData: ValidTrackData> {
 	pub(crate) playing:             Arc<AtomicBool>,
@@ -198,51 +160,49 @@ where
 		// INVARIANT:
 		// The order these are selected MUST match
 		// order of the `Msg` enum variants.
-		select.recv(&channels.toggle_recv);
-		select.recv(&channels.play_recv);
-		select.recv(&channels.pause_recv);
-		select.recv(&channels.clear_recv);
-		select.recv(&channels.repeat_recv);
-		select.recv(&channels.shuffle_recv);
-		select.recv(&channels.volume_recv);
-		select.recv(&channels.restore_recv);
-		select.recv(&channels.add_recv);
-		select.recv(&channels.seek_recv);
-		select.recv(&channels.next_recv);
-		select.recv(&channels.previous_recv);
-		select.recv(&channels.skip_recv);
-		select.recv(&channels.back_recv);
-		select.recv(&channels.set_index_recv);
-		select.recv(&channels.remove_recv);
-		select.recv(&channels.remove_range_recv);
-		select.recv(&channels.shutdown);
-
-		// 19 channels to select over, make sure we counted right :)
-		assert_eq!(Msg::COUNT, select.recv(&channels.shutdown_hang));
+		assert_eq!(0,  select.recv(&channels.toggle_recv));
+		assert_eq!(1,  select.recv(&channels.play_recv));
+		assert_eq!(2,  select.recv(&channels.pause_recv));
+		assert_eq!(3,  select.recv(&channels.clear_recv));
+		assert_eq!(4,  select.recv(&channels.repeat_recv));
+		assert_eq!(5,  select.recv(&channels.shuffle_recv));
+		assert_eq!(6,  select.recv(&channels.volume_recv));
+		assert_eq!(7,  select.recv(&channels.restore_recv));
+		assert_eq!(8,  select.recv(&channels.add_recv));
+		assert_eq!(9,  select.recv(&channels.seek_recv));
+		assert_eq!(10, select.recv(&channels.next_recv));
+		assert_eq!(11, select.recv(&channels.previous_recv));
+		assert_eq!(12, select.recv(&channels.skip_recv));
+		assert_eq!(13, select.recv(&channels.back_recv));
+		assert_eq!(14, select.recv(&channels.set_index_recv));
+		assert_eq!(15, select.recv(&channels.remove_recv));
+		assert_eq!(16, select.recv(&channels.remove_range_recv));
+		assert_eq!(17, select.recv(&channels.shutdown));
+		assert_eq!(18, select.recv(&channels.shutdown_hang));
 
 		// Loop, receiving signals and routing them
 		// to their appropriate handler function [fn_*()].
 		loop {
 			let signal = select.select();
-			match Msg::from_usize(signal.index()) {
-				Msg::Toggle       => self.fn_toggle(),
-				Msg::Play         => self.fn_play(),
-				Msg::Pause        => self.fn_pause(),
-				Msg::Clear        => self.fn_clear(),
-				Msg::Repeat       => self.fn_repeat(),
-				Msg::Shuffle      => self.fn_shuffle(),
-				Msg::Volume       => self.fn_volume(),
-				Msg::Restore      => self.fn_restore(),
-				Msg::Add          => self.fn_add(),
-				Msg::Seek         => self.fn_seek(),
-				Msg::Next         => self.fn_next(),
-				Msg::Previous     => self.fn_previous(),
-				Msg::Skip         => self.fn_skip(),
-				Msg::Back         => self.fn_back(),
-				Msg::SetIndex     => self.fn_set_index(),
-				Msg::Remove       => self.fn_remove(),
-				Msg::RemoveRange  => self.fn_remove_range(),
-				Msg::Shutdown     => {
+			match signal.index() {
+				0  => self.fn_toggle(),
+				1  => self.fn_play(),
+				2  => self.fn_pause(),
+				3  => self.fn_clear(),
+				4  => self.fn_repeat(),
+				5  => self.fn_shuffle(),
+				6  => self.fn_volume(),
+				7  => self.fn_restore(),
+				8  => self.fn_add(),
+				9  => self.fn_seek(),
+				10 => self.fn_next(),
+				11 => self.fn_previous(),
+				12 => self.fn_skip(),
+				13 => self.fn_back(),
+				14 => self.fn_set_index(),
+				15 => self.fn_remove(),
+				16 => self.fn_remove_range(),
+				17 => {
 					debug2!("Kernel - shutting down");
 					// Tell all actors to shutdown.
 					for actor in channels.shutdown_actor.iter() {
@@ -256,7 +216,7 @@ where
 				// Same as shutdown but sends a message to a
 				// hanging [Engine] indicating we're done, which
 				// allows the caller to return.
-				Msg::ShutdownHang => {
+				18 => {
 					debug2!("Kernel - shutting down (hang)");
 					for actor in channels.shutdown_actor.iter() {
 						send!(actor, ());
@@ -265,6 +225,8 @@ where
 					send!(channels.shutdown_done, ());
 					return;
 				},
+
+				_ => unreachable!(),
 			}
 		}
 	}
