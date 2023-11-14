@@ -9,7 +9,7 @@ use crate::{
 	actor::audio::TookAudioBuffer,
 	macros::{recv,send,debug2},
 };
-use symphonia::core::audio::AudioBuffer;
+use symphonia::core::{audio::AudioBuffer, units::Time};
 use std::{
 	sync::{
 		Arc,
@@ -49,7 +49,7 @@ pub(crate) struct Decode {
 struct Channels {
 	shutdown:    Receiver<()>,
 	to_gc:       Sender<SourceInner>,
-	to_audio:    Sender<AudioBuffer<f32>>,
+	to_audio:    Sender<(AudioBuffer<f32>, Time)>,
 	from_audio:  Receiver<TookAudioBuffer>,
 	to_kernel:   Sender<DecodeToKernel>,
 	from_kernel: Receiver<KernelToDecode>,
@@ -89,7 +89,7 @@ pub(crate) struct InitArgs {
 	pub(crate) to_gc:               Sender<SourceInner>,
 	pub(crate) to_pool:             Sender<VecDeque<AudioBuffer<f32>>>,
 	pub(crate) from_pool:           Receiver<VecDeque<AudioBuffer<f32>>>,
-	pub(crate) to_audio:            Sender<AudioBuffer<f32>>,
+	pub(crate) to_audio:            Sender<(AudioBuffer<f32>, Time)>,
 	pub(crate) from_audio:          Receiver<TookAudioBuffer>,
 	pub(crate) to_kernel:           Sender<DecodeToKernel>,
 	pub(crate) from_kernel:         Receiver<KernelToDecode>,
@@ -199,48 +199,15 @@ impl Decode {
 			};
 
 			// Decode the packet into audio samples.
-			// match decoder.decode(&packet) {
-			// 	Ok(decoded) => {
-			// 		// Get the audio buffer specification. This is a description
-			// 		// of the decoded audio buffer's sample format and sample rate.
-			// 		let spec = *decoded.spec();
+			match self.source.decoder.decode(&packet) {
+				Ok(decoded) => {
+					let audio = decoded.make_equivalent::<f32>();
+					let time  = self.source.timebase.calc_time(packet.ts);
+					send!(channels.to_audio, (audio, time));
+				}
 
-			// 		// Get the capacity of the decoded buffer.
-			// 		let duration = decoded.capacity() as u64;
-
-			// 		if spec != self.output.spec || duration != self.output.duration {
-			// 			// If the spec/duration is different, we must re-open a
-			// 			// matching audio output device or audio will get weird.
-			// 			match AudioOutput::try_open(spec, duration) {
-			// 				Ok(o)  => self.output = o,
-
-			// 				// And if we couldn't, pause playback.
-			// 				Err(e) => {
-			// 					todo!();
-			// 					continue;
-			// 				},
-			// 			}
-			// 		}
-
-			// 		// Convert the buffer to `f32` and multiply
-			// 		// it by `0.0..1.0` to set volume levels.
-			// 		let volume = Volume::new(atomic_load!(VOLUME)).f32();
-			// 		let mut buf = AudioBuffer::<f32>::new(duration, spec);
-			// 		decoded.convert(&mut buf);
-			// 		buf.transform(|f| f * volume);
-
-			// 		// Write to audio output device.
-			// 		self.output.write(buf.as_audio_buffer_ref()).unwrap();
-
-			// 		// Set runtime timestamp.
-			// 		let new_time = timebase.calc_time(packet.ts);
-			// 		if time.seconds != new_time.seconds {
-			// 			*time = new_time;
-			// 		}
-			// 	}
-
-			// 	Err(err) => todo!(),
-			// }
+				Err(err) => todo!(),
+			}
 		}
 	}
 

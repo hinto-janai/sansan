@@ -7,6 +7,7 @@
 //
 // TODO: channel stereo support message
 
+use crate::signal::Volume;
 //----------------------------------------------------------------------------------------------- use
 use crate::{
 	audio::output::AudioOutput,
@@ -74,6 +75,11 @@ where
 	// The resampler.
 	resampler: Option<R>,
 
+	// Audio spec output was opened with.
+	spec: SignalSpec,
+	// Duration this output was opened with.
+	duration: u64,
+
 	// A re-usable sample buffer.
 	sample_buf: SampleBuffer<f32>,
 
@@ -89,11 +95,22 @@ impl<R> AudioOutput for Cubeb<R>
 where
 	R: Resampler,
 {
-	fn write(&mut self, audio: AudioBuffer<f32>, gc: &Sender<AudioBuffer<f32>>) -> Result<(), AudioOutputError> {
+	fn write(
+		&mut self,
+		audio: AudioBuffer<f32>,
+		gc: &Sender<AudioBuffer<f32>>,
+		volume: Volume,
+	) -> Result<(), AudioOutputError> {
 		// 1. Return if empty audio
 		if audio.frames() == 0  {
 			return Ok(());
 		}
+
+		// PERF:
+		// Applying volume after resampling
+		// leads to (less) lossly audio.
+		let volume = volume.inner();
+		debug_assert!((0.0..=1.0).contains(&volume));
 
 		match self.resampler.as_mut() {
 			// No resampling required (common path).
@@ -106,9 +123,16 @@ where
 				// Duplicate channel data if mono, else split left/right.
 				if self.channels == 2 {
 					raw.chunks_exact(2)
-						.for_each(|f| send!(self.sender, StereoFrame { l: f[0], r: f[1] }));
+						.for_each(|f| {
+							let l = f[0] * volume;
+							let r = f[1] * volume;
+							send!(self.sender, StereoFrame { l, r });
+						});
 				} else {
-					raw.iter().for_each(|f| send!(self.sender, StereoFrame { l: *f, r: *f }));
+					raw.iter().for_each(|f| {
+						let f = f * volume;
+						send!(self.sender, StereoFrame { l: f, r: f });
+					});
 				}
 
 				// Send garbage to GC.
@@ -137,9 +161,16 @@ where
 				// Duplicate channel data if mono, else split left/right.
 				if self.channels == 2 {
 					raw.chunks_exact(2)
-						.for_each(|f| send!(self.sender, StereoFrame { l: f[0], r: f[1] }));
+						.for_each(|f| {
+							let l = f[0] * volume;
+							let r = f[1] * volume;
+							send!(self.sender, StereoFrame { l, r });
+						});
 				} else {
-					raw.iter().for_each(|f| send!(self.sender, StereoFrame { l: *f, r: *f }));
+					raw.iter().for_each(|f| {
+						let f = f * volume;
+						send!(self.sender, StereoFrame { l: f, r: f });
+					});
 				}
 
 				// Send garbage to GC.
@@ -359,6 +390,8 @@ where
 			discard,
 			drained: drained_recv,
 			resampler,
+			spec: signal_spec,
+			duration,
 			sample_buf: SampleBuffer::new(duration, signal_spec),
 			channels,
 			playing: false,
@@ -395,5 +428,13 @@ where
 
 	fn is_playing(&mut self) -> bool {
 		self.playing
+	}
+
+	fn spec(&self) -> &SignalSpec {
+		&self.spec
+	}
+
+	fn duration(&self) -> u64 {
+		self.duration
 	}
 }

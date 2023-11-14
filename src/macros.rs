@@ -17,6 +17,22 @@ macro_rules! send {
 }
 pub(crate) use send;
 
+// `try_recv` a channel message, unwrap.
+macro_rules! try_recv {
+    ($channel:expr) => {
+        $channel.try_recv().unwrap()
+    }
+}
+pub(crate) use try_recv;
+
+// `try_send` a channel message, unwrap.
+macro_rules! try_send {
+    ($channel:expr, $($msg:tt)+) => {
+        $channel.try_send($($msg)+).unwrap()
+    }
+}
+pub(crate) use try_send;
+
 //---------------------------------------------------------------------------------------------------- Logging
 // Logs with `log` but only if in debug
 // mode or if the log feature is enabled.

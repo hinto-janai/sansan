@@ -6,7 +6,7 @@ use crate::{
 	channel,
 	state::{AudioState,AudioStatePatch},
 };
-use symphonia::core::audio::AudioBuffer;
+use symphonia::core::{audio::AudioBuffer, units::Time};
 use std::sync::{
 	Arc,
 	Barrier,
@@ -19,7 +19,8 @@ use crate::audio::{
 	cubeb::Cubeb,
 	rubato::Rubato,
 };
-use crate::macros::{send,recv,debug2};
+use crate::macros::{send,try_recv,debug2};
+use crate::signal::Volume;
 
 //---------------------------------------------------------------------------------------------------- Constants
 // AUDIO_BUFFER_LEN is the buffer size of the channel
@@ -55,7 +56,7 @@ struct Channels {
 	to_gc:       Sender<AudioBuffer<f32>>,
 
 	to_decode:   Sender<TookAudioBuffer>,
-	from_decode: Receiver<AudioBuffer<f32>>, // Only 1 msg, no enum required
+	from_decode: Receiver<(AudioBuffer<f32>, Time)>,
 
 	to_kernel:   Sender<AudioToKernel>,
 	from_kernel: Receiver<DiscardCurrentAudio>,
@@ -101,7 +102,7 @@ pub(crate) struct InitArgs {
 	pub(crate) shutdown:      Receiver<()>,
 	pub(crate) to_gc:         Sender<AudioBuffer<f32>>,
 	pub(crate) to_decode:     Sender<TookAudioBuffer>,
-	pub(crate) from_decode:   Receiver<AudioBuffer<f32>>,
+	pub(crate) from_decode:   Receiver<(AudioBuffer<f32>, Time)>,
 	pub(crate) to_kernel:     Sender<AudioToKernel>,
 	pub(crate) from_kernel:   Receiver<DiscardCurrentAudio>,
 }
@@ -171,8 +172,8 @@ where
 		loop {
 			// If we're playing, check if we have samples to play.
 			if self.playing_local {
-				if let Ok(audio) = channels.from_decode.try_recv() {
-					self.fn_play_audio_buffer(audio, &channels.to_gc);
+				if let Ok(msg) = channels.from_decode.try_recv() {
+					self.fn_play_audio_buffer(msg, &channels.to_gc);
 				}
 			}
 
@@ -197,13 +198,13 @@ where
 			match signal.index() {
 				// From `Decode`.
 				0 => {
-					let audio = channels.from_decode.try_recv().unwrap();
-					self.fn_play_audio_buffer(audio, &channels.to_gc);
+					let msg = try_recv!(channels.from_decode);
+					self.fn_play_audio_buffer(msg, &channels.to_gc);
 				},
 
 				// From `Kernel`.
 				1 => {
-					channels.from_kernel.try_recv().unwrap();
+					let msg = try_recv!(channels.from_kernel);
 					self.fn_discard_audio(&channels.from_decode, &channels.to_gc);
 				},
 
@@ -234,25 +235,58 @@ where
 	#[inline]
 	fn fn_play_audio_buffer(
 		&mut self,
-		audio: AudioBuffer<f32>,
+		msg: (AudioBuffer<f32>, symphonia::core::units::Time),
 		to_gc: &Sender<AudioBuffer<f32>>
 	) {
+		let (audio, time) = msg;
+
+		let spec    = *audio.spec();
+		let duration = audio.capacity() as u64;
+
+		// If the spec/duration is different, we must re-open a
+		// matching audio output device or audio will get weird.
+		if spec != *self.output.spec() || duration != self.output.duration() {
+			match AudioOutput::try_open(
+				"TODO", // TODO: name
+				spec,
+				duration,
+				false, // TODO: disable_device_switch
+				None,  // TODO: buffer_milliseconds
+			) {
+				Ok(o)  => self.output = o,
+
+				// And if we couldn't, handle error.
+				Err(e) => {
+					todo!();
+				},
+			}
+		}
+
+		// TODO: load atomic [Volume] from [Engine]
+		let volume: Volume = Volume::new(todo!());
+
 		// Write audio buffer (hangs).
-		if let Err(e) = self.output.write(audio, to_gc) {
+		if let Err(e) = self.output.write(audio, to_gc, volume) {
 			// TODO: Send error the engine backchannel
 			// or discard depending on user config.
 			todo!();
 		}
+
+		// TODO: tell [Kernel] we just wrote
+		// an audio buffer with [time] timestamp.
+		todo!();
 	}
 
 	#[inline]
 	fn fn_discard_audio(
 		&mut self,
-		from_decode: &Receiver<AudioBuffer<f32>>,
+		from_decode: &Receiver<(AudioBuffer<f32>, Time)>,
 		to_gc: &Sender<AudioBuffer<f32>>,
 	) {
-		while let Ok(audio) = from_decode.try_recv() {
-			send!(to_gc, audio);
+		// `Time` is just `u64` + `f64`.
+		// Doesn't make sense sending stack variables to GC.
+		while let Ok(msg) = from_decode.try_recv() {
+			send!(to_gc, msg.0);
 		}
 	}
 }

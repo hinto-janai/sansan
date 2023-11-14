@@ -13,7 +13,7 @@
 use crate::{
 	error::AudioOutputError,
 	audio::resampler::Resampler,
-	channel::SansanSender
+	channel::SansanSender, signal::Volume
 };
 use symphonia::core::audio::{
 	AudioBuffer,SignalSpec,Channels, Signal, AudioBufferRef, SampleBuffer,
@@ -37,7 +37,12 @@ where
 	/// Invariants:
 	/// 1. `audio` may be a zero amount of frames (silence)
 	/// 2. `audio` may need to be resampled
-	fn write(&mut self, audio: AudioBuffer<f32>, gc: &Sender<AudioBuffer<f32>>) -> Result<(), AudioOutputError>;
+	fn write(
+		&mut self,
+		audio: AudioBuffer<f32>,
+		gc: &Sender<AudioBuffer<f32>>,
+		volume: Volume,
+	) -> Result<(), AudioOutputError>;
 
 	/// Flush all the current audio in the internal buffer (if any).
 	///
@@ -100,6 +105,13 @@ where
 
 	/// Is the stream currently in play mode?
 	fn is_playing(&mut self) -> bool;
+
+	// What is the audio specification
+	// this `AudioOutput` was created for?
+	fn spec(&self) -> &SignalSpec;
+	// What is the duration
+	// this `AudioOutput` was created for?
+	fn duration(&self) -> u64;
 
 	/// Toggle playback.
 	fn toggle(&mut self) -> Result<(), AudioOutputError> {
