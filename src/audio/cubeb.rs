@@ -7,9 +7,9 @@
 //
 // TODO: channel stereo support message
 
-use crate::signal::Volume;
 //----------------------------------------------------------------------------------------------- use
 use crate::{
+	signal::Volume,
 	audio::output::AudioOutput,
 	audio::resampler::Resampler,
 	error::AudioOutputError,
@@ -33,6 +33,11 @@ const SAMPLE_RATE_FALLBACK: u32 = 44_100;
 // us and `cubeb`'s callback function (if the user does
 // not provide a value).
 const AUDIO_MILLISECOND_BUFFER_FALLBACK: usize = 20;
+
+// The amount of raw [f32] samples held in our [Vec<f32>] sample buffer.
+//
+// Tracks seem to max out at `8192`, so do that * 2 to be safe.
+pub(crate) const AUDIO_SAMPLE_BUFFER_LEN: usize = 16_384;
 
 //----------------------------------------------------------------------------------------------- Cubeb
 //
@@ -82,6 +87,8 @@ where
 
 	// A re-usable sample buffer.
 	sample_buf: SampleBuffer<f32>,
+	// A re-usable Vec of samples.
+	samples: Vec<f32>,
 
 	// How many channels?
 	channels: usize,
@@ -97,53 +104,30 @@ where
 {
 	fn write(
 		&mut self,
-		audio: AudioBuffer<f32>,
-		gc: &Sender<AudioBuffer<f32>>,
+		mut audio: AudioBuffer<f32>,
+		to_gc:  &Sender<AudioBuffer<f32>>,
 		volume: Volume,
 	) -> Result<(), AudioOutputError> {
-		// 1. Return if empty audio
+		// Return if empty audio.
 		if audio.frames() == 0  {
 			return Ok(());
 		}
 
 		// PERF:
 		// Applying volume after resampling
-		// leads to (less) lossly audio.
+		// leads to (less) lossy audio.
 		let volume = volume.inner();
 		debug_assert!((0.0..=1.0).contains(&volume));
 
-		match self.resampler.as_mut() {
+		// Get raw `[f32]` sample data.
+		let samples = match self.resampler.as_mut() {
 			// No resampling required (common path).
 			None => {
-				// Create raw `[f32]` data.
+				// Apply volume transformation.
+				audio.transform(|f| f * volume);
+
 				self.sample_buf.copy_interleaved_typed(&audio);
-				let raw = self.sample_buf.samples();
-
-				// Send audio data to cubeb.
-				// Duplicate channel data if mono, else split left/right.
-				if self.channels == 2 {
-					raw.chunks_exact(2)
-						.for_each(|f| {
-							let l = f[0] * volume;
-							let r = f[1] * volume;
-							send!(self.sender, StereoFrame { l, r });
-						});
-				} else {
-					raw.iter().for_each(|f| {
-						let f = f * volume;
-						send!(self.sender, StereoFrame { l: f, r: f });
-					});
-				}
-
-				// Send garbage to GC.
-				send!(gc, audio);
-
-				if self.error.load(Ordering::Relaxed) {
-					self.error.store(false, Ordering::Relaxed);
-					Err(AudioOutputError::Write)
-				} else {
-					Ok(())
-				}
+				self.sample_buf.samples()
 			},
 
 			// We have a `Resampler`.
@@ -153,36 +137,54 @@ where
 			// have the sample spec, we need to resample this.
 			Some(resampler) => {
 				// Resample.
-				let mut audio_buf = audio.make_equivalent();
-				audio.convert::<f32>(&mut audio_buf);
-				let raw = resampler.resample(&audio_buf);
+				let samples = resampler.resample(&audio);
 
-				// Send audio data to cubeb.
-				// Duplicate channel data if mono, else split left/right.
-				if self.channels == 2 {
-					raw.chunks_exact(2)
-						.for_each(|f| {
-							let l = f[0] * volume;
-							let r = f[1] * volume;
-							send!(self.sender, StereoFrame { l, r });
-						});
-				} else {
-					raw.iter().for_each(|f| {
-						let f = f * volume;
-						send!(self.sender, StereoFrame { l: f, r: f });
-					});
+				self.samples[..samples.len()].copy_from_slice(samples);
+
+				let capacity = audio.capacity();
+				let frames   = audio.frames();
+
+				// Taken from: https://docs.rs/symphonia-core/0.5.3/src/symphonia_core/audio.rs.html#680-692
+				for plane in self.samples.chunks_mut(capacity) {
+					for sample in &mut plane[0..frames] {
+						*sample = *sample * volume;
+					}
 				}
 
-				// Send garbage to GC.
-				send!(gc, audio);
-				send!(gc, audio_buf);
+				&self.samples
+			},
+		};
 
-				if self.error.load(Ordering::Relaxed) {
-					self.error.store(false, Ordering::Relaxed);
-					Err(AudioOutputError::Write)
-				} else {
-					Ok(())
-				}
+		// Send audio data to cubeb.
+		// Duplicate channel data if mono, else split left/right.
+		if self.channels == 2 {
+			samples.chunks_exact(2).for_each(|f| {
+				let l = f[0];
+				let r = f[1];
+				send!(self.sender, StereoFrame { l, r });
+			});
+		} else {
+			samples.iter().for_each(|f| {
+				send!(self.sender, StereoFrame { l: *f, r: *f });
+			});
+		}
+
+		// Send garbage to GC.
+		send!(to_gc, audio);
+		// INVARIANT:
+		// This must be cleared as the next call to this
+		// function assumes our local [Vec<f32>] is emptied.
+		//
+		// Clearing a bunch of [f32]'s locally
+		// is probably faster than swapping with [Pool].
+		self.samples.clear();
+
+		// If [cubeb] errored, forward it.
+		match self.error.load(Ordering::Acquire) {
+			false => Ok(()),
+			true  => {
+				self.error.store(false, Ordering::Release);
+				Err(AudioOutputError::Write)
 			},
 		}
 	}
@@ -393,6 +395,7 @@ where
 			spec: signal_spec,
 			duration,
 			sample_buf: SampleBuffer::new(duration, signal_spec),
+			samples: Vec::with_capacity(AUDIO_SAMPLE_BUFFER_LEN),
 			channels,
 			playing: false,
 		})

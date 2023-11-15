@@ -55,7 +55,7 @@ where
 struct Channels {
 	shutdown: Receiver<()>,
 
-	to_gc:       Sender<AudioBuffer<f32>>,
+	to_gc:   Sender<AudioBuffer<f32>>,
 
 	to_decode:   Sender<TookAudioBuffer>,
 	from_decode: Receiver<(AudioBuffer<f32>, Time)>,
