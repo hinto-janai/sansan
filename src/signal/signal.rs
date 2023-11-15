@@ -42,8 +42,8 @@ where
 	pub(crate) pause_send:        Sender<()>,
 	pub(crate) clear_send:        Sender<Clear>,
 	pub(crate) restore_send:      Sender<AudioState<TrackData>>,
-	pub(crate) repeat_send:       Sender<Repeat>,
 	pub(crate) shuffle_send:      Sender<Shuffle>,
+	pub(crate) repeat_send:       Sender<Repeat>,
 	pub(crate) volume_send:       Sender<Volume>,
 
 	// Signals that return `Result<T, E>`.
@@ -113,14 +113,14 @@ where
 
 	#[inline]
 	///
-	fn repeat(&mut self, repeat: Repeat) {
-		self.repeat_send.send(repeat).unwrap();
+	fn shuffle(&mut self, shuffle: Shuffle) {
+		self.shuffle_send.send(shuffle).unwrap();
 	}
 
 	#[inline]
 	///
-	fn shuffle(&mut self, shuffle: Shuffle) {
-		self.shuffle_send.send(shuffle).unwrap();
+	fn repeat(&mut self, repeat: Repeat) {
+		self.repeat_send.send(repeat).unwrap();
 	}
 
 	#[inline]

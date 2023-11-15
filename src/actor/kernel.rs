@@ -2,7 +2,7 @@
 use std::thread::JoinHandle;
 use crossbeam::channel::{Sender, Receiver, Select};
 use crate::{
-	macros::{send,recv,debug2},
+	macros::{send,try_recv,debug2},
 	state::{AudioState,AudioStatePatch,ValidTrackData,AtomicAudioState},
 	actor::{
 		decode::{KernelToDecode,DecodeToKernel},
@@ -42,10 +42,11 @@ use strum::EnumCount;
 //---------------------------------------------------------------------------------------------------- Kernel
 #[derive(Debug)]
 pub(crate) struct Kernel<TrackData: ValidTrackData> {
-	audio_state: someday::Writer<AudioState<TrackData>, AudioStatePatch>,
-	playing: Arc<AtomicBool>,
+	atomic_state:        Arc<AtomicAudioState>,
+	audio_state:         someday::Writer<AudioState<TrackData>, AudioStatePatch>,
+	playing:             Arc<AtomicBool>,
 	audio_ready_to_recv: Arc<AtomicBool>,
-	shutdown_wait: Arc<Barrier>,
+	shutdown_wait:       Arc<Barrier>,
 }
 
 //---------------------------------------------------------------------------------------------------- Msg
@@ -89,8 +90,8 @@ pub(crate) struct Channels<TrackData: ValidTrackData> {
 	pub(crate) play_recv:    Receiver<()>,
 	pub(crate) pause_recv:   Receiver<()>,
 	pub(crate) clear_recv:   Receiver<Clear>,
-	pub(crate) repeat_recv:  Receiver<Repeat>,
 	pub(crate) shuffle_recv: Receiver<Shuffle>,
+	pub(crate) repeat_recv:  Receiver<Repeat>,
 	pub(crate) volume_recv:  Receiver<Volume>,
 	pub(crate) restore_recv: Receiver<AudioState<TrackData>>,
 
@@ -142,6 +143,7 @@ where
 		} = args;
 
 		let this = Kernel {
+			atomic_state,
 			playing,
 			audio_state,
 			audio_ready_to_recv,
@@ -166,8 +168,8 @@ where
 		assert_eq!(1,  select.recv(&channels.play_recv));
 		assert_eq!(2,  select.recv(&channels.pause_recv));
 		assert_eq!(3,  select.recv(&channels.clear_recv));
-		assert_eq!(4,  select.recv(&channels.repeat_recv));
-		assert_eq!(5,  select.recv(&channels.shuffle_recv));
+		assert_eq!(4,  select.recv(&channels.shuffle_recv));
+		assert_eq!(5,  select.recv(&channels.repeat_recv));
 		assert_eq!(6,  select.recv(&channels.volume_recv));
 		assert_eq!(7,  select.recv(&channels.restore_recv));
 		assert_eq!(8,  select.recv(&channels.add_recv));
@@ -191,9 +193,9 @@ where
 				1  => self.fn_play(),
 				2  => self.fn_pause(),
 				3  => self.fn_clear(),
-				4  => self.fn_repeat(),
 				5  => self.fn_shuffle(),
-				6  => self.fn_volume(),
+				4  => self.fn_repeat(try_recv!(channels.repeat_recv)),
+				6  => self.fn_volume(try_recv!(channels.volume_recv)),
 				7  => self.fn_restore(),
 				8  => self.fn_add(),
 				9  => self.fn_seek(),
@@ -264,18 +266,18 @@ where
 	}
 
 	#[inline]
-	fn fn_repeat(&mut self) {
-		todo!()
-	}
-
-	#[inline]
 	fn fn_shuffle(&mut self) {
 		todo!()
 	}
 
 	#[inline]
-	fn fn_volume(&mut self) {
-		todo!()
+	fn fn_repeat(&mut self, repeat: Repeat) {
+		self.atomic_state.repeat.set(repeat);
+	}
+
+	#[inline]
+	fn fn_volume(&mut self, volume: Volume) {
+		self.atomic_state.volume.set(volume);
 	}
 
 	#[inline]
@@ -325,12 +327,6 @@ where
 
 	#[inline]
 	fn fn_remove_range(&mut self) {
-		todo!()
-	}
-
-	#[cold]
-	#[inline(never)]
-	fn fn_shutdown(&mut self) {
 		todo!()
 	}
 }

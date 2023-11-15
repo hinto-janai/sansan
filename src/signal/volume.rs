@@ -246,19 +246,33 @@ impl AtomicVolume {
 
 	pub(crate) const DEFAULT: Self = Self(AtomicU32::new(Self::DEFAULT_BITS));
 
+	#[cold]
+	#[inline(never)]
 	pub(crate) fn new(volume: Volume) -> Self {
 		let bits = volume.inner().to_bits();
 		Self(AtomicU32::new(bits))
 	}
 
+	#[inline]
 	pub(crate) fn store(&self, volume: Volume, ordering: Ordering) {
 		let bits = volume.inner().to_bits();
 		self.0.store(bits, ordering);
 	}
 
+	#[inline]
 	pub(crate) fn load(&self, ordering: Ordering) -> Volume {
 		let bits = self.0.load(ordering);
 		Volume(f32::from_bits(bits))
+	}
+
+	#[inline]
+	pub(crate) fn set(&self, volume: Volume) {
+		self.store(volume, Ordering::Release);
+	}
+
+	#[inline]
+	pub(crate) fn get(&self) -> Volume {
+		self.load(Ordering::Acquire)
 	}
 }
 

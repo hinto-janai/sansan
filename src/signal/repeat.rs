@@ -48,13 +48,23 @@ impl AtomicRepeat {
 	pub(crate) const DEFAULT: Self = Self(AtomicU8::new(Repeat::DEFAULT.to_u8()));
 
 	#[inline]
-	pub(crate) fn load(&self, repeat: Repeat, ordering: Ordering) -> Repeat {
+	pub(crate) fn load(&self, ordering: Ordering) -> Repeat {
 		Repeat::from_u8(self.0.load(ordering))
 	}
 
 	#[inline]
 	pub(crate) fn store(&self, repeat: Repeat, ordering: Ordering) {
 		self.0.store(repeat.to_u8(), ordering)
+	}
+
+	#[inline]
+	pub(crate) fn set(&self, repeat: Repeat) {
+		self.store(repeat, Ordering::Release);
+	}
+
+	#[inline]
+	pub(crate) fn get(&self) -> Repeat {
+		self.load(Ordering::Acquire)
 	}
 }
 

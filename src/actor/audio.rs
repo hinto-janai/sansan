@@ -226,7 +226,7 @@ where
 	) {
 		let (audio, time) = msg;
 
-		let spec    = *audio.spec();
+		let spec     = *audio.spec();
 		let duration = audio.capacity() as u64;
 
 		// If the spec/duration is different, we must re-open a
@@ -248,8 +248,7 @@ where
 			}
 		}
 
-		// TODO: load atomic [Volume] from [Engine]
-		let volume: Volume = Volume::new(todo!());
+		let volume = self.atomic_state.volume.get();
 
 		// Write audio buffer (hangs).
 		if let Err(e) = self.output.write(audio, to_gc, volume) {
