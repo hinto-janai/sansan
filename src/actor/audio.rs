@@ -21,6 +21,7 @@ use crate::audio::{
 };
 use crate::macros::{send,try_recv,debug2};
 use crate::signal::Volume;
+use crate::state::AtomicAudioState;
 
 //---------------------------------------------------------------------------------------------------- Constants
 // AUDIO_BUFFER_LEN is the buffer size of the channel
@@ -41,6 +42,7 @@ pub(crate) struct Audio<Output>
 where
 	Output: AudioOutput,
 {
+	atomic_state:  Arc<AtomicAudioState>,
 	playing_local: bool,
 	playing:       Arc<AtomicBool>,
 	ready_to_recv: Arc<AtomicBool>,
@@ -62,25 +64,6 @@ struct Channels {
 	from_kernel: Receiver<DiscardCurrentAudio>,
 }
 
-//---------------------------------------------------------------------------------------------------- Msg
-// See [src/actor/kernel.rs].
-#[repr(u8)]
-#[derive(Debug,Eq,PartialEq)]
-#[derive(EnumCount)]
-enum Msg {
-	FromDecode,
-	FromKernel,
-	Shutdown,
-}
-impl Msg {
-	const fn from_usize(u: usize) -> Self {
-		debug_assert!(u <= Msg::COUNT);
-
-		// SAFETY: repr(u8)
-		unsafe { std::mem::transmute(u as u8) }
-	}
-}
-
 //---------------------------------------------------------------------------------------------------- (Actual) Messages
 // Audio -> Decode
 //
@@ -96,6 +79,7 @@ pub(crate) enum AudioToKernel {
 
 //---------------------------------------------------------------------------------------------------- Audio Impl
 pub(crate) struct InitArgs {
+	pub(crate) atomic_state:  Arc<AtomicAudioState>,
 	pub(crate) playing:       Arc<AtomicBool>,
 	pub(crate) ready_to_recv: Arc<AtomicBool>,
 	pub(crate) shutdown_wait: Arc<Barrier>,
@@ -117,6 +101,7 @@ where
 	#[inline(never)]
 	pub(crate) fn init(args: InitArgs) -> Result<JoinHandle<()>, std::io::Error> {
 		let InitArgs {
+			atomic_state,
 			playing,
 			ready_to_recv,
 			shutdown_wait,
@@ -146,6 +131,7 @@ where
 				let output: Cubeb<Rubato> = Cubeb::dummy().unwrap();
 
 				let this = Audio {
+					atomic_state,
 					playing_local: false,
 					playing,
 					ready_to_recv,

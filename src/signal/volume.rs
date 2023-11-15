@@ -233,4 +233,50 @@ impl From<f32> for Volume {
 	}
 }
 
+//---------------------------------------------------------------------------------------------------- AtomicVolume
+use std::sync::atomic::{AtomicU32,Ordering};
+
+pub(crate) struct AtomicVolume(AtomicU32);
+
+impl AtomicVolume {
+	/// FIXME: This may not be portable across different platforms.
+	///
+	/// Should equal to `Volume::DEFAULT`'s f32 bits.
+	pub(crate) const DEFAULT_BITS: u32 = 1048576000;
+
+	pub(crate) const DEFAULT: Self = Self(AtomicU32::new(Self::DEFAULT_BITS));
+
+	pub(crate) fn new(volume: Volume) -> Self {
+		let bits = volume.inner().to_bits();
+		Self(AtomicU32::new(bits))
+	}
+
+	pub(crate) fn store(&self, volume: Volume, ordering: Ordering) {
+		let bits = volume.inner().to_bits();
+		self.0.store(bits, ordering);
+	}
+
+	pub(crate) fn load(&self, ordering: Ordering) -> Volume {
+		let bits = self.0.load(ordering);
+		Volume(f32::from_bits(bits))
+	}
+}
+
+impl std::fmt::Debug for AtomicVolume {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_tuple("AtomicVolume")
+			.field(&self.0.load(Ordering::Relaxed))
+			.finish()
+	}
+}
+
 //---------------------------------------------------------------------------------------------------- TESTS
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn atomic_volume_default_bits() {
+		assert_eq!(Volume::DEFAULT.inner().to_bits(), AtomicVolume::DEFAULT_BITS);
+	}
+}

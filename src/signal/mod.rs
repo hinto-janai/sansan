@@ -28,6 +28,7 @@ pub use remove::{Remove,RemoveError};
 
 mod repeat;
 pub use repeat::Repeat;
+pub(crate) use repeat::AtomicRepeat;
 
 mod seek;
 pub use seek::{Seek,SeekError};
@@ -46,6 +47,7 @@ pub use signal::Signal;
 
 mod volume;
 pub use volume::Volume;
+pub(crate) use volume::AtomicVolume;
 
 
 //---------------------------------------------------------------------------------------------------- Signal Etc

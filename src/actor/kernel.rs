@@ -3,7 +3,7 @@ use std::thread::JoinHandle;
 use crossbeam::channel::{Sender, Receiver, Select};
 use crate::{
 	macros::{send,recv,debug2},
-	state::{AudioState,AudioStatePatch,ValidTrackData},
+	state::{AudioState,AudioStatePatch,ValidTrackData,AtomicAudioState},
 	actor::{
 		decode::{KernelToDecode,DecodeToKernel},
 		audio::AudioToKernel,
@@ -117,6 +117,7 @@ pub(crate) struct Channels<TrackData: ValidTrackData> {
 
 //---------------------------------------------------------------------------------------------------- Kernel Impl
 pub(crate) struct InitArgs<TrackData: ValidTrackData> {
+	pub(crate) atomic_state:        Arc<AtomicAudioState>,
 	pub(crate) playing:             Arc<AtomicBool>,
 	pub(crate) audio_ready_to_recv: Arc<AtomicBool>,
 	pub(crate) shutdown_wait:       Arc<Barrier>,
@@ -132,6 +133,7 @@ where
 	//---------------------------------------------------------------------------------------------------- Init
 	pub(crate) fn init(args: InitArgs<TrackData>) -> Result<JoinHandle<()>, std::io::Error> {
 		let InitArgs {
+			atomic_state,
 			playing,
 			audio_ready_to_recv,
 			shutdown_wait,

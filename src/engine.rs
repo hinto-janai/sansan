@@ -1,8 +1,8 @@
 //---------------------------------------------------------------------------------------------------- Use
 use std::thread::JoinHandle;
 use crate::{
-	state::{AudioStateReader,AudioState,ValidTrackData},
-	signal::Signal,
+	state::{AudioStateReader,AudioState,ValidTrackData, AtomicAudioState},
+	signal::{Signal,Volume,Repeat},
 	config::Config,
 	actor::{
 		audio::{Audio,AUDIO_BUFFER_LEN},
@@ -84,6 +84,16 @@ where
 		// hasn't yet exited and has [send()]'ed a message,
 		// causing a panic.
 		let shutdown_wait = Arc::new(Barrier::new(ACTOR_COUNT));
+
+		// Initialize the "AtomicAudioState".
+		//
+		// This is the state that lives as line as the [Engine]
+		// and is used for quick communications between the
+		// actors. Since these are usually accessed in a loop,
+		// acquiring a channel message or locking would be a
+		// bit slower, so they're either atomic types, or
+		// wrapped in `atomic::Atomic<T>`.
+		let atomic_state = Arc::new(AtomicAudioState::DEFAULT);
 
 		// Initialize all the channels between [Kernel] <-> [Signal].
 		//
@@ -189,6 +199,7 @@ where
 		let (a_shutdown, shutdown) = bounded(1);
 		let (a_to_gc, gc_from_a)   = unbounded();
 		Audio::<Cubeb<Rubato>>::init(crate::actor::audio::InitArgs {
+			atomic_state:  Arc::clone(&atomic_state),
 			playing:       Arc::clone(&playing),
 			ready_to_recv: Arc::clone(&audio_ready_to_recv),
 			shutdown_wait: Arc::clone(&shutdown_wait),
@@ -293,6 +304,7 @@ where
 			remove_range_recv: k_remove_range_recv,
 		};
 		Kernel::<TrackData>::init(crate::actor::kernel::InitArgs {
+			atomic_state,
 			playing,
 			audio_ready_to_recv,
 			shutdown_wait: Arc::clone(&shutdown_wait),

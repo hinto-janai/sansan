@@ -1,6 +1,6 @@
 //---------------------------------------------------------------------------------------------------- Use
 use crate::signal::{
-	Volume,Repeat,
+	Volume,Repeat,AtomicVolume,AtomicRepeat,
 };
 use someday::{Reader, Commit, CommitRef};
 use readable::RuntimeMilli;
@@ -61,9 +61,23 @@ where
 	pub const DUMMY: Self = Self {
 		queue:   VecDeque::new(),
 		playing: false,
-		repeat:  Repeat,
+		repeat:  Repeat::Off,
 		volume:  Volume::DEFAULT,
 		current: None,
+	};
+}
+
+//---------------------------------------------------------------------------------------------------- AtomicAudioState
+#[derive(Debug)]
+pub(crate) struct AtomicAudioState {
+	pub(crate) repeat: AtomicRepeat,
+	pub(crate) volume: AtomicVolume,
+}
+
+impl AtomicAudioState {
+	pub(crate) const DEFAULT: Self = Self {
+		repeat: AtomicRepeat::DEFAULT,
+		volume: AtomicVolume::DEFAULT,
 	};
 }
 
@@ -128,4 +142,9 @@ where
 	fn as_ref(&self) -> &AudioState<TrackData> {
 		&self.0
 	}
+}
+
+//---------------------------------------------------------------------------------------------------- TESTS
+#[cfg(test)]
+mod tests {
 }
