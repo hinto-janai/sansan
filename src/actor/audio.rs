@@ -10,7 +10,7 @@ use symphonia::core::{audio::AudioBuffer, units::Time};
 use std::sync::{
 	Arc,
 	Barrier,
-	atomic::AtomicBool,
+	atomic::{AtomicBool,Ordering},
 };
 use crate::actor::kernel::DiscardCurrentAudio;
 use crate::audio::{
@@ -159,7 +159,7 @@ where
 			// If we're playing, check if we have samples to play.
 			if self.playing_local {
 				if let Ok(msg) = channels.from_decode.try_recv() {
-					self.fn_play_audio_buffer(msg, &channels.to_gc);
+					self.play_audio_buffer(msg, &channels.to_gc);
 				}
 			}
 
@@ -185,13 +185,13 @@ where
 				// From `Decode`.
 				0 => {
 					let msg = try_recv!(channels.from_decode);
-					self.fn_play_audio_buffer(msg, &channels.to_gc);
+					self.play_audio_buffer(msg, &channels.to_gc);
 				},
 
 				// From `Kernel`.
 				1 => {
 					let msg = try_recv!(channels.from_kernel);
-					self.fn_discard_audio(&channels.from_decode, &channels.to_gc);
+					self.discard_audio(&channels.from_decode, &channels.to_gc);
 				},
 
 				// Shutdown.
@@ -219,7 +219,7 @@ where
 	// to exact messages/signals from the other actors.
 
 	#[inline]
-	fn fn_play_audio_buffer(
+	fn play_audio_buffer(
 		&mut self,
 		msg: (AudioBuffer<f32>, symphonia::core::units::Time),
 		to_gc: &Sender<AudioBuffer<f32>>
@@ -263,15 +263,22 @@ where
 	}
 
 	#[inline]
-	fn fn_discard_audio(
+	fn discard_audio(
 		&mut self,
 		from_decode: &Receiver<(AudioBuffer<f32>, Time)>,
 		to_gc: &Sender<AudioBuffer<f32>>,
 	) {
+		// While we are discarding audio, signal to [Decode]
+		// that we don't want any new [AudioBuffer]'s
+		// (since they'll just get discarded).
+		self.ready_to_recv.store(false, Ordering::Release);
+
 		// `Time` is just `u64` + `f64`.
 		// Doesn't make sense sending stack variables to GC.
 		while let Ok(msg) = from_decode.try_recv() {
 			send!(to_gc, msg.0);
 		}
+
+		self.ready_to_recv.store(true, Ordering::Release);
 	}
 }

@@ -216,6 +216,8 @@ where
 		recv!(self.drained);
 	}
 
+	#[cold]
+	#[inline(never)]
 	fn try_open(
 		name: impl Into<Vec<u8>>,
 		signal_spec: SignalSpec,

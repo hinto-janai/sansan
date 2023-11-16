@@ -9,7 +9,11 @@ use crate::{
 	actor::audio::TookAudioBuffer,
 	macros::{recv,send,debug2},
 };
-use symphonia::core::{audio::AudioBuffer, units::Time};
+use symphonia::core::{
+	audio::AudioBuffer,
+	units::Time,
+	formats::{SeekMode,SeekTo},
+};
 use std::{
 	sync::{
 		Arc,
@@ -34,14 +38,17 @@ use strum::EnumCount;
 // so this should never actually resize.
 pub(crate) const DECODE_BUFFER_LEN: usize = 16_000;
 
+//---------------------------------------------------------------------------------------------------- Types
+type ToAudio = (AudioBuffer<f32>, Time);
+
 //---------------------------------------------------------------------------------------------------- Decode
 pub(crate) struct Decode {
 	audio_ready_to_recv: Arc<AtomicBool>,
-	buffer:              VecDeque<AudioBuffer<f32>>,
+	buffer:              VecDeque<ToAudio>,
 	source:              SourceInner,
 	done_decoding:       bool,
-	to_pool:             Sender<VecDeque<AudioBuffer<f32>>>,
-	from_pool:           Receiver<VecDeque<AudioBuffer<f32>>>,
+	to_pool:             Sender<VecDeque<ToAudio>>,
+	from_pool:           Receiver<VecDeque<ToAudio>>,
 	shutdown_wait:       Arc<Barrier>,
 }
 
@@ -49,7 +56,7 @@ pub(crate) struct Decode {
 struct Channels {
 	shutdown:    Receiver<()>,
 	to_gc:       Sender<SourceInner>,
-	to_audio:    Sender<(AudioBuffer<f32>, Time)>,
+	to_audio:    Sender<ToAudio>,
 	from_audio:  Receiver<TookAudioBuffer>,
 	to_kernel:   Sender<DecodeToKernel>,
 	from_kernel: Receiver<KernelToDecode>,
@@ -87,9 +94,9 @@ pub(crate) struct InitArgs {
 	pub(crate) shutdown_wait:       Arc<Barrier>,
 	pub(crate) shutdown:            Receiver<()>,
 	pub(crate) to_gc:               Sender<SourceInner>,
-	pub(crate) to_pool:             Sender<VecDeque<AudioBuffer<f32>>>,
-	pub(crate) from_pool:           Receiver<VecDeque<AudioBuffer<f32>>>,
-	pub(crate) to_audio:            Sender<(AudioBuffer<f32>, Time)>,
+	pub(crate) to_pool:             Sender<VecDeque<ToAudio>>,
+	pub(crate) from_pool:           Receiver<VecDeque<ToAudio>>,
+	pub(crate) to_audio:            Sender<ToAudio>,
 	pub(crate) from_audio:          Receiver<TookAudioBuffer>,
 	pub(crate) to_kernel:           Sender<DecodeToKernel>,
 	pub(crate) from_kernel:         Receiver<KernelToDecode>,
@@ -160,7 +167,7 @@ impl Decode {
 			// executing the below code.
 			if let Ok(signal) = signal {
 				match signal.index() {
-					0 => self.fn_audio_took_buffer(),
+					0 => self.send_audio_if_ready(&channels.to_audio),
 					1 => self.msg_from_kernel(&channels),
 					2 => {
 						debug2!("Debug - shutting down");
@@ -203,7 +210,8 @@ impl Decode {
 				Ok(decoded) => {
 					let audio = decoded.make_equivalent::<f32>();
 					let time  = self.source.timebase.calc_time(packet.ts);
-					send!(channels.to_audio, (audio, time));
+					self.set_current_audio_time(time);
+					self.send_or_store_audio(&channels.to_audio, (audio, time));
 				}
 
 				Err(err) => todo!(),
@@ -220,9 +228,9 @@ impl Decode {
 
 		use KernelToDecode as K;
 		match msg {
-			K::NewSource(source)   => self.fn_new_source(source, &channels.to_gc),
-			K::Seek(seek)          => self.fn_seek(seek),
-			K::DiscardAudioAndStop => self.fn_discard_audio_and_stop(),
+			K::NewSource(source)   => self.new_source(source, &channels.to_gc),
+			K::Seek(seek)          => self.seek(seek),
+			K::DiscardAudioAndStop => self.discard_audio_and_stop(),
 		}
 	}
 
@@ -233,12 +241,29 @@ impl Decode {
 	// to exact messages/signals from the other actors.
 
 	#[inline]
-	fn fn_audio_took_buffer(&mut self) {
-		todo!()
+	// If [Audio]'s is ready, take out the
+	// oldest buffer and send it.
+	fn send_audio_if_ready(&mut self, to_audio: &Sender<ToAudio>) {
+		if self.audio_is_ready(&to_audio) {
+			if let Some(data) = self.buffer.pop_front() {
+				send!(to_audio, data);
+			}
+		}
 	}
 
 	#[inline]
-	fn fn_new_source(&mut self, source: Source, to_gc: &Sender<SourceInner>) {
+	// Send decoded audio data to [Audio]
+	// if they are ready, else, store locally.
+	fn send_or_store_audio(&mut self, to_audio: &Sender<ToAudio>, data: ToAudio) {
+		if !self.audio_is_ready(to_audio) {
+			self.buffer.push_back(data);
+		} else {
+			send!(to_audio, data);
+		}
+	}
+
+	#[inline]
+	fn new_source(&mut self, source: Source, to_gc: &Sender<SourceInner>) {
 		match source.try_into() {
 			Ok(mut s) => {
 				self.swap_audio_buffer();
@@ -254,24 +279,78 @@ impl Decode {
 	}
 
 	#[inline]
-	fn fn_seek(&mut self, seek: signal::Seek) {
-		todo!()
+	fn seek(&mut self, seek: signal::Seek) {
+		use signal::Seek as S;
+
+		// Get the absolute timestamp of where we'll be seeking.
+		let time = match seek {
+			S::Absolute(time) => {
+				// TODO: handle error.
+				// seeked further than total track time.
+				if time > self.source.secs_total {
+					todo!();
+				}
+
+				Time { seconds: time as u64, frac: time.fract() }
+			},
+
+			S::Forward(time) => {
+				let new = time + (
+					self.source.time_now.seconds as f64 +
+					self.source.time_now.frac
+				);
+
+				// TODO: error or skip.
+				// seeked further than total track time.
+				if new > self.source.secs_total {
+					todo!()
+				}
+
+				Time { seconds: new as u64, frac: new.fract() }
+			},
+
+			S::Backward(time)  => {
+				let new =
+					(self.source.time_now.seconds as f64 +
+					self.source.time_now.frac) -
+					time;
+
+				// TODO: error or skip.
+				// seeked backwards more than 0.0.
+				if new.is_sign_negative() {
+					todo!()
+				}
+
+				Time { seconds: new as u64, frac: new.fract() }
+			},
+		};
+
+		// Attempt seek.
+		if let Err(e) = self.source.reader.seek(
+			SeekMode::Coarse,
+			SeekTo::Time { time, track_id: None },
+		) {
+			// TODO: handle seek error.
+			todo!();
+		}
 	}
 
 	#[inline]
-	fn fn_discard_audio_and_stop(&mut self) {
-		todo!()
+	fn set_current_audio_time(&mut self, time: Time) {
+		self.source.time_now = time;
+	}
+
+	#[inline]
+	fn discard_audio_and_stop(&mut self) {
+		self.swap_audio_buffer();
+		self.done_decoding();
 	}
 
 	#[cold]
 	#[inline(never)]
-	fn fn_shutdown(&mut self) {
+	fn shutdown(&mut self) {
 		todo!()
 	}
-
-	//---------------------------------------------------------------------------------------------------- Misc
-	// These are common extracted functions
-	// used in the `fn_()` handlers above.
 
 	#[inline]
 	// Swap our current audio buffer
@@ -293,5 +372,12 @@ impl Decode {
 	#[inline]
 	fn done_decoding(&mut self) {
 		self.done_decoding = true;
+	}
+
+	#[inline]
+	/// If [Audio] is in a state that is
+	// willing to accept new audio buffers.
+	fn audio_is_ready(&self, to_audio: &Sender<ToAudio>) -> bool {
+		!to_audio.is_full() && self.audio_ready_to_recv.load(std::sync::atomic::Ordering::Acquire)
 	}
 }

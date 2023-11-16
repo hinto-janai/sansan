@@ -8,7 +8,7 @@ use crate::{
 	actor::audio::TookAudioBuffer,
 	macros::{recv,send,debug2},
 };
-use symphonia::core::audio::AudioBuffer;
+use symphonia::core::{audio::AudioBuffer, units::Time};
 use std::{
 	sync::{
 		Arc,
@@ -21,6 +21,9 @@ use strum::EnumCount;
 
 //---------------------------------------------------------------------------------------------------- Constants
 
+//---------------------------------------------------------------------------------------------------- Types
+type ToDecode = (AudioBuffer<f32>, Time);
+
 //---------------------------------------------------------------------------------------------------- Pool
 pub(crate) struct Pool<TrackData: ValidTrackData> {
 	shutdown_wait: Arc<Barrier>,
@@ -30,22 +33,20 @@ pub(crate) struct Pool<TrackData: ValidTrackData> {
 // See [src/actor/kernel.rs]'s [Channels]
 struct Channels<TrackData: ValidTrackData> {
 	shutdown:     Receiver<()>,
-	to_decode:    Sender<VecDeque<AudioBuffer<f32>>>,
-	from_decode:  Receiver<VecDeque<AudioBuffer<f32>>>,
+	to_decode:    Sender<VecDeque<ToDecode>>,
+	from_decode:  Receiver<VecDeque<ToDecode>>,
 	to_kernel:    Sender<VecDeque<Track<TrackData>>>,
 	from_kernel:  Receiver<VecDeque<Track<TrackData>>>,
 	to_gc_decode: Sender<AudioBuffer<f32>>,
 	to_gc_kernel: Sender<Track<TrackData>>,
 }
 
-//---------------------------------------------------------------------------------------------------- (Actual) Messages
-
 //---------------------------------------------------------------------------------------------------- InitArgs
 pub(crate) struct InitArgs<TrackData: ValidTrackData> {
 	pub(crate) shutdown_wait: Arc<Barrier>,
 	pub(crate) shutdown:      Receiver<()>,
-	pub(crate) to_decode:     Sender<VecDeque<AudioBuffer<f32>>>,
-	pub(crate) from_decode:   Receiver<VecDeque<AudioBuffer<f32>>>,
+	pub(crate) to_decode:     Sender<VecDeque<ToDecode>>,
+	pub(crate) from_decode:   Receiver<VecDeque<ToDecode>>,
 	pub(crate) to_kernel:     Sender<VecDeque<Track<TrackData>>>,
 	pub(crate) from_kernel:   Receiver<VecDeque<Track<TrackData>>>,
 	pub(crate) to_gc_decode:  Sender<AudioBuffer<f32>>,
@@ -136,9 +137,11 @@ impl<TrackData: ValidTrackData> Pool<TrackData> {
 		// Receive old buffer.
 		let mut buffer = recv!(channels.from_decode);
 
-		// Drain, sending data to [Gc].
-		for i in buffer.drain(..) {
-			send!(channels.to_gc_decode, i);
+		// Drain, sending audio data (boxed) to [Gc].
+		//
+		// Drop the [Time] in scope, it is just [u64] + [f64].
+		for (audio, _time) in buffer.drain(..) {
+			send!(channels.to_gc_decode, audio);
 		}
 
 		// Return clean buffer to [Decode].

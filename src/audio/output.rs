@@ -98,7 +98,7 @@ where
 	fn pause(&mut self) -> Result<(), AudioOutputError>;
 
 	/// `flush()` + `pause()`.
-	fn flush_pause(&mut self) -> Result<(), AudioOutputError> {
+	fn stop(&mut self) -> Result<(), AudioOutputError> {
 		self.flush();
 		self.pause()
 	}

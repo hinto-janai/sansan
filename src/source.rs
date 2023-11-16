@@ -285,13 +285,15 @@ pub(crate) struct SourceInner {
 	// The audio's sample rate
 	pub(crate) sample_rate: u32,
 	// The audio's current `Time`
-	pub(crate) time: Time,
+	pub(crate) time_now: Time,
+	// The audio's total runtime.
+	// This is calculated in `try_from_inner()` before any decoding.
+	pub(crate) time_total: Time,
+	// Same as above, but in [f64] seconds.
+	pub(crate) secs_total: f64,
 	// The audio's `TimeBase`.
 	// This is used to calculated elapsed time as the audio progresses.
 	pub(crate) timebase: TimeBase,
-	// The audio's total runtime.
-	// This is calculated in `try_from_inner()` before any decoding.
-	pub(crate) total_time: Time,
 }
 
 impl SourceInner {
@@ -344,9 +346,10 @@ impl SourceInner {
 			reader:      Box::new(DummyReader),
 			decoder:     Box::new(DummyDecoder),
 			sample_rate: 0,
-			time:        Time { seconds: 0, frac: 0.0, },
+			time_now:    Time { seconds: 0, frac: 0.0, },
+			time_total:  Time { seconds: 0, frac: 0.0 },
+			secs_total:  0.0,
 			timebase:    TimeBase { numer: 0, denom: 0 },
-			total_time:  Time { seconds: 0, frac: 0.0 },
 		}
 	}
 }
@@ -403,15 +406,17 @@ impl TryFrom<MediaSourceStream> for SourceInner {
 		let Some(n_frames) = track.codec_params.n_frames else {
 			return Err(SourceError::Frames);
 		};
-		let total_time = timebase.calc_time(n_frames);
+		let time_total = timebase.calc_time(n_frames);
+		let secs_total = time_total.seconds as f64 + time_total.frac;
 
 		Ok(Self {
 			reader,
 			decoder,
 			sample_rate,
-			time: Time { seconds: 0, frac: 0.0 },
+			time_now: Time { seconds: 0, frac: 0.0 },
+			time_total,
+			secs_total,
 			timebase,
-			total_time,
 		})
 	}
 }
