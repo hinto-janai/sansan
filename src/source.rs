@@ -297,6 +297,8 @@ pub(crate) struct SourceInner {
 }
 
 impl SourceInner {
+	#[cold]
+	#[inline(never)]
 	// Returns a dummy [SourceInner]
 	// that cannot actually be used.
 	//
@@ -318,27 +320,37 @@ impl SourceInner {
 
 		struct DummyReader;
 		impl FormatReader for DummyReader {
+			#[cold] #[inline(never)]
 			fn try_new(source: MediaSourceStream, options: &FormatOptions) -> Result<Self> { unreachable!() }
+			#[cold] #[inline(never)]
 			fn cues(&self) -> &[Cue] { unreachable!() }
+			#[cold] #[inline(never)]
 			fn metadata(&mut self) -> Metadata<'_> { unreachable!() }
-			fn seek(
-				&mut self,
-				mode: SeekMode,
-				to: SeekTo
-				) -> Result<SeekedTo> { unreachable!() }
+			#[cold] #[inline(never)]
+			fn seek(&mut self, mode: SeekMode, to: SeekTo) -> Result<SeekedTo> { unreachable!() }
+			#[cold] #[inline(never)]
 			fn tracks(&self) -> &[Track] { unreachable!() }
+			#[cold] #[inline(never)]
 			fn next_packet(&mut self) -> Result<Packet> { unreachable!() }
+			#[cold] #[inline(never)]
 			fn into_inner(self: Box<Self>) -> MediaSourceStream { unreachable!() }
 		}
 
 		struct DummyDecoder;
 		impl Decoder for DummyDecoder {
+			#[cold] #[inline(never)]
 			fn try_new(params: &symphonia::core::codecs::CodecParameters, options: &DecoderOptions) -> Result<Self> { unreachable!() }
+			#[cold] #[inline(never)]
 			fn supported_codecs() -> &'static [CodecDescriptor] { unreachable!() }
+			#[cold] #[inline(never)]
 			fn reset(&mut self) { unreachable!() }
+			#[cold] #[inline(never)]
 			fn codec_params(&self) -> &CodecParameters { unreachable!() }
+			#[cold] #[inline(never)]
 			fn decode(&mut self, packet: &Packet) -> Result<AudioBufferRef> { unreachable!() }
+			#[cold] #[inline(never)]
 			fn finalize(&mut self) -> FinalizeResult { unreachable!() }
+			#[cold] #[inline(never)]
 			fn last_decoded(&self) -> AudioBufferRef { unreachable!() }
 		}
 
@@ -425,7 +437,6 @@ impl TryFrom<MediaSourceStream> for SourceInner {
 impl TryInto<SourceInner> for Source {
 	type Error = SourceError;
 
-	#[inline]
 	fn try_into(self) -> Result<SourceInner, Self::Error> {
 		match self {
 			Self::Path(path) => {

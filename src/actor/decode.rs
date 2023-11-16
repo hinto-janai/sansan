@@ -105,6 +105,8 @@ pub(crate) struct InitArgs {
 //---------------------------------------------------------------------------------------------------- Decode Impl
 impl Decode {
 	//---------------------------------------------------------------------------------------------------- Init
+	#[cold]
+	#[inline(never)]
 	pub(crate) fn init(args: InitArgs) -> Result<JoinHandle<()>, std::io::Error> {
 		let InitArgs {
 			audio_ready_to_recv,
@@ -144,6 +146,8 @@ impl Decode {
 	}
 
 	//---------------------------------------------------------------------------------------------------- Main Loop
+	#[cold]
+	#[inline(never)]
 	fn main(mut self, channels: Channels) {
 		// Create channels that we will
 		// be selecting/listening to for all time.
@@ -344,12 +348,6 @@ impl Decode {
 	fn discard_audio_and_stop(&mut self) {
 		self.swap_audio_buffer();
 		self.done_decoding();
-	}
-
-	#[cold]
-	#[inline(never)]
-	fn shutdown(&mut self) {
-		todo!()
 	}
 
 	#[inline]

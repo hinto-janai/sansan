@@ -324,13 +324,13 @@ where
 		})
 	}
 
-	#[inline(always)]
+	#[inline]
 	/// TODO
 	pub fn reader(&self) -> AudioStateReader<TrackData> {
 		AudioStateReader::clone(&self.audio)
 	}
 
-	#[inline(always)]
+	#[inline]
 	/// TODO
 	//
 	// INVARIANT

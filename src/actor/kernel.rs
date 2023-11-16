@@ -132,6 +132,8 @@ where
 	TrackData: ValidTrackData
 {
 	//---------------------------------------------------------------------------------------------------- Init
+	#[cold]
+	#[inline(never)]
 	pub(crate) fn init(args: InitArgs<TrackData>) -> Result<JoinHandle<()>, std::io::Error> {
 		let InitArgs {
 			atomic_state,
@@ -156,6 +158,8 @@ where
 	}
 
 	//---------------------------------------------------------------------------------------------------- Main Loop
+	#[cold]
+	#[inline(never)]
 	fn main(mut self, channels: Channels<TrackData>) {
 		// Create channels that we will
 		// be selecting/listening to for all time.

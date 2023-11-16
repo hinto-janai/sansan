@@ -32,6 +32,8 @@ impl<TrackData: ValidTrackData> Gc<TrackData> {
 	}
 
 	//---------------------------------------------------------------------------------------------------- Main Loop
+	#[cold]
+	#[inline(never)]
 	fn main(self) {
 		let mut select = Select::new();
 
@@ -41,10 +43,7 @@ impl<TrackData: ValidTrackData> Gc<TrackData> {
 		assert_eq!(3, select.recv(&self.shutdown));
 
 		// Reduce [Gc] to the lowest thread priority.
-		match lpt::lpt() {
-			Ok(_)  => debug2!("Gc - lowest thread priority ... OK"),
-			Err(_) => warn2!("Gc - lowest thread priority ... FAIL"),
-		}
+		lpt::lpt();
 
 		// Loop, receive garbage, and immediately drop it.
 		loop {
