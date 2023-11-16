@@ -61,7 +61,7 @@ impl<TrackData: ValidTrackData> Gc<TrackData> {
 					return;
 				},
 
-				_ => unreachable!(),
+				_ => crate::macros::unreachable2!(),
 			}
 		}
 	}

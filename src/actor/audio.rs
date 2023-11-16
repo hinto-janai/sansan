@@ -203,7 +203,7 @@ where
 					return;
 				},
 
-				_ => unreachable!(),
+				_ => crate::macros::unreachable2!(),
 			}
 		}
 	}

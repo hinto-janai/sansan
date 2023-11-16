@@ -121,7 +121,7 @@ impl<TrackData: ValidTrackData> Pool<TrackData> {
 					return;
 				},
 
-				_ => unreachable!(),
+				_ => crate::macros::unreachable2!(),
 			}
 		}
 	}

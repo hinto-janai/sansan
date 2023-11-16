@@ -28,7 +28,7 @@ impl Repeat {
 			0 => Self::Off,
 			1 => Self::Track,
 			2 => Self::Queue,
-			_ => unreachable!(),
+			_ => crate::macros::unreachable2!(),
 		}
 	}
 

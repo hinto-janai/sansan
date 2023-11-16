@@ -1,5 +1,16 @@
 // Global macros for internal sansan usage.
 
+//---------------------------------------------------------------------------------------------------- Panics
+macro_rules! unreachable2 {
+	() => {{
+		#[cfg(debug_assertions)]
+		unreachable!();
+		#[cfg(not(debug_assertions))]
+		unsafe { std::hint::unreachable_unchecked() };
+	}};
+}
+pub(crate) use unreachable2;
+
 //---------------------------------------------------------------------------------------------------- Channels
 // Receive a channel message, unwrap.
 macro_rules! recv {

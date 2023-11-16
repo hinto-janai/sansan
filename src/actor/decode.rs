@@ -177,7 +177,7 @@ impl Decode {
 						return;
 					},
 
-					_ => unreachable!(),
+					_ => crate::macros::unreachable2!(),
 				}
 			}
 
