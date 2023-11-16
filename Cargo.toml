@@ -12,6 +12,9 @@ readme         = "README.md"
 license        = "MIT"
 description    = "Real-time music engine"
 
+# Arc::into_inner()
+rust-version   = "1.70.0"
+
 # Exclude files when uploading to crate.io
 exclude = [
 	".github",
@@ -47,7 +50,6 @@ log     = { version = "0.4.20", features = ["serde"] }
 [dependencies]
 ### Personal libraries.
 someday  = { version = "0.0.4" }
-readable = { version = "0.13.0" }
 lpt      = { version = "0.1.0" }
 
 ## Optional libraries.

@@ -17,33 +17,46 @@ jobs:
 
     strategy:
       matrix:
-        os: [windows-2022, macos-12, ubuntu-20.04]
+        os: [windows-latest, macos-latest, ubuntu-latest]
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         submodules: recursive
 
     - name: Cache
       uses: actions/cache@v3
       with:
-        path: target
+        path: |
+          target
+          ~/.cargo
         key: ${{ matrix.os }}
 
     - name: Install dependencies
-      run: |
-        rustup update
-        if [ "$RUNNER_OS" == "Linux" ]; then
-          sudo apt update
-          sudo apt install -y libasound2-dev libjack-dev libpulse-dev libdbus-1-dev
-        elif [ "$RUNNER_OS" == "macOS" ]; then
-          rustup target add aarch64-apple-darwin
-        fi
       shell: bash
+      run: |
+        if [ "$RUNNER_OS" == 'Linux' ]; then
+          sudo apt update
+          sudo apt install -y libasound2-dev libpulse-dev libdbus-1-dev
+        fi
+        rustup toolchain add 1.70.0 --profile default
+        cargo install cargo-deny
+        cargo install cargo-audit
+
+    - name: Deny
+      run: cargo deny check
+
+    - name: Audit
+      shell: bash
+      run: |
+        rm -rf ~/.cargo/advisory-db
+        cargo audit
 
     - name: Clippy
-      run: cargo clippy
+      shell: bash
+      run: cargo +1.70.0 clippy
 
     - name: Test
-      run: cargo test
+      shell: bash
+      run: cargo +1.70.0 test

@@ -153,6 +153,9 @@ The supported audio metadata formats are:
 - `RIFF`
 - `Vorbis comment` (FLAC & OGG)
 
+## MSRV
+The `Minimum Supported Rust Version` is `1.70.0`.
+
 ## License
 `sansan` is licensed under the [MIT License](https://github.com/hinto-janai/sansan/blob/main/LICENSE).
 
