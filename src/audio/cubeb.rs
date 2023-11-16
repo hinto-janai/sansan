@@ -22,7 +22,7 @@ use std::sync::{
 	Arc,
 	atomic::{AtomicBool,Ordering},
 };
-use crate::macros::{recv,send};
+use crate::macros::{recv,send,try_send,try_recv};
 
 //----------------------------------------------------------------------------------------------- Constants
 // The most common sample rate to fallback to if we cannot
@@ -157,6 +157,10 @@ where
 
 		// Send audio data to cubeb.
 		// Duplicate channel data if mono, else split left/right.
+		//
+		// This hangs until we've sent all the samples, which
+		// most likely take a while as [cubeb] will have a
+		// backlog of previous samples.
 		if self.channels == 2 {
 			samples.chunks_exact(2).for_each(|f| {
 				let l = f[0];
@@ -170,7 +174,7 @@ where
 		}
 
 		// Send garbage to GC.
-		send!(to_gc, audio);
+		try_send!(to_gc, audio);
 		// INVARIANT:
 		// This must be cleared as the next call to this
 		// function assumes our local [Vec<f32>] is emptied.
@@ -207,6 +211,10 @@ where
 		if !self.playing {
 			return;
 		}
+
+		// INVARIANT:
+		// Bounded channels, [try_*]
+		// methods not applicable.
 
 		if self.discard.is_empty() {
 			send!(self.discard, ());

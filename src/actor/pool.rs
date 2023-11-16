@@ -8,7 +8,7 @@ use crate::{
 	actor::audio::TookAudioBuffer,
 	actor::decode::DECODE_BUFFER_LEN,
 	actor::kernel::QUEUE_LEN,
-	macros::{recv,send,debug2},
+	macros::{recv,send,try_send,try_recv,debug2},
 };
 use symphonia::core::{audio::AudioBuffer, units::Time};
 use std::{
@@ -87,8 +87,8 @@ impl<TrackData: ValidTrackData> Pool<TrackData> {
 		let buffer_decode    = VecDeque::with_capacity(DECODE_BUFFER_LEN);
 		let buffer_to_kernel = VecDeque::with_capacity(QUEUE_LEN);
 		let buffer_kernel    = VecDeque::with_capacity(QUEUE_LEN);
-		send!(to_decode, buffer_to_decode);
-		send!(to_kernel, buffer_to_kernel);
+		try_send!(to_decode, buffer_to_decode);
+		try_send!(to_kernel, buffer_to_kernel);
 
 		let channels = Channels {
 			shutdown,
@@ -152,12 +152,12 @@ impl<TrackData: ValidTrackData> Pool<TrackData> {
 	#[inline]
 	fn from_decode(&mut self, channels: &Channels<TrackData>) {
 		// Receive old buffer.
-		let mut buffer = recv!(channels.from_decode);
+		let mut buffer = try_recv!(channels.from_decode);
 
 		// Quickly swap with local buffer that
 		// was cleaned from the last call.
 		std::mem::swap(&mut self.buffer_decode, &mut buffer);
-		send!(channels.to_decode, buffer);
+		try_send!(channels.to_decode, buffer);
 
 		// Clean our new local buffer,
 		// sending audio data (boxed) to [Gc].
@@ -165,7 +165,7 @@ impl<TrackData: ValidTrackData> Pool<TrackData> {
 		// Drop the [Time] in scope, it is just [u64] + [f64].
 		self.buffer_decode
 			.drain(..)
-			.for_each(|(audio, _time)| send!(channels.to_gc_decode, audio));
+			.for_each(|(audio, _time)| try_send!(channels.to_gc_decode, audio));
 
 		// Make sure the capacity is large enough.
 		self.buffer_decode.reserve_exact(DECODE_BUFFER_LEN);
@@ -173,14 +173,14 @@ impl<TrackData: ValidTrackData> Pool<TrackData> {
 
 	#[inline]
 	fn from_kernel(&mut self, channels: &Channels<TrackData>) {
-		let mut buffer = recv!(channels.from_kernel);
+		let mut buffer = try_recv!(channels.from_kernel);
 
 		std::mem::swap(&mut self.buffer_kernel, &mut buffer);
-		send!(channels.to_kernel, buffer);
+		try_send!(channels.to_kernel, buffer);
 
 		self.buffer_kernel
 			.drain(..)
-			.for_each(|track| send!(channels.to_gc_kernel, track));
+			.for_each(|track| try_send!(channels.to_gc_kernel, track));
 
 		self.buffer_kernel.reserve_exact(QUEUE_LEN);
 	}

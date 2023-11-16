@@ -13,7 +13,7 @@ use crate::{
 	},
 	audio::{cubeb::Cubeb,rubato::Rubato},
 	channel::SansanSender,
-	macros::{send,recv},
+	macros::{send,recv,try_send,try_recv},
 };
 use crossbeam::channel::{Sender,Receiver};
 use symphonia::core::audio::AudioBuffer;
@@ -352,7 +352,7 @@ where
 	pub fn shutdown(self) {
 		// Tell [Kernel] to shutdown,
 		// and to not notify us.
-		send!(self.shutdown, ());
+		try_send!(self.shutdown, ());
 	}
 
 	#[cold]
@@ -361,7 +361,7 @@ where
 	pub fn shutdown_blocking(self) {
 		// Tell [Kernel] to shutdown,
 		// and to tell us when it's done.
-		send!(self.shutdown_hang, ());
+		try_send!(self.shutdown_hang, ());
 		// Hang until [Kernel] responds.
 		recv!(self.shutdown_done);
 	}

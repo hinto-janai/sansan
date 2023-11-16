@@ -2,7 +2,7 @@
 use std::thread::JoinHandle;
 use crossbeam::channel::{Sender, Receiver, Select};
 use crate::{
-	macros::{send,try_recv,debug2},
+	macros::{send,try_recv,try_send,debug2},
 	state::{AudioState,AudioStatePatch,ValidTrackData,AtomicAudioState},
 	actor::{
 		decode::{KernelToDecode,DecodeToKernel},
@@ -35,7 +35,7 @@ use crate::{
 use std::sync::{
 	Arc,
 	Barrier,
-	atomic::AtomicBool,
+	atomic::{AtomicBool,Ordering},
 };
 use strum::EnumCount;
 
@@ -175,7 +175,7 @@ where
 
 		// INVARIANT:
 		// The order these are selected MUST match
-		// order of the `Msg` enum variants.
+		// the order of the match function mappings below.
 		assert_eq!(0,  select.recv(&channels.toggle_recv));
 		assert_eq!(1,  select.recv(&channels.play_recv));
 		assert_eq!(2,  select.recv(&channels.pause_recv));
@@ -199,8 +199,7 @@ where
 		// Loop, receiving signals and routing them
 		// to their appropriate handler function.
 		loop {
-			let signal = select.select();
-			match signal.index() {
+			match select.select().index() {
 				0  => self.toggle(),
 				1  => self.play(),
 				2  => self.pause(),
@@ -222,7 +221,7 @@ where
 					debug2!("Kernel - shutting down");
 					// Tell all actors to shutdown.
 					for actor in channels.shutdown_actor.iter() {
-						send!(actor, ());
+						try_send!(actor, ());
 					}
 					// Wait until all threads are ready to shutdown.
 					self.shutdown_wait.wait();
@@ -235,10 +234,10 @@ where
 				18 => {
 					debug2!("Kernel - shutting down (hang)");
 					for actor in channels.shutdown_actor.iter() {
-						send!(actor, ());
+						try_send!(actor, ());
 					}
 					self.shutdown_wait.wait();
-					send!(channels.shutdown_done, ());
+					try_send!(channels.shutdown_done, ());
 					return;
 				},
 
@@ -340,5 +339,21 @@ where
 	#[inline]
 	fn remove_range(&mut self) {
 		todo!()
+	}
+
+	//---------------------------------------------------------------------------------------------------- Misc Functions
+	fn tell_audio_to_discard(&mut self, to_audio: &Sender<DiscardCurrentAudio>) {
+		// INVARIANT:
+		// This is set by [Kernel] since it
+		// _knows_ when we're discarding first.
+		//
+		// [Audio] is responsible for setting it
+		// back to [true].
+		self.audio_ready_to_recv.store(false, Ordering::Release);
+		try_send!(to_audio, DiscardCurrentAudio);
+	}
+
+	fn tell_decode_to_discard(&mut self, to_decode: &Sender<KernelToDecode>) {
+		try_send!(to_decode, KernelToDecode::DiscardAudioAndStop);
 	}
 }

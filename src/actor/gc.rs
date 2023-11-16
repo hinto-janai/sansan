@@ -5,7 +5,7 @@ use std::{
 };
 use crate::{
 	state::{Track,ValidTrackData},
-	macros::{debug2,warn2},
+	macros::{debug2,warn2,try_recv},
 };
 use crossbeam::channel::{Receiver, Select};
 use symphonia::core::audio::AudioBuffer;
@@ -49,9 +49,9 @@ impl<TrackData: ValidTrackData> Gc<TrackData> {
 		loop {
 			let signal = select.select();
 			match signal.index() {
-				0 => drop(self.from_audio.try_recv()),
-				1 => drop(self.from_decode.try_recv()),
-				2 => drop(self.from_kernel.try_recv()),
+				0 => drop(try_recv!(self.from_audio)),
+				1 => drop(try_recv!(self.from_decode)),
+				2 => drop(try_recv!(self.from_kernel)),
 				3 => {
 					debug2!("Gc - shutting down");
 					// Wait until all threads are ready to shutdown.

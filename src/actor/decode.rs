@@ -7,7 +7,7 @@ use crate::{
 	source::{Source, SourceInner},
 	state::{AudioState,AudioStatePatch},
 	actor::audio::TookAudioBuffer,
-	macros::{recv,send,debug2},
+	macros::{recv,send,try_send,debug2},
 };
 use symphonia::core::{
 	audio::AudioBuffer,
@@ -250,7 +250,7 @@ impl Decode {
 	fn send_audio_if_ready(&mut self, to_audio: &Sender<ToAudio>) {
 		if self.audio_is_ready(&to_audio) {
 			if let Some(data) = self.buffer.pop_front() {
-				send!(to_audio, data);
+				try_send!(to_audio, data);
 			}
 		}
 	}
@@ -262,7 +262,7 @@ impl Decode {
 		if !self.audio_is_ready(to_audio) {
 			self.buffer.push_back(data);
 		} else {
-			send!(to_audio, data);
+			try_send!(to_audio, data);
 		}
 	}
 
@@ -272,7 +272,7 @@ impl Decode {
 			Ok(mut s) => {
 				self.swap_audio_buffer();
 				std::mem::swap(&mut self.source, &mut s);
-				send!(to_gc, s);
+				try_send!(to_gc, s);
 			},
 
 			Err(e) => {
@@ -358,6 +358,10 @@ impl Decode {
 		// Pool must send 1 buffer on init such
 		// that this will immediately receive
 		// something on the very first call.
+		//
+		// These are also [recv] + [send] instead
+		// of the [try_*] variants since [Pool] may
+		// not have taken out the older buffers yet.
 		let mut buffer = recv!(self.from_pool);
 
 		// Swap our buffer with the fresh one.

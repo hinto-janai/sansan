@@ -19,7 +19,7 @@ use crate::audio::{
 	cubeb::Cubeb,
 	rubato::Rubato,
 };
-use crate::macros::{send,try_recv,debug2};
+use crate::macros::{send,try_recv,debug2,try_send};
 use crate::signal::Volume;
 use crate::state::AtomicAudioState;
 
@@ -271,12 +271,19 @@ where
 		// While we are discarding audio, signal to [Decode]
 		// that we don't want any new [AudioBuffer]'s
 		// (since they'll just get discarded).
-		self.ready_to_recv.store(false, Ordering::Release);
+		//
+		// INVARIANT: This is set by [Kernel] since it
+		// _knows_ when we're discarding audio first.
+		//
+		// [Audio] is responsible for setting it
+		// back to [true].
+		//
+		// self.ready_to_recv.store(false, Ordering::Release);
 
 		// `Time` is just `u64` + `f64`.
 		// Doesn't make sense sending stack variables to GC.
 		while let Ok(msg) = from_decode.try_recv() {
-			send!(to_gc, msg.0);
+			try_send!(to_gc, msg.0);
 		}
 
 		self.ready_to_recv.store(true, Ordering::Release);
