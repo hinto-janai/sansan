@@ -39,6 +39,14 @@ use std::sync::{
 };
 use strum::EnumCount;
 
+//---------------------------------------------------------------------------------------------------- Constants
+// QUEUE_LEN is the initial buffer size of the [AudioState]'s queue.
+//
+// This should be big enough such a resize never
+// occurs (in most situations) but not too big incase
+// the generic [TrackData] the user provides is large.
+pub(crate) const QUEUE_LEN: usize = 256;
+
 //---------------------------------------------------------------------------------------------------- Kernel
 #[derive(Debug)]
 pub(crate) struct Kernel<TrackData: ValidTrackData> {
@@ -189,27 +197,27 @@ where
 		assert_eq!(18, select.recv(&channels.shutdown_hang));
 
 		// Loop, receiving signals and routing them
-		// to their appropriate handler function [fn_*()].
+		// to their appropriate handler function.
 		loop {
 			let signal = select.select();
 			match signal.index() {
-				0  => self.fn_toggle(),
-				1  => self.fn_play(),
-				2  => self.fn_pause(),
-				3  => self.fn_clear(),
-				5  => self.fn_shuffle(),
-				4  => self.fn_repeat(try_recv!(channels.repeat_recv)),
-				6  => self.fn_volume(try_recv!(channels.volume_recv)),
-				7  => self.fn_restore(),
-				8  => self.fn_add(),
-				9  => self.fn_seek(),
-				10 => self.fn_next(),
-				11 => self.fn_previous(),
-				12 => self.fn_skip(),
-				13 => self.fn_back(),
-				14 => self.fn_set_index(),
-				15 => self.fn_remove(),
-				16 => self.fn_remove_range(),
+				0  => self.toggle(),
+				1  => self.play(),
+				2  => self.pause(),
+				3  => self.clear(),
+				5  => self.shuffle(),
+				4  => self.repeat(try_recv!(channels.repeat_recv)),
+				6  => self.volume(try_recv!(channels.volume_recv)),
+				7  => self.restore(),
+				8  => self.add(),
+				9  => self.seek(),
+				10 => self.next(),
+				11 => self.previous(),
+				12 => self.skip(),
+				13 => self.back(),
+				14 => self.set_index(),
+				15 => self.remove(),
+				16 => self.remove_range(),
 				17 => {
 					debug2!("Kernel - shutting down");
 					// Tell all actors to shutdown.
@@ -250,87 +258,87 @@ where
 	// to exact messages/signals from the other actors.
 
 	#[inline]
-	fn fn_toggle(&mut self) {
+	fn toggle(&mut self) {
 		todo!()
 	}
 
 	#[inline]
-	fn fn_play(&mut self) {
+	fn play(&mut self) {
 		todo!()
 	}
 
 	#[inline]
-	fn fn_pause(&mut self) {
+	fn pause(&mut self) {
 		todo!()
 	}
 
 	#[inline]
-	fn fn_clear(&mut self) {
+	fn clear(&mut self) {
 		todo!()
 	}
 
 	#[inline]
-	fn fn_shuffle(&mut self) {
+	fn shuffle(&mut self) {
 		todo!()
 	}
 
 	#[inline]
-	fn fn_repeat(&mut self, repeat: Repeat) {
+	fn repeat(&mut self, repeat: Repeat) {
 		self.atomic_state.repeat.set(repeat);
 	}
 
 	#[inline]
-	fn fn_volume(&mut self, volume: Volume) {
+	fn volume(&mut self, volume: Volume) {
 		self.atomic_state.volume.set(volume);
 	}
 
 	#[inline]
-	fn fn_add(&mut self) {
+	fn add(&mut self) {
 		todo!()
 	}
 
 	#[inline]
-	fn fn_seek(&mut self) {
+	fn seek(&mut self) {
 		todo!()
 	}
 
 	#[inline]
-	fn fn_next(&mut self) {
+	fn next(&mut self) {
 		todo!()
 	}
 
 	#[inline]
-	fn fn_previous(&mut self) {
+	fn previous(&mut self) {
 		todo!()
 	}
 
 	#[inline]
-	fn fn_skip(&mut self) {
+	fn skip(&mut self) {
 		todo!()
 	}
 
 	#[inline]
-	fn fn_back(&mut self) {
+	fn back(&mut self) {
 		todo!()
 	}
 
 	#[inline]
-	fn fn_restore(&mut self) {
+	fn restore(&mut self) {
 		todo!()
 	}
 
 	#[inline]
-	fn fn_set_index(&mut self) {
+	fn set_index(&mut self) {
 		todo!()
 	}
 
 	#[inline]
-	fn fn_remove(&mut self) {
+	fn remove(&mut self) {
 		todo!()
 	}
 
 	#[inline]
-	fn fn_remove_range(&mut self) {
+	fn remove_range(&mut self) {
 		todo!()
 	}
 }

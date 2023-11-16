@@ -6,6 +6,8 @@ use crate::{
 	source::Source,
 	state::{Track,ValidTrackData},
 	actor::audio::TookAudioBuffer,
+	actor::decode::DECODE_BUFFER_LEN,
+	actor::kernel::QUEUE_LEN,
 	macros::{recv,send,debug2},
 };
 use symphonia::core::{audio::AudioBuffer, units::Time};
@@ -27,7 +29,8 @@ type ToDecode = (AudioBuffer<f32>, Time);
 //---------------------------------------------------------------------------------------------------- Pool
 pub(crate) struct Pool<TrackData: ValidTrackData> {
 	shutdown_wait: Arc<Barrier>,
-	_p: PhantomData<TrackData>,
+	buffer_decode: VecDeque<ToDecode>,
+	buffer_kernel: VecDeque<Track<TrackData>>,
 }
 
 // See [src/actor/kernel.rs]'s [Channels]
@@ -71,12 +74,21 @@ impl<TrackData: ValidTrackData> Pool<TrackData> {
 		} = args;
 
 		// INVARIANT:
-		// Decode relies on the fact that on the very
-		// first `.recv()`, there will already be a
-		// buffer waiting for it.
+		// [Kernel] & [Decode] rely on the fact that on the
+		// very first `.recv()`, there will already be a
+		// buffer waiting.
 		//
-		// We must send this in advance.
-		send!(to_decode, VecDeque::with_capacity(crate::actor::decode::DECODE_BUFFER_LEN));
+		// We must send 1 in advance.
+		//
+		// Other buffers are created in near proximity
+		// in hopes the compiler will do some memory
+		// allocation optimization black magic.
+		let buffer_to_decode = VecDeque::with_capacity(DECODE_BUFFER_LEN);
+		let buffer_decode    = VecDeque::with_capacity(DECODE_BUFFER_LEN);
+		let buffer_to_kernel = VecDeque::with_capacity(QUEUE_LEN);
+		let buffer_kernel    = VecDeque::with_capacity(QUEUE_LEN);
+		send!(to_decode, buffer_to_decode);
+		send!(to_kernel, buffer_to_kernel);
 
 		let channels = Channels {
 			shutdown,
@@ -90,7 +102,8 @@ impl<TrackData: ValidTrackData> Pool<TrackData> {
 
 		let this = Pool {
 			shutdown_wait,
-			_p: PhantomData,
+			buffer_decode,
+			buffer_kernel,
 		};
 
 		std::thread::Builder::new()
@@ -111,12 +124,12 @@ impl<TrackData: ValidTrackData> Pool<TrackData> {
 		assert_eq!(2, select.recv(&channels.shutdown));
 
 		// Loop, receiving signals and routing them
-		// to their appropriate handler function [fn_*()].
+		// to their appropriate handler function.
 		loop {
 			let signal = select.select();
 			match signal.index() {
-				0 => self.fn_from_decode(&channels),
-				1 => self.fn_from_kernel(&channels),
+				0 => self.from_decode(&channels),
+				1 => self.from_kernel(&channels),
 				2 => {
 					debug2!("Pool - shutting down");
 					// Wait until all threads are ready to shutdown.
@@ -137,29 +150,38 @@ impl<TrackData: ValidTrackData> Pool<TrackData> {
 	// to exact messages/signals from the other actors.
 
 	#[inline]
-	fn fn_from_decode(&mut self, channels: &Channels<TrackData>) {
+	fn from_decode(&mut self, channels: &Channels<TrackData>) {
 		// Receive old buffer.
 		let mut buffer = recv!(channels.from_decode);
 
-		// Drain, sending audio data (boxed) to [Gc].
+		// Quickly swap with local buffer that
+		// was cleaned from the last call.
+		std::mem::swap(&mut self.buffer_decode, &mut buffer);
+		send!(channels.to_decode, buffer);
+
+		// Clean our new local buffer,
+		// sending audio data (boxed) to [Gc].
 		//
 		// Drop the [Time] in scope, it is just [u64] + [f64].
-		for (audio, _time) in buffer.drain(..) {
-			send!(channels.to_gc_decode, audio);
-		}
+		self.buffer_decode
+			.drain(..)
+			.for_each(|(audio, _time)| send!(channels.to_gc_decode, audio));
 
-		// Return clean buffer to [Decode].
-		send!(channels.to_decode, buffer);
+		// Make sure the capacity is large enough.
+		self.buffer_decode.reserve_exact(DECODE_BUFFER_LEN);
 	}
 
 	#[inline]
-	fn fn_from_kernel(&mut self, channels: &Channels<TrackData>) {
+	fn from_kernel(&mut self, channels: &Channels<TrackData>) {
 		let mut buffer = recv!(channels.from_kernel);
 
-		for i in buffer.drain(..) {
-			send!(channels.to_gc_kernel, i);
-		}
-
+		std::mem::swap(&mut self.buffer_kernel, &mut buffer);
 		send!(channels.to_kernel, buffer);
+
+		self.buffer_kernel
+			.drain(..)
+			.for_each(|track| send!(channels.to_gc_kernel, track));
+
+		self.buffer_kernel.reserve_exact(QUEUE_LEN);
 	}
 }
