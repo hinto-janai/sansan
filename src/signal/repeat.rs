@@ -2,12 +2,19 @@
 use std::sync::atomic::{
 	AtomicU8,Ordering
 };
+use strum::{
+	AsRefStr,Display,EnumCount,EnumIter,EnumString,
+	EnumVariantNames,EnumDiscriminants,IntoStaticStr,
+};
 
 //---------------------------------------------------------------------------------------------------- Repeat
 /// TODO
+#[derive(Copy,Clone,Default,Debug,PartialEq,PartialOrd,Eq,Ord,Hash)]
+#[derive(AsRefStr,Display,EnumCount,EnumIter,EnumString,EnumVariantNames,EnumDiscriminants,IntoStaticStr)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
-#[derive(Copy,Clone,Default,Debug,PartialEq,PartialOrd,Eq,Ord,Hash)]
+#[strum(serialize_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum Repeat {
 	#[default]
 	/// TODO
@@ -73,5 +80,23 @@ impl std::fmt::Debug for AtomicRepeat {
 		f.debug_tuple("AtomicRepeat")
 			.field(&self.0.load(Ordering::Relaxed))
 			.finish()
+	}
+}
+
+//---------------------------------------------------------------------------------------------------- AtomicRepeat
+#[cfg(test)]
+mod tests {
+	use strum::IntoEnumIterator;
+	use super::*;
+
+	#[test]
+	fn all_variants() {
+		let atomic = AtomicRepeat::DEFAULT;
+
+		for (i, repeat) in Repeat::iter().enumerate() {
+			atomic.set(repeat);
+			assert_eq!(atomic.get(), repeat);
+			assert_eq!(repeat.to_u8() as usize, i);
+		}
 	}
 }

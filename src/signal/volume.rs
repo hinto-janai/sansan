@@ -293,4 +293,14 @@ mod tests {
 	fn atomic_volume_default_bits() {
 		assert_eq!(Volume::DEFAULT.inner().to_bits(), AtomicVolume::DEFAULT_BITS);
 	}
+
+	#[test]
+	fn atomic_volume_0_to_100() {
+		let mut v = 0.0;
+		while v <= 1.0 {
+			let atomic = AtomicVolume::new(v.into());
+			assert_eq!(atomic.get().inner(), v);
+			v += 0.1;
+		}
+	}
 }
