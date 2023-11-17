@@ -3,13 +3,14 @@ use std::thread::JoinHandle;
 use crate::{
 	state::{AudioStateReader,AudioState,ValidTrackData, AtomicAudioState},
 	signal::{Signal,Volume,Repeat},
-	config::Config,
+	config::{Config,Callbacks},
 	actor::{
 		audio::{Audio,AUDIO_BUFFER_LEN},
 		decode::Decode,
 		kernel::Kernel,
 		pool::Pool,
 		gc::Gc,
+		caller::Caller,
 	},
 	audio::{cubeb::Cubeb,rubato::Rubato},
 	channel::SansanSender,
@@ -69,7 +70,7 @@ where
 	/// TODO
 	#[cold]
 	#[inline(never)]
-	pub fn init(config: Config<TrackData, CallbackSender>) -> Result<Self, EngineInitError> {
+	pub fn init(mut config: Config<TrackData, CallbackSender>) -> Result<Self, EngineInitError> {
 		use crossbeam::channel::{bounded,unbounded};
 
 		// Initialize the `AudioStateReader`.
@@ -181,6 +182,31 @@ where
 			remove_range_recv: s_remove_range_recv,
 		};
 
+		//-------------------------------------------------------------- Spawn [Caller]
+		// FIXME:
+		// Only spawn [Caller] is callbacks exist,
+		// and only send messages from other actors
+		// if there are [Callback]'s in the vector.
+		let callbacks = config.callbacks.take().unwrap_or_else(|| Callbacks::DEFAULT);
+
+		// Initialize [Caller]'s channels.
+		let (c_shutdown,          shutdown)    = bounded(1);
+		let (to_caller_next,      next)        = unbounded();
+		let (to_caller_queue_end, queue_end)   = unbounded();
+		let (to_caller_repeat,    repeat)      = unbounded();
+		let (to_caller_elapsed,   elapsed)     = unbounded();
+		Caller::<TrackData, CallbackSender>::init(crate::actor::caller::InitArgs {
+			callbacks,
+			audio_state:   AudioStateReader::clone(&audio_state_reader),
+			shutdown_wait: Arc::clone(&shutdown_wait),
+			shutdown,
+			next,
+			queue_end,
+			repeat,
+			elapsed,
+		}).expect("sansan [Engine] - could not spawn [Caller] thread");
+
+		//-------------------------------------------------------------- Spawn [Audio]
 		// Initialize [Audio] channels.
 		//
 		// Variables are prefix/suffixed accordingly:
@@ -195,7 +221,6 @@ where
 		let playing             = Arc::new(AtomicBool::new(false));
 		let audio_ready_to_recv = Arc::new(AtomicBool::new(false));
 
-		//-------------------------------------------------------------- Spawn [Audio]
 		let (a_shutdown, shutdown) = bounded(1);
 		let (a_to_gc, gc_from_a)   = unbounded();
 		Audio::<Cubeb<Rubato>>::init(crate::actor::audio::InitArgs {
