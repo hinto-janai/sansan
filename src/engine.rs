@@ -195,16 +195,32 @@ where
 		let (to_caller_queue_end, queue_end)   = unbounded();
 		let (to_caller_repeat,    repeat)      = unbounded();
 		let (to_caller_elapsed,   elapsed)     = unbounded();
-		Caller::<TrackData, CallbackSender>::init(crate::actor::caller::InitArgs {
-			callbacks,
-			audio_state:   AudioStateReader::clone(&audio_state_reader),
-			shutdown_wait: Arc::clone(&shutdown_wait),
-			shutdown,
-			next,
-			queue_end,
-			repeat,
-			elapsed,
-		}).expect("sansan [Engine] - could not spawn [Caller] thread");
+
+		let to_caller_next      = if callbacks.next.is_some()      { Some(to_caller_next)      } else { None };
+		let to_caller_queue_end = if callbacks.queue_end.is_some() { Some(to_caller_queue_end) } else { None };
+		let to_caller_repeat    = if callbacks.repeat.is_some()    { Some(to_caller_repeat)    } else { None };
+		let to_caller_elapsed   = callbacks.elapsed.as_ref().and_then(|(_, d)| Some((to_caller_elapsed, d.as_secs_f64())));
+
+		// INVARIANT:
+		//
+		// If all callbacks are set to [None], then the other
+		// actors will never send a message, therefore we
+		// can safely _not_ spawn [Caller] and drop the
+		// [Receiver] end of the channels.
+		if callbacks.all_none() {
+			drop((callbacks, shutdown, next, queue_end, repeat, elapsed));
+		} else {
+			Caller::<TrackData, CallbackSender>::init(crate::actor::caller::InitArgs {
+				callbacks,
+				audio_state:   AudioStateReader::clone(&audio_state_reader),
+				shutdown_wait: Arc::clone(&shutdown_wait),
+				shutdown,
+				next,
+				queue_end,
+				repeat,
+				elapsed,
+			}).expect("sansan [Engine] - could not spawn [Caller] thread");
+		}
 
 		//-------------------------------------------------------------- Spawn [Audio]
 		// Initialize [Audio] channels.
@@ -224,16 +240,17 @@ where
 		let (a_shutdown, shutdown) = bounded(1);
 		let (a_to_gc, gc_from_a)   = unbounded();
 		Audio::<Cubeb<Rubato>>::init(crate::actor::audio::InitArgs {
-			atomic_state:  Arc::clone(&atomic_state),
-			playing:       Arc::clone(&playing),
-			ready_to_recv: Arc::clone(&audio_ready_to_recv),
-			shutdown_wait: Arc::clone(&shutdown_wait),
 			shutdown,
-			to_gc:         a_to_gc,
-			to_decode:     a_to_d,
-			from_decode:   a_from_d,
-			to_kernel:     a_to_k,
-			from_kernel:   a_from_k,
+			atomic_state:      Arc::clone(&atomic_state),
+			playing:           Arc::clone(&playing),
+			ready_to_recv:     Arc::clone(&audio_ready_to_recv),
+			shutdown_wait:     Arc::clone(&shutdown_wait),
+			to_gc:             a_to_gc,
+			to_caller_elapsed: to_caller_elapsed.clone(),
+			to_decode:         a_to_d,
+			from_decode:       a_from_d,
+			to_kernel:         a_to_k,
+			from_kernel:       a_from_k,
 		}).expect("sansan [Engine] - could not spawn [Audio] thread");
 
 		//-------------------------------------------------------------- Spawn [Decode]

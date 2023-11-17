@@ -40,7 +40,7 @@ strip     = "none"
 opt-level = 1
 
 [features]
-default = ["serde"]
+default = ["serde", "cubeb"]
 
 [dev-dependencies]
 bincode = { version = "2.0.0-rc.3", features = ["derive"]  }
@@ -69,11 +69,15 @@ paste        = { version = "1.0.14" }
 
 ### Audio libraries.
 audio_thread_priority = { version = "0.30.0" }
-cubeb     = { version = "0.10.3" }
-souvlaki  = { version = "0.6.1" }
-symphonia = { version = "0.5.3", features = ["all"] }
-rubato    = { version = "0.14.1" }
-rb        = { version = "0.4.1" }
+souvlaki              = { version = "0.6.1" }
+symphonia             = { version = "0.5.3", features = ["all"] }
+rubato                = { version = "0.14.1" }
+rb                    = { version = "0.4.1" }
+
+### Optional Audio libraries.
+cubeb = { version = "0.10.3", optional = true }
+# TODO: eventually as another backend
+#cpal  = { version = "0.15.2", optional = true }
 
 ## Windows.
 [target.'cfg(windows)'.dependencies]

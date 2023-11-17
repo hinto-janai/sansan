@@ -161,10 +161,10 @@ where
 	#[inline]
 	fn call(
 		audio_state: &AudioState<TrackData>,
-		callbacks: &mut [Callback<TrackData, CallbackSender>]
+		callback: &mut Option<Callback<TrackData, CallbackSender>>
 	) {
-		callbacks
-			.iter_mut()
-			.for_each(|cb| cb.call(&audio_state));
+		if let Some(cb) = callback.as_mut() {
+			cb.call(audio_state);
+		}
 	}
 }

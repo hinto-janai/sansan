@@ -42,12 +42,13 @@ pub(crate) struct Audio<Output>
 where
 	Output: AudioOutput,
 {
-	atomic_state:  Arc<AtomicAudioState>,
-	playing_local: bool,
-	playing:       Arc<AtomicBool>,
-	ready_to_recv: Arc<AtomicBool>,
-	shutdown_wait: Arc<Barrier>,
-	output: Output
+	atomic_state:   Arc<AtomicAudioState>,
+	playing_local:  bool,
+	playing:        Arc<AtomicBool>,
+	elapsed:        f64,
+	ready_to_recv:  Arc<AtomicBool>,
+	shutdown_wait:  Arc<Barrier>,
+	output:         Output
 }
 
 //---------------------------------------------------------------------------------------------------- Channels
@@ -55,7 +56,8 @@ where
 struct Channels {
 	shutdown: Receiver<()>,
 
-	to_gc:   Sender<AudioBuffer<f32>>,
+	to_gc:             Sender<AudioBuffer<f32>>,
+	to_caller_elapsed: Option<(Sender<()>, f64)>,
 
 	to_decode:   Sender<TookAudioBuffer>,
 	from_decode: Receiver<(AudioBuffer<f32>, Time)>,
@@ -79,16 +81,17 @@ pub(crate) enum AudioToKernel {
 
 //---------------------------------------------------------------------------------------------------- Audio Impl
 pub(crate) struct InitArgs {
-	pub(crate) atomic_state:  Arc<AtomicAudioState>,
-	pub(crate) playing:       Arc<AtomicBool>,
-	pub(crate) ready_to_recv: Arc<AtomicBool>,
-	pub(crate) shutdown_wait: Arc<Barrier>,
-	pub(crate) shutdown:      Receiver<()>,
-	pub(crate) to_gc:         Sender<AudioBuffer<f32>>,
-	pub(crate) to_decode:     Sender<TookAudioBuffer>,
-	pub(crate) from_decode:   Receiver<(AudioBuffer<f32>, Time)>,
-	pub(crate) to_kernel:     Sender<AudioToKernel>,
-	pub(crate) from_kernel:   Receiver<DiscardCurrentAudio>,
+	pub(crate) atomic_state:      Arc<AtomicAudioState>,
+	pub(crate) playing:           Arc<AtomicBool>,
+	pub(crate) ready_to_recv:     Arc<AtomicBool>,
+	pub(crate) shutdown_wait:     Arc<Barrier>,
+	pub(crate) shutdown:          Receiver<()>,
+	pub(crate) to_gc:             Sender<AudioBuffer<f32>>,
+	pub(crate) to_caller_elapsed: Option<(Sender<()>, f64)>,
+	pub(crate) to_decode:         Sender<TookAudioBuffer>,
+	pub(crate) from_decode:       Receiver<(AudioBuffer<f32>, Time)>,
+	pub(crate) to_kernel:         Sender<AudioToKernel>,
+	pub(crate) from_kernel:       Receiver<DiscardCurrentAudio>,
 }
 
 //---------------------------------------------------------------------------------------------------- Audio Impl
@@ -110,6 +113,7 @@ where
 					shutdown_wait,
 					shutdown,
 					to_gc,
+					to_caller_elapsed,
 					to_decode,
 					from_decode,
 					to_kernel,
@@ -119,6 +123,7 @@ where
 				let channels = Channels {
 					shutdown,
 					to_gc,
+					to_caller_elapsed,
 					to_decode,
 					from_decode,
 					to_kernel,
@@ -134,6 +139,7 @@ where
 					atomic_state,
 					playing_local: false,
 					playing,
+					elapsed: 0.0,
 					ready_to_recv,
 					shutdown_wait,
 					output,
@@ -146,7 +152,7 @@ where
 	//---------------------------------------------------------------------------------------------------- Main Loop
 	#[cold]
 	#[inline(never)]
-	fn main(mut self, channels: Channels) {
+	fn main(mut self, mut channels: Channels) {
 		// Create channels that we will
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
@@ -159,7 +165,7 @@ where
 			// If we're playing, check if we have samples to play.
 			if self.playing_local {
 				if let Ok(msg) = channels.from_decode.try_recv() {
-					self.play_audio_buffer(msg, &channels.to_gc);
+					self.play_audio_buffer(msg, &channels.to_gc, &mut channels.to_caller_elapsed);
 				}
 			}
 
@@ -185,7 +191,7 @@ where
 				// From `Decode`.
 				0 => {
 					let msg = try_recv!(channels.from_decode);
-					self.play_audio_buffer(msg, &channels.to_gc);
+					self.play_audio_buffer(msg, &channels.to_gc, &mut channels.to_caller_elapsed);
 				},
 
 				// From `Kernel`.
@@ -222,7 +228,8 @@ where
 	fn play_audio_buffer(
 		&mut self,
 		msg: (AudioBuffer<f32>, symphonia::core::units::Time),
-		to_gc: &Sender<AudioBuffer<f32>>
+		to_gc: &Sender<AudioBuffer<f32>>,
+		to_caller_elapsed: &mut Option<(Sender<()>, f64)>,
 	) {
 		let (audio, time) = msg;
 
@@ -257,6 +264,17 @@ where
 			todo!();
 		}
 
+		// Notify [Caller] if enough time
+		// has elapsed in the current track.
+		if let Some((sender, elapsed_target)) = to_caller_elapsed.as_ref() {
+			let total_seconds = time.seconds as f64 + time.frac;
+
+			if total_seconds >= *elapsed_target {
+				self.elapsed = 0.0;
+				try_send!(sender, ());
+			}
+		}
+
 		// TODO: tell [Kernel] we just wrote
 		// an audio buffer with [time] timestamp.
 		todo!();
@@ -279,6 +297,9 @@ where
 		// back to [true].
 		//
 		// self.ready_to_recv.store(false, Ordering::Release);
+
+		// Reset elapsed time for our callback.
+		self.elapsed = 0.0;
 
 		// `Time` is just `u64` + `f64`.
 		// Doesn't make sense sending stack variables to GC.

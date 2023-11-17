@@ -139,13 +139,13 @@ where
 	CallbackSender: SansanSender<()>
 {
 	/// TODO
-	pub next:      Vec<Callback<TrackData, CallbackSender>>,
+	pub next:      Option<Callback<TrackData, CallbackSender>>,
 	/// TODO
-	pub queue_end: Vec<Callback<TrackData, CallbackSender>>,
+	pub queue_end: Option<Callback<TrackData, CallbackSender>>,
 	/// TODO
-	pub repeat:    Vec<Callback<TrackData, CallbackSender>>,
+	pub repeat:    Option<Callback<TrackData, CallbackSender>>,
 	/// TODO
-	pub elapsed:   Vec<(Callback<TrackData, CallbackSender>, Duration)>,
+	pub elapsed:   Option<(Callback<TrackData, CallbackSender>, Duration)>,
 }
 
 //---------------------------------------------------------------------------------------------------- Callbacks Impl
@@ -157,70 +157,64 @@ where
 	/// A fresh [`Self`] with no callbacks, same as [`Self::new()`]
 	pub const DEFAULT: Self = Self::new();
 
-	/// Returns a fresh [`Self`] with no callbacks (empty [`Vec`]'s)
+	/// Returns a fresh [`Self`] with no callbacks (all set to [`None`])
 	///
 	/// ```rust
 	/// # use sansan::*;
 	/// # use sansan::config::*;
 	/// let callbacks: Callbacks<(), ()> = Callbacks::new();
-	/// assert_eq!(callbacks.next.capacity(),      0);
-	/// assert_eq!(callbacks.queue_end.capacity(), 0);
-	/// assert_eq!(callbacks.repeat.capacity(),    0);
-	/// assert_eq!(callbacks.elapsed.capacity(),   0);
+	/// assert!(callbacks.next.is_none());
+	/// assert!(callbacks.queue_end.is_none());
+	/// assert!(callbacks.repeat.is_none());
+	/// assert!(callbacks.elapsed.is_none());
 	/// ```
 	pub const fn new() -> Self {
 		Self {
-			next:      Vec::new(),
-			queue_end: Vec::new(),
-			repeat:    Vec::new(),
-			elapsed:   Vec::new(),
-		}
-	}
-
-	/// Returns a fresh [`Self`] with no callbacks, but with `1` capacity on each field
-	///
-	/// This is for the common case where you have 1 callback per field.
-	///
-	/// ```rust
-	/// # use sansan::*;
-	/// # use sansan::config::*;
-	/// let callbacks: Callbacks<(), ()> = Callbacks::new_1_capacity();
-	/// assert_eq!(callbacks.next.capacity(),      1);
-	/// assert_eq!(callbacks.queue_end.capacity(), 1);
-	/// assert_eq!(callbacks.repeat.capacity(),    1);
-	/// assert_eq!(callbacks.elapsed.capacity(),   1);
-	/// ```
-	pub fn new_1_capacity() -> Self {
-		Self {
-			next:      Vec::with_capacity(1),
-			queue_end: Vec::with_capacity(1),
-			repeat:    Vec::with_capacity(1),
-			elapsed:   Vec::with_capacity(1),
+			next:      None,
+			queue_end: None,
+			repeat:    None,
+			elapsed:   None,
 		}
 	}
 
 	/// TODO
 	pub fn next(&mut self, callback: Callback<TrackData, CallbackSender>) -> &mut Self {
-		self.next.push(callback);
+		self.next = Some(callback);
 		self
 	}
 
 	/// TODO
 	pub fn queue_end(&mut self, callback: Callback<TrackData, CallbackSender>) -> &mut Self {
-		self.queue_end.push(callback);
+		self.queue_end = Some(callback);
 		self
 	}
 
 	/// TODO
 	pub fn repeat(&mut self, callback: Callback<TrackData, CallbackSender>) -> &mut Self {
-		self.repeat.push(callback);
+		self.repeat = Some(callback);
 		self
 	}
 
 	/// TODO
 	pub fn elapsed(&mut self, callback: Callback<TrackData, CallbackSender>, duration: Duration) -> &mut Self {
-		self.elapsed.push((callback, duration));
+		self.elapsed = Some((callback, duration));
 		self
+	}
+
+	/// TODO
+	pub fn all_none(&self) -> bool {
+		self.next.is_none() &&
+		self.queue_end.is_none() &&
+		self.repeat.is_none() &&
+		self.elapsed.is_none()
+	}
+
+	/// TODO
+	pub fn all_some(&self) -> bool {
+		self.next.is_some() &&
+		self.queue_end.is_some() &&
+		self.repeat.is_some() &&
+		self.elapsed.is_some()
 	}
 }
 
