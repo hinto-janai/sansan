@@ -1,5 +1,5 @@
 //---------------------------------------------------------------------------------------------------- Use
-use std::thread::JoinHandle;
+use std::{thread::JoinHandle, marker::PhantomData};
 use crate::{
 	state::{AudioStateReader,AudioState,ValidTrackData, AtomicAudioState},
 	signal::{Signal,Volume,Repeat},
@@ -16,7 +16,7 @@ use crate::{
 	channel::SansanSender,
 	macros::{send,recv,try_send,try_recv},
 };
-use crossbeam::channel::{Sender,Receiver};
+use crossbeam::channel::{Sender,Receiver,bounded,unbounded};
 use symphonia::core::audio::AudioBuffer;
 use std::sync::{
 	Arc,
@@ -49,7 +49,7 @@ where
 	// Data and objects.
 	audio:  AudioStateReader<TrackData>,
 	signal: Signal<TrackData>,
-	config: Config<TrackData, CallbackSender>,
+	_config: PhantomData<CallbackSender>,
 
 	// Signal to [Kernel] to tell all of our internal
 	// actors (threads) to start shutting down.
@@ -70,9 +70,7 @@ where
 	/// TODO
 	#[cold]
 	#[inline(never)]
-	pub fn init(mut config: Config<TrackData, CallbackSender>) -> Result<Self, EngineInitError> {
-		use crossbeam::channel::{bounded,unbounded};
-
+	pub fn init(config: Config<TrackData, CallbackSender>) -> Result<Self, EngineInitError> {
 		// Initialize the `AudioStateReader`.
 		let (audio_state_reader, audio_state_writer) = someday::new(AudioState::DUMMY);
 		let audio_state_reader = AudioStateReader(audio_state_reader);
@@ -187,7 +185,7 @@ where
 		// Only spawn [Caller] is callbacks exist,
 		// and only send messages from other actors
 		// if there are [Callback]'s in the vector.
-		let callbacks = config.callbacks.take().unwrap_or_else(|| Callbacks::DEFAULT);
+		let callbacks = config.callbacks;
 
 		// Initialize [Caller]'s channels.
 		let (c_shutdown,          shutdown)    = bounded(1);
@@ -211,6 +209,7 @@ where
 			drop((callbacks, shutdown, next, queue_end, repeat, elapsed));
 		} else {
 			Caller::<TrackData, CallbackSender>::init(crate::actor::caller::InitArgs {
+				low_priority: config.callback_low_priority,
 				callbacks,
 				audio_state:   AudioStateReader::clone(&audio_state_reader),
 				shutdown_wait: Arc::clone(&shutdown_wait),
@@ -358,8 +357,7 @@ where
 		Ok(Self {
 			audio: audio_state_reader,
 			signal,
-			config,
-
+			_config: PhantomData,
 			shutdown,
 			shutdown_hang,
 			shutdown_done,

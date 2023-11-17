@@ -42,6 +42,7 @@ where
 	TrackData: ValidTrackData,
 	CallbackSender: SansanSender<()>,
 {
+	pub(crate) low_priority:  bool,
 	pub(crate) callbacks:     Callbacks<TrackData, CallbackSender>,
 	pub(crate) audio_state:   AudioStateReader<TrackData>,
 	pub(crate) shutdown_wait: Arc<Barrier>,
@@ -66,6 +67,7 @@ where
 			.name("Caller".into())
 			.spawn(move || {
 				let InitArgs {
+					low_priority,
 					callbacks,
 					audio_state,
 					shutdown_wait,
@@ -90,14 +92,14 @@ where
 					shutdown_wait,
 				};
 
-				Caller::main(this, channels);
+				Caller::main(this, channels, low_priority);
 			})
 	}
 
 	//---------------------------------------------------------------------------------------------------- Main Loop
 	#[cold]
 	#[inline(never)]
-	fn main(mut self, channels: Channels) {
+	fn main(mut self, channels: Channels, low_priority: bool) {
 		// Create channels that we will
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
@@ -107,6 +109,8 @@ where
 		assert_eq!(2, select.recv(&channels.repeat));
 		assert_eq!(3, select.recv(&channels.elapsed));
 		assert_eq!(4, select.recv(&channels.shutdown));
+
+		if low_priority { lpt::lpt(); }
 
 		loop {
 			// Route signal to its appropriate handler function [fn_*()].

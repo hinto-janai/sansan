@@ -29,7 +29,9 @@ where
 	CallbackSender: SansanSender<()>,
 {
 	/// TODO
-	pub callbacks: Option<Callbacks<TrackData, CallbackSender>>,
+	pub callbacks: Callbacks<TrackData, CallbackSender>,
+	/// TODO
+	pub callback_low_priority: bool,
 
 	/// TODO
 	pub restore: Option<AudioState<TrackData>>,
@@ -139,7 +141,8 @@ where
 	/// ```rust
 	/// # use sansan::config::*;
 	/// Config::<(), ()> {
-	///     callbacks:                   None,
+	///     callbacks:                   Callbacks::DEFAULT,
+	///     callback_low_priority:       true,
 	///     restore:                     None,
 	///     audio_state:                 AudioStateConfig::DEFAULT,
 	///     audio_output_error_behavior: AudioErrorBehavior::DEFAULT,
@@ -148,9 +151,10 @@ where
 	/// };
 	/// ```
 	pub const DEFAULT: Self = Self {
-		callbacks:                   None,
-		audio_state:                 AudioStateConfig::DEFAULT,
+		callbacks:                   Callbacks::DEFAULT,
+		callback_low_priority:       true,
 		restore:                     None,
+		audio_state:                 AudioStateConfig::DEFAULT,
 		audio_output_error_behavior: AudioErrorBehavior::DEFAULT,
 		audio_seek_error_behavior:   AudioErrorBehavior::DEFAULT,
 		audio_decode_error_behavior: AudioErrorBehavior::DEFAULT,
