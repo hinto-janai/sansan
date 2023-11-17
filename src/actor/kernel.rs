@@ -143,26 +143,28 @@ where
 	#[cold]
 	#[inline(never)]
 	pub(crate) fn init(args: InitArgs<TrackData>) -> Result<JoinHandle<()>, std::io::Error> {
-		let InitArgs {
-			atomic_state,
-			playing,
-			audio_ready_to_recv,
-			shutdown_wait,
-			audio_state,
-			channels,
-		} = args;
-
-		let this = Kernel {
-			atomic_state,
-			playing,
-			audio_state,
-			audio_ready_to_recv,
-			shutdown_wait,
-		};
-
 		std::thread::Builder::new()
 			.name("Kernel".into())
-			.spawn(move || Kernel::main(this, channels))
+			.spawn(move || {
+				let InitArgs {
+					atomic_state,
+					playing,
+					audio_ready_to_recv,
+					shutdown_wait,
+					audio_state,
+					channels,
+				} = args;
+
+				let this = Kernel {
+					atomic_state,
+					playing,
+					audio_state,
+					audio_ready_to_recv,
+					shutdown_wait,
+				};
+
+				Kernel::main(this, channels);
+			})
 	}
 
 	//---------------------------------------------------------------------------------------------------- Main Loop

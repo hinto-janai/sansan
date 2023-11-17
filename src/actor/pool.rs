@@ -62,53 +62,55 @@ impl<TrackData: ValidTrackData> Pool<TrackData> {
 	#[cold]
 	#[inline(never)]
 	pub(crate) fn init(args: InitArgs<TrackData>) -> Result<JoinHandle<()>, std::io::Error> {
-		let InitArgs {
-			shutdown_wait,
-			shutdown,
-			to_decode,
-			from_decode,
-			to_kernel,
-			from_kernel,
-			to_gc_decode,
-			to_gc_kernel,
-		} = args;
-
-		// INVARIANT:
-		// [Kernel] & [Decode] rely on the fact that on the
-		// very first `.recv()`, there will already be a
-		// buffer waiting.
-		//
-		// We must send 1 in advance.
-		//
-		// Other buffers are created in near proximity
-		// in hopes the compiler will do some memory
-		// allocation optimization black magic.
-		let buffer_to_decode = VecDeque::with_capacity(DECODE_BUFFER_LEN);
-		let buffer_decode    = VecDeque::with_capacity(DECODE_BUFFER_LEN);
-		let buffer_to_kernel = VecDeque::with_capacity(QUEUE_LEN);
-		let buffer_kernel    = VecDeque::with_capacity(QUEUE_LEN);
-		try_send!(to_decode, buffer_to_decode);
-		try_send!(to_kernel, buffer_to_kernel);
-
-		let channels = Channels {
-			shutdown,
-			to_decode,
-			from_decode,
-			to_kernel,
-			from_kernel,
-			to_gc_decode,
-			to_gc_kernel,
-		};
-
-		let this = Pool {
-			shutdown_wait,
-			buffer_decode,
-			buffer_kernel,
-		};
-
 		std::thread::Builder::new()
 			.name("Pool".into())
-			.spawn(move || Pool::main(this, channels))
+			.spawn(move || {
+				let InitArgs {
+					shutdown_wait,
+					shutdown,
+					to_decode,
+					from_decode,
+					to_kernel,
+					from_kernel,
+					to_gc_decode,
+					to_gc_kernel,
+				} = args;
+
+				// INVARIANT:
+				// [Kernel] & [Decode] rely on the fact that on the
+				// very first `.recv()`, there will already be a
+				// buffer waiting.
+				//
+				// We must send 1 in advance.
+				//
+				// Other buffers are created in near proximity
+				// in hopes the compiler will do some memory
+				// allocation optimization black magic.
+				let buffer_to_decode = VecDeque::with_capacity(DECODE_BUFFER_LEN);
+				let buffer_decode    = VecDeque::with_capacity(DECODE_BUFFER_LEN);
+				let buffer_to_kernel = VecDeque::with_capacity(QUEUE_LEN);
+				let buffer_kernel    = VecDeque::with_capacity(QUEUE_LEN);
+				try_send!(to_decode, buffer_to_decode);
+				try_send!(to_kernel, buffer_to_kernel);
+
+				let channels = Channels {
+					shutdown,
+					to_decode,
+					from_decode,
+					to_kernel,
+					from_kernel,
+					to_gc_decode,
+					to_gc_kernel,
+				};
+
+				let this = Pool {
+					shutdown_wait,
+					buffer_decode,
+					buffer_kernel,
+				};
+
+				Pool::main(this, channels)
+			})
 	}
 
 	//---------------------------------------------------------------------------------------------------- Main Loop

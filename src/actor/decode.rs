@@ -108,41 +108,43 @@ impl Decode {
 	#[cold]
 	#[inline(never)]
 	pub(crate) fn init(args: InitArgs) -> Result<JoinHandle<()>, std::io::Error> {
-		let InitArgs {
-			audio_ready_to_recv,
-			shutdown_wait,
-			shutdown,
-			to_gc,
-			to_pool,
-			from_pool,
-			to_audio,
-			from_audio,
-			to_kernel,
-			from_kernel,
-		} = args;
-
-		let channels = Channels {
-			shutdown,
-			to_gc,
-			to_audio,
-			from_audio,
-			to_kernel,
-			from_kernel,
-		};
-
-		let this = Decode {
-			audio_ready_to_recv,
-			buffer: VecDeque::with_capacity(DECODE_BUFFER_LEN),
-			source: SourceInner::dummy(),
-			done_decoding: true,
-			to_pool,
-			from_pool,
-			shutdown_wait,
-		};
-
 		std::thread::Builder::new()
 			.name("Decode".into())
-			.spawn(move || Decode::main(this, channels))
+			.spawn(move || {
+				let InitArgs {
+					audio_ready_to_recv,
+					shutdown_wait,
+					shutdown,
+					to_gc,
+					to_pool,
+					from_pool,
+					to_audio,
+					from_audio,
+					to_kernel,
+					from_kernel,
+				} = args;
+
+				let channels = Channels {
+					shutdown,
+					to_gc,
+					to_audio,
+					from_audio,
+					to_kernel,
+					from_kernel,
+				};
+
+				let this = Decode {
+					audio_ready_to_recv,
+					buffer: VecDeque::with_capacity(DECODE_BUFFER_LEN),
+					source: SourceInner::dummy(),
+					done_decoding: true,
+					to_pool,
+					from_pool,
+					shutdown_wait,
+				};
+
+				Decode::main(this, channels)
+			})
 	}
 
 	//---------------------------------------------------------------------------------------------------- Main Loop

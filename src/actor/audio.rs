@@ -100,22 +100,22 @@ where
 	#[cold]
 	#[inline(never)]
 	pub(crate) fn init(args: InitArgs) -> Result<JoinHandle<()>, std::io::Error> {
-		let InitArgs {
-			atomic_state,
-			playing,
-			ready_to_recv,
-			shutdown_wait,
-			shutdown,
-			to_gc,
-			to_decode,
-			from_decode,
-			to_kernel,
-			from_kernel,
-		} = args;
-
 		std::thread::Builder::new()
 			.name("Audio".into())
 			.spawn(move || {
+				let InitArgs {
+					atomic_state,
+					playing,
+					ready_to_recv,
+					shutdown_wait,
+					shutdown,
+					to_gc,
+					to_decode,
+					from_decode,
+					to_kernel,
+					from_kernel,
+				} = args;
+
 				let channels = Channels {
 					shutdown,
 					to_gc,

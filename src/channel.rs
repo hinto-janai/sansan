@@ -44,7 +44,11 @@ use std::convert::Infallible;
 
 //---------------------------------------------------------------------------------------------------- Sender
 /// A sender side of a channel, that can send the message `T`.
-pub trait SansanSender<T> {
+pub trait SansanSender<T>
+where
+	T: Send + Sync + 'static,
+	Self: Send + Sync + 'static,
+{
 	/// The error(s) that can occur when sending.
 	type Error;
 
@@ -54,7 +58,11 @@ pub trait SansanSender<T> {
 
 //---------------------------------------------------------------------------------------------------- Receiver
 /// A receiver side of a channel, that can receive the message `T`.
-pub trait SansanReceiver<T> {
+pub trait SansanReceiver<T>
+where
+	T: Send + Sync + 'static,
+	Self: Send + Sync + 'static,
+{
 	/// The error(s) that can occur when receiving.
 	type Error;
 
@@ -63,14 +71,22 @@ pub trait SansanReceiver<T> {
 }
 
 //---------------------------------------------------------------------------------------------------- crossbeam
-impl<T> SansanSender<T> for crossbeam::channel::Sender<T> {
+impl<T> SansanSender<T> for crossbeam::channel::Sender<T>
+where
+	T: Send + Sync + 'static,
+	Self: Send + Sync + 'static,
+{
 	type Error = crossbeam::channel::TrySendError<T>;
 	#[inline(always)]
 	fn try_send(&self, t: T) -> Result<(), Self::Error> {
 		self.try_send(t)
 	}
 }
-impl<T> SansanReceiver<T> for crossbeam::channel::Receiver<T> {
+impl<T> SansanReceiver<T> for crossbeam::channel::Receiver<T>
+where
+	T: Send + Sync + 'static,
+	Self: Send + Sync + 'static,
+{
 	type Error = crossbeam::channel::TryRecvError;
 	#[inline(always)]
 	fn try_recv(&self) -> Result<T, Self::Error> {
@@ -79,21 +95,33 @@ impl<T> SansanReceiver<T> for crossbeam::channel::Receiver<T> {
 }
 
 //---------------------------------------------------------------------------------------------------- std
-impl<T> SansanSender<T> for std::sync::mpsc::Sender<T> {
+impl<T> SansanSender<T> for std::sync::mpsc::Sender<T>
+where
+	T: Send + Sync + 'static,
+	Self: Send + Sync + 'static,
+{
 	type Error = std::sync::mpsc::SendError<T>;
 	#[inline(always)]
 	fn try_send(&self, t: T) -> Result<(), Self::Error> {
 		self.send(t)
 	}
 }
-impl<T> SansanSender<T> for std::sync::mpsc::SyncSender<T> {
+impl<T> SansanSender<T> for std::sync::mpsc::SyncSender<T>
+where
+	T: Send + Sync + 'static,
+	Self: Send + Sync + 'static,
+{
 	type Error = std::sync::mpsc::TrySendError<T>;
 	#[inline(always)]
 	fn try_send(&self, t: T) -> Result<(), Self::Error> {
 		self.try_send(t)
 	}
 }
-impl<T> SansanReceiver<T> for std::sync::mpsc::Receiver<T> {
+impl<T> SansanReceiver<T> for std::sync::mpsc::Receiver<T>
+where
+	T: Send + Sync + 'static,
+	Self: Send + Sync + 'static,
+{
 	type Error = std::sync::mpsc::TryRecvError;
 	#[inline(always)]
 	fn try_recv(&self) -> Result<T, Self::Error> {
