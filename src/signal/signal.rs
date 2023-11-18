@@ -8,6 +8,7 @@ use crate::signal::{
 	AddError,SeekError,NextError,PreviousError,SkipError,
 	BackError,SetIndexError,RemoveError,RemoveRangeError,
 };
+use crate::macros::{try_send,send,recv};
 
 //---------------------------------------------------------------------------------------------------- Signal
 /// TODO
@@ -37,34 +38,34 @@ where
 	TrackData: ValidTrackData
 {
 	// Signals that return `()`.
-	pub(crate) toggle_send:       Sender<()>,
-	pub(crate) play_send:         Sender<()>,
-	pub(crate) pause_send:        Sender<()>,
-	pub(crate) clear_send:        Sender<Clear>,
-	pub(crate) restore_send:      Sender<AudioState<TrackData>>,
-	pub(crate) shuffle_send:      Sender<Shuffle>,
-	pub(crate) repeat_send:       Sender<Repeat>,
-	pub(crate) volume_send:       Sender<Volume>,
+	pub(crate) send_toggle:       Sender<()>,
+	pub(crate) send_play:         Sender<()>,
+	pub(crate) send_pause:        Sender<()>,
+	pub(crate) send_clear:        Sender<Clear>,
+	pub(crate) send_restore:      Sender<AudioState<TrackData>>,
+	pub(crate) send_shuffle:      Sender<Shuffle>,
+	pub(crate) send_repeat:       Sender<Repeat>,
+	pub(crate) send_volume:       Sender<Volume>,
 
 	// Signals that return `Result<T, E>`.
-	pub(crate) add_send:          Sender<Add>,
-	pub(crate) add_recv:          Receiver<Result<(), AddError>>,
-	pub(crate) seek_send:         Sender<Seek>,
-	pub(crate) seek_recv:         Receiver<Result<(), SeekError>>,
-	pub(crate) next_send:         Sender<()>,
-	pub(crate) next_recv:         Receiver<Result<usize, NextError>>,
-	pub(crate) previous_send:     Sender<Previous>,
-	pub(crate) previous_recv:     Receiver<Result<usize, PreviousError>>,
-	pub(crate) skip_send:         Sender<Skip>,
-	pub(crate) skip_recv:         Receiver<Result<usize, SkipError>>,
-	pub(crate) back_send:         Sender<Back>,
-	pub(crate) back_recv:         Receiver<Result<usize, BackError>>,
-	pub(crate) set_index_send:    Sender<SetIndex>,
-	pub(crate) set_index_recv:    Receiver<Result<usize, SetIndexError>>,
-	pub(crate) remove_send:       Sender<Remove>,
-	pub(crate) remove_recv:       Receiver<Result<usize, RemoveError>>,
-	pub(crate) remove_range_send: Sender<RemoveRange>,
-	pub(crate) remove_range_recv: Receiver<Result<usize, RemoveRangeError>>,
+	pub(crate) send_add:          Sender<Add>,
+	pub(crate) recv_add:          Receiver<Result<(), AddError>>,
+	pub(crate) send_seek:         Sender<Seek>,
+	pub(crate) recv_seek:         Receiver<Result<(), SeekError>>,
+	pub(crate) send_next:         Sender<()>,
+	pub(crate) recv_next:         Receiver<Result<usize, NextError>>,
+	pub(crate) send_previous:     Sender<Previous>,
+	pub(crate) recv_previous:     Receiver<Result<usize, PreviousError>>,
+	pub(crate) send_skip:         Sender<Skip>,
+	pub(crate) recv_skip:         Receiver<Result<usize, SkipError>>,
+	pub(crate) send_back:         Sender<Back>,
+	pub(crate) recv_back:         Receiver<Result<usize, BackError>>,
+	pub(crate) send_set_index:    Sender<SetIndex>,
+	pub(crate) recv_set_index:    Receiver<Result<usize, SetIndexError>>,
+	pub(crate) send_remove:       Sender<Remove>,
+	pub(crate) recv_remove:       Receiver<Result<usize, RemoveError>>,
+	pub(crate) send_remove_range: Sender<RemoveRange>,
+	pub(crate) recv_remove_range: Receiver<Result<usize, RemoveRangeError>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Signal Impl
@@ -81,114 +82,97 @@ where
 	// Just in case [Kernel] panicked, we [unwrap()] as all
 	// bets are off since [Kernel] shouldn't be panicking.
 
-	#[inline]
-	///
+	/// TODO
 	fn toggle(&mut self) {
-		self.toggle_send.send(()).unwrap();
+		try_send!(self.send_toggle, ());
 	}
 
-	#[inline]
-	///
+	/// TODO
 	fn play(&mut self) {
-		self.play_send.send(()).unwrap();
+		try_send!(self.send_play, ());
 	}
 
-	#[inline]
-	///
+	/// TODO
 	fn pause(&mut self) {
-		self.pause_send.send(()).unwrap();
+		try_send!(self.send_pause, ());
 	}
 
-	#[inline]
-	///
+	/// TODO
 	fn clear(&mut self, clear: Clear) {
-		self.clear_send.send(clear).unwrap();
+		try_send!(self.send_clear, clear);
 	}
 
-	#[inline]
-	///
+	/// TODO
 	fn restore(&mut self, restore: AudioState<TrackData>) {
-		self.restore_send.send(restore).unwrap();
+		try_send!(self.send_restore, restore);
 	}
 
-	#[inline]
-	///
+	/// TODO
 	fn shuffle(&mut self, shuffle: Shuffle) {
-		self.shuffle_send.send(shuffle).unwrap();
+		try_send!(self.send_shuffle, shuffle);
 	}
 
-	#[inline]
-	///
+	/// TODO
 	fn repeat(&mut self, repeat: Repeat) {
-		self.repeat_send.send(repeat).unwrap();
+		try_send!(self.send_repeat, repeat);
 	}
 
-	#[inline]
-	///
+	/// TODO
 	fn volume(&mut self, volume: Volume) {
-		self.volume_send.send(volume).unwrap();
+		try_send!(self.send_volume, volume);
 	}
 
-	#[inline]
-	///
+	/// TODO
 	fn seek(&mut self, seek: Seek) -> Result<(), SeekError> {
-		self.seek_send.send(seek).unwrap();
-		self.seek_recv.recv().unwrap()
+		send!(self.send_seek, seek);
+		recv!(self.recv_seek)
 	}
 
-	#[inline]
-	///
+	/// TODO
 	fn next(&mut self) -> Result<usize, NextError> {
-		self.next_send.send(()).unwrap();
-		self.next_recv.recv().unwrap()
+		send!(self.send_next, ());
+		recv!(self.recv_next)
 	}
 
-	#[inline]
-	///
+	/// TODO
 	fn previous(&mut self, previous: Previous) -> Result<usize, PreviousError> {
-		self.previous_send.send(previous).unwrap();
-		self.previous_recv.recv().unwrap()
+		send!(self.send_previous, previous);
+		recv!(self.recv_previous)
 	}
 
-	#[inline]
-	///
+	/// TODO
 	fn skip(&mut self, skip: Skip) -> Result<usize, SkipError> {
-		self.skip_send.send(skip).unwrap();
-		self.skip_recv.recv().unwrap()
+		send!(self.send_skip, skip);
+		recv!(self.recv_skip)
 	}
 
-	#[inline]
-	///
+	/// TODO
 	fn back(&mut self, back: Back) -> Result<usize, BackError> {
-		self.back_send.send(back).unwrap();
-		self.back_recv.recv().unwrap()
+		send!(self.send_back, back);
+		recv!(self.recv_back)
 	}
 
-	#[inline]
-	///
+	/// TODO
 	fn add(&mut self, add: Add) -> Result<(), AddError> {
-		self.add_send.send(add).unwrap();
-		self.add_recv.recv().unwrap()
+		send!(self.send_add, add);
+		recv!(self.recv_add)
 	}
 
-	#[inline]
-	///
+	/// TODO
 	fn set_index(&mut self, set_index: SetIndex) -> Result<usize, SetIndexError> {
-		self.set_index_send.send(set_index).unwrap();
-		self.set_index_recv.recv().unwrap()
+		send!(self.send_set_index, set_index);
+		recv!(self.recv_set_index)
 	}
 
-	#[inline]
-	///
+	/// TODO
 	fn remove(&mut self, remove: Remove) -> Result<usize, RemoveError> {
-		self.remove_send.send(remove).unwrap();
-		self.remove_recv.recv().unwrap()
+		send!(self.send_remove, remove);
+		recv!(self.recv_remove)
 	} // defines what happens on included remove song, other errors, etc
 
-	#[inline]
-	///
+	/// TODO
 	fn remove_range(&mut self, remove_range: RemoveRange) -> Result<usize, RemoveRangeError> {
-		self.remove_range_send.send(remove_range).unwrap();
-		self.remove_range_recv.recv().unwrap()
+		send!(self.send_remove_range, remove_range);
+		recv!(self.recv_remove_range)
 	} // defines what happens on included remove song, other errors, etc
 }

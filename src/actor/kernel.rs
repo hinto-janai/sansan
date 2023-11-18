@@ -94,34 +94,34 @@ pub(crate) struct Channels<TrackData: ValidTrackData> {
 	pub(crate) from_decode: Receiver<DecodeToKernel>,
 
 	// Signals that return `()`.
-	pub(crate) toggle_recv:  Receiver<()>,
-	pub(crate) play_recv:    Receiver<()>,
-	pub(crate) pause_recv:   Receiver<()>,
-	pub(crate) clear_recv:   Receiver<Clear>,
-	pub(crate) shuffle_recv: Receiver<Shuffle>,
-	pub(crate) repeat_recv:  Receiver<Repeat>,
-	pub(crate) volume_recv:  Receiver<Volume>,
-	pub(crate) restore_recv: Receiver<AudioState<TrackData>>,
+	pub(crate) recv_toggle:  Receiver<()>,
+	pub(crate) recv_play:    Receiver<()>,
+	pub(crate) recv_pause:   Receiver<()>,
+	pub(crate) recv_clear:   Receiver<Clear>,
+	pub(crate) recv_shuffle: Receiver<Shuffle>,
+	pub(crate) recv_repeat:  Receiver<Repeat>,
+	pub(crate) recv_volume:  Receiver<Volume>,
+	pub(crate) recv_restore: Receiver<AudioState<TrackData>>,
 
 	// // Signals that return `Result<T, E>`.
-	pub(crate) add_send:          Sender<Result<(), AddError>>,
-	pub(crate) add_recv:          Receiver<Add>,
-	pub(crate) seek_send:         Sender<Result<(), SeekError>>,
-	pub(crate) seek_recv:         Receiver<Seek>,
-	pub(crate) next_send:         Sender<Result<usize, NextError>>,
-	pub(crate) next_recv:         Receiver<()>,
-	pub(crate) previous_send:     Sender<Result<usize, PreviousError>>,
-	pub(crate) previous_recv:     Receiver<Previous>,
-	pub(crate) skip_send:         Sender<Result<usize, SkipError>>,
-	pub(crate) skip_recv:         Receiver<Skip>,
-	pub(crate) back_send:         Sender<Result<usize, BackError>>,
-	pub(crate) back_recv:         Receiver<Back>,
-	pub(crate) set_index_send:    Sender<Result<usize, SetIndexError>>,
-	pub(crate) set_index_recv:    Receiver<SetIndex>,
-	pub(crate) remove_send:       Sender<Result<usize, RemoveError>>,
-	pub(crate) remove_recv:       Receiver<Remove>,
-	pub(crate) remove_range_send: Sender<Result<usize, RemoveRangeError>>,
-	pub(crate) remove_range_recv: Receiver<RemoveRange>,
+	pub(crate) send_add:          Sender<Result<(), AddError>>,
+	pub(crate) recv_add:          Receiver<Add>,
+	pub(crate) send_seek:         Sender<Result<(), SeekError>>,
+	pub(crate) recv_seek:         Receiver<Seek>,
+	pub(crate) send_next:         Sender<Result<usize, NextError>>,
+	pub(crate) recv_next:         Receiver<()>,
+	pub(crate) send_previous:     Sender<Result<usize, PreviousError>>,
+	pub(crate) recv_previous:     Receiver<Previous>,
+	pub(crate) send_skip:         Sender<Result<usize, SkipError>>,
+	pub(crate) recv_skip:         Receiver<Skip>,
+	pub(crate) send_back:         Sender<Result<usize, BackError>>,
+	pub(crate) recv_back:         Receiver<Back>,
+	pub(crate) send_set_index:    Sender<Result<usize, SetIndexError>>,
+	pub(crate) recv_set_index:    Receiver<SetIndex>,
+	pub(crate) send_remove:       Sender<Result<usize, RemoveError>>,
+	pub(crate) recv_remove:       Receiver<Remove>,
+	pub(crate) send_remove_range: Sender<Result<usize, RemoveRangeError>>,
+	pub(crate) recv_remove_range: Receiver<RemoveRange>,
 }
 
 //---------------------------------------------------------------------------------------------------- Kernel Impl
@@ -178,23 +178,23 @@ where
 		// INVARIANT:
 		// The order these are selected MUST match
 		// the order of the match function mappings below.
-		assert_eq!(0,  select.recv(&channels.toggle_recv));
-		assert_eq!(1,  select.recv(&channels.play_recv));
-		assert_eq!(2,  select.recv(&channels.pause_recv));
-		assert_eq!(3,  select.recv(&channels.clear_recv));
-		assert_eq!(4,  select.recv(&channels.shuffle_recv));
-		assert_eq!(5,  select.recv(&channels.repeat_recv));
-		assert_eq!(6,  select.recv(&channels.volume_recv));
-		assert_eq!(7,  select.recv(&channels.restore_recv));
-		assert_eq!(8,  select.recv(&channels.add_recv));
-		assert_eq!(9,  select.recv(&channels.seek_recv));
-		assert_eq!(10, select.recv(&channels.next_recv));
-		assert_eq!(11, select.recv(&channels.previous_recv));
-		assert_eq!(12, select.recv(&channels.skip_recv));
-		assert_eq!(13, select.recv(&channels.back_recv));
-		assert_eq!(14, select.recv(&channels.set_index_recv));
-		assert_eq!(15, select.recv(&channels.remove_recv));
-		assert_eq!(16, select.recv(&channels.remove_range_recv));
+		assert_eq!(0,  select.recv(&channels.recv_toggle));
+		assert_eq!(1,  select.recv(&channels.recv_play));
+		assert_eq!(2,  select.recv(&channels.recv_pause));
+		assert_eq!(3,  select.recv(&channels.recv_clear));
+		assert_eq!(4,  select.recv(&channels.recv_shuffle));
+		assert_eq!(5,  select.recv(&channels.recv_repeat));
+		assert_eq!(6,  select.recv(&channels.recv_volume));
+		assert_eq!(7,  select.recv(&channels.recv_restore));
+		assert_eq!(8,  select.recv(&channels.recv_add));
+		assert_eq!(9,  select.recv(&channels.recv_seek));
+		assert_eq!(10, select.recv(&channels.recv_next));
+		assert_eq!(11, select.recv(&channels.recv_previous));
+		assert_eq!(12, select.recv(&channels.recv_skip));
+		assert_eq!(13, select.recv(&channels.recv_back));
+		assert_eq!(14, select.recv(&channels.recv_set_index));
+		assert_eq!(15, select.recv(&channels.recv_remove));
+		assert_eq!(16, select.recv(&channels.recv_remove_range));
 		assert_eq!(17, select.recv(&channels.shutdown));
 		assert_eq!(18, select.recv(&channels.shutdown_hang));
 
@@ -207,8 +207,8 @@ where
 				2  => self.pause(),
 				3  => self.clear(),
 				5  => self.shuffle(),
-				4  => self.repeat(try_recv!(channels.repeat_recv)),
-				6  => self.volume(try_recv!(channels.volume_recv)),
+				4  => self.repeat(try_recv!(channels.recv_repeat)),
+				6  => self.volume(try_recv!(channels.recv_volume)),
 				7  => self.restore(),
 				8  => self.add(),
 				9  => self.seek(),

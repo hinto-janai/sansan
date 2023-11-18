@@ -118,66 +118,66 @@ where
 		// They are [unbounded()] to allow for immediate return.
 		//  |
 		//  v
-		let (toggle_send,  toggle_recv)  = unbounded();
-		let (play_send,    play_recv)    = unbounded();
-		let (pause_send,   pause_recv)   = unbounded();
-		let (clear_send,   clear_recv)   = unbounded();
-		let (restore_send, restore_recv) = unbounded();
-		let (repeat_send,  repeat_recv)  = unbounded();
-		let (shuffle_send, shuffle_recv) = unbounded();
-		let (volume_send,  volume_recv)  = unbounded();
+		let (send_toggle,  recv_toggle)  = unbounded();
+		let (send_play,    recv_play)    = unbounded();
+		let (send_pause,   recv_pause)   = unbounded();
+		let (send_clear,   recv_clear)   = unbounded();
+		let (send_restore, recv_restore) = unbounded();
+		let (send_repeat,  recv_repeat)  = unbounded();
+		let (send_shuffle, recv_shuffle) = unbounded();
+		let (send_volume,  recv_volume)  = unbounded();
 		// These must be labeled.
 		// Although semantically [bounded(0)] makes sense since [Kernel]
 		// and [Signal] must meet up, [bounded(1)] is faster.
 		//  |
 		//  v
-		let (s_add_send,          k_add_recv)          = bounded(1);
-		let (k_add_send,          s_add_recv)          = bounded(1);
-		let (s_seek_send,         k_seek_recv)         = bounded(1);
-		let (k_seek_send,         s_seek_recv)         = bounded(1);
-		let (s_next_send,         k_next_recv)         = bounded(1);
-		let (k_next_send,         s_next_recv)         = bounded(1);
-		let (s_previous_send,     k_previous_recv)     = bounded(1);
-		let (k_previous_send,     s_previous_recv)     = bounded(1);
-		let (s_skip_send,         k_skip_recv)         = bounded(1);
-		let (k_skip_send,         s_skip_recv)         = bounded(1);
-		let (s_back_send,         k_back_recv)         = bounded(1);
-		let (k_back_send,         s_back_recv)         = bounded(1);
-		let (s_set_index_send,    k_set_index_recv)    = bounded(1);
-		let (k_set_index_send,    s_set_index_recv)    = bounded(1);
-		let (s_remove_send,       k_remove_recv)       = bounded(1);
-		let (k_remove_send,       s_remove_recv)       = bounded(1);
-		let (s_remove_range_send, k_remove_range_recv) = bounded(1);
-		let (k_remove_range_send, s_remove_range_recv) = bounded(1);
+		let (s_send_add,          k_recv_add)          = bounded(1);
+		let (k_send_add,          s_recv_add)          = bounded(1);
+		let (s_send_seek,         k_recv_seek)         = bounded(1);
+		let (k_send_seek,         s_recv_seek)         = bounded(1);
+		let (s_send_next,         k_recv_next)         = bounded(1);
+		let (k_send_next,         s_recv_next)         = bounded(1);
+		let (s_send_previous,     k_recv_previous)     = bounded(1);
+		let (k_send_previous,     s_recv_previous)     = bounded(1);
+		let (s_send_skip,         k_recv_skip)         = bounded(1);
+		let (k_send_skip,         s_recv_skip)         = bounded(1);
+		let (s_send_back,         k_recv_back)         = bounded(1);
+		let (k_send_back,         s_recv_back)         = bounded(1);
+		let (s_send_set_index,    k_recv_set_index)    = bounded(1);
+		let (k_send_set_index,    s_recv_set_index)    = bounded(1);
+		let (s_send_remove,       k_recv_remove)       = bounded(1);
+		let (k_send_remove,       s_recv_remove)       = bounded(1);
+		let (s_send_remove_range, k_recv_remove_range) = bounded(1);
+		let (k_send_remove_range, s_recv_remove_range) = bounded(1);
 
 		let signal = Signal {
-			toggle_send,
-			play_send,
-			pause_send,
-			clear_send,
-			restore_send,
-			repeat_send,
-			shuffle_send,
-			volume_send,
+			send_toggle,
+			send_play,
+			send_pause,
+			send_clear,
+			send_restore,
+			send_repeat,
+			send_shuffle,
+			send_volume,
 
-			add_send:          s_add_send,
-			add_recv:          s_add_recv,
-			seek_send:         s_seek_send,
-			seek_recv:         s_seek_recv,
-			next_send:         s_next_send,
-			next_recv:         s_next_recv,
-			previous_send:     s_previous_send,
-			previous_recv:     s_previous_recv,
-			skip_send:         s_skip_send,
-			skip_recv:         s_skip_recv,
-			back_send:         s_back_send,
-			back_recv:         s_back_recv,
-			set_index_send:    s_set_index_send,
-			set_index_recv:    s_set_index_recv,
-			remove_send:       s_remove_send,
-			remove_recv:       s_remove_recv,
-			remove_range_send: s_remove_range_send,
-			remove_range_recv: s_remove_range_recv,
+			send_add:          s_send_add,
+			recv_add:          s_recv_add,
+			send_seek:         s_send_seek,
+			recv_seek:         s_recv_seek,
+			send_next:         s_send_next,
+			recv_next:         s_recv_next,
+			send_previous:     s_send_previous,
+			recv_previous:     s_recv_previous,
+			send_skip:         s_send_skip,
+			recv_skip:         s_recv_skip,
+			send_back:         s_send_back,
+			recv_back:         s_recv_back,
+			send_set_index:    s_send_set_index,
+			recv_set_index:    s_recv_set_index,
+			send_remove:       s_send_remove,
+			recv_remove:       s_recv_remove,
+			send_remove_range: s_send_remove_range,
+			recv_remove_range: s_recv_remove_range,
 		};
 
 		//-------------------------------------------------------------- Spawn [Caller]
@@ -313,36 +313,36 @@ where
 				d_shutdown,
 				gc_shutdown,
 			]),
-			toggle_recv,
-			play_recv,
-			pause_recv,
+			recv_toggle,
+			recv_play,
+			recv_pause,
 			to_audio:    k_to_a,
 			from_audio:  k_from_a,
 			to_decode:   k_to_d,
 			from_decode: k_from_d,
-			clear_recv,
-			repeat_recv,
-			shuffle_recv,
-			volume_recv,
-			restore_recv,
-			add_send:          k_add_send,
-			add_recv:          k_add_recv,
-			seek_send:         k_seek_send,
-			seek_recv:         k_seek_recv,
-			next_send:         k_next_send,
-			next_recv:         k_next_recv,
-			previous_send:     k_previous_send,
-			previous_recv:     k_previous_recv,
-			skip_send:         k_skip_send,
-			skip_recv:         k_skip_recv,
-			back_send:         k_back_send,
-			back_recv:         k_back_recv,
-			set_index_send:    k_set_index_send,
-			set_index_recv:    k_set_index_recv,
-			remove_send:       k_remove_send,
-			remove_recv:       k_remove_recv,
-			remove_range_send: k_remove_range_send,
-			remove_range_recv: k_remove_range_recv,
+			recv_clear,
+			recv_repeat,
+			recv_shuffle,
+			recv_volume,
+			recv_restore,
+			send_add:          k_send_add,
+			recv_add:          k_recv_add,
+			send_seek:         k_send_seek,
+			recv_seek:         k_recv_seek,
+			send_next:         k_send_next,
+			recv_next:         k_recv_next,
+			send_previous:     k_send_previous,
+			recv_previous:     k_recv_previous,
+			send_skip:         k_send_skip,
+			recv_skip:         k_recv_skip,
+			send_back:         k_send_back,
+			recv_back:         k_recv_back,
+			send_set_index:    k_send_set_index,
+			recv_set_index:    k_recv_set_index,
+			send_remove:       k_send_remove,
+			recv_remove:       k_recv_remove,
+			send_remove_range: k_send_remove_range,
+			recv_remove_range: k_recv_remove_range,
 		};
 		Kernel::<TrackData>::init(crate::actor::kernel::InitArgs {
 			atomic_state,
@@ -364,13 +364,11 @@ where
 		})
 	}
 
-	#[inline]
 	/// TODO
 	pub fn reader(&self) -> AudioStateReader<TrackData> {
 		AudioStateReader::clone(&self.audio)
 	}
 
-	#[inline]
 	/// TODO
 	//
 	// INVARIANT
