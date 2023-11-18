@@ -46,8 +46,8 @@ use std::convert::Infallible;
 /// A sender side of a channel, that can send the message `T`.
 pub trait SansanSender<T>
 where
-	T: Send + Sync + 'static,
-	Self: Send + Sync + 'static,
+	T: Send + 'static,
+	Self: Send + 'static,
 {
 	/// The error(s) that can occur when sending.
 	type Error;
@@ -60,8 +60,8 @@ where
 /// A receiver side of a channel, that can receive the message `T`.
 pub trait SansanReceiver<T>
 where
-	T: Send + Sync + 'static,
-	Self: Send + Sync + 'static,
+	T: Send + 'static,
+	Self: Send + 'static,
 {
 	/// The error(s) that can occur when receiving.
 	type Error;
@@ -73,8 +73,8 @@ where
 //---------------------------------------------------------------------------------------------------- crossbeam
 impl<T> SansanSender<T> for crossbeam::channel::Sender<T>
 where
-	T: Send + Sync + 'static,
-	Self: Send + Sync + 'static,
+	T: Send + 'static,
+	Self: Send + 'static,
 {
 	type Error = crossbeam::channel::TrySendError<T>;
 	#[inline(always)]
@@ -84,8 +84,8 @@ where
 }
 impl<T> SansanReceiver<T> for crossbeam::channel::Receiver<T>
 where
-	T: Send + Sync + 'static,
-	Self: Send + Sync + 'static,
+	T: Send + 'static,
+	Self: Send + 'static,
 {
 	type Error = crossbeam::channel::TryRecvError;
 	#[inline(always)]
@@ -97,8 +97,8 @@ where
 //---------------------------------------------------------------------------------------------------- std
 impl<T> SansanSender<T> for std::sync::mpsc::Sender<T>
 where
-	T: Send + Sync + 'static,
-	Self: Send + Sync + 'static,
+	T: Send + 'static,
+	Self: Send + 'static,
 {
 	type Error = std::sync::mpsc::SendError<T>;
 	#[inline(always)]
@@ -108,8 +108,8 @@ where
 }
 impl<T> SansanSender<T> for std::sync::mpsc::SyncSender<T>
 where
-	T: Send + Sync + 'static,
-	Self: Send + Sync + 'static,
+	T: Send + 'static,
+	Self: Send + 'static,
 {
 	type Error = std::sync::mpsc::TrySendError<T>;
 	#[inline(always)]
@@ -119,8 +119,8 @@ where
 }
 impl<T> SansanReceiver<T> for std::sync::mpsc::Receiver<T>
 where
-	T: Send + Sync + 'static,
-	Self: Send + Sync + 'static,
+	T: Send + 'static,
+	Self: Send + 'static,
 {
 	type Error = std::sync::mpsc::TryRecvError;
 	#[inline(always)]
