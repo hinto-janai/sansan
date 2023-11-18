@@ -120,7 +120,7 @@ pub struct Track<TrackData> {
 // Wrapper around `someday::CommitRef` so that users don't have to handle `someday` types.
 //
 /// TODO
-pub struct AudioStateSnapshot<TrackData: ValidTrackData>(CommitRef<AudioState<TrackData>>);
+pub struct AudioStateSnapshot<TrackData: ValidTrackData>(pub(crate) CommitRef<AudioState<TrackData>>);
 
 impl<TrackData> std::ops::Deref for AudioStateSnapshot<TrackData>
 where

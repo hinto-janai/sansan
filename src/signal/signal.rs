@@ -1,11 +1,11 @@
 //---------------------------------------------------------------------------------------------------- Use
-use crate::state::{AudioState,ValidTrackData};
+use crate::state::{AudioState,ValidTrackData, AudioStateSnapshot};
 use crate::source::Source;
 use crossbeam::channel::{Sender,Receiver,bounded,unbounded};
 use crate::signal::{
 	Add,Append,Back,Clear,Previous,RemoveRange,Remove,
 	Repeat,Seek,SetIndex,Shuffle,Skip,Volume,
-	AddError,SeekError,NextError,PreviousError,SkipError,
+	AddError,SeekError,Next,NextError,PreviousError,SkipError,
 	BackError,SetIndexError,RemoveError,RemoveRangeError,
 };
 use crate::macros::{try_send,send,recv};
@@ -37,35 +37,35 @@ pub struct Signal<TrackData>
 where
 	TrackData: ValidTrackData
 {
-	// Signals that return `()`.
+	// Signals that input/output `()`
 	pub(crate) send_toggle:       Sender<()>,
 	pub(crate) send_play:         Sender<()>,
 	pub(crate) send_pause:        Sender<()>,
+	pub(crate) send_shuffle:      Sender<()>,
+	pub(crate) send_next:         Sender<()>,
+	pub(crate) send_previous:     Sender<()>,
+
+	// Signals that have input and output `()`
 	pub(crate) send_clear:        Sender<Clear>,
 	pub(crate) send_restore:      Sender<AudioState<TrackData>>,
-	pub(crate) send_shuffle:      Sender<Shuffle>,
 	pub(crate) send_repeat:       Sender<Repeat>,
 	pub(crate) send_volume:       Sender<Volume>,
 
-	// Signals that return `Result<T, E>`.
+	// Signals that return `Result<T, E>`
 	pub(crate) send_add:          Sender<Add>,
-	pub(crate) recv_add:          Receiver<Result<(), AddError>>,
+	pub(crate) recv_add:          Receiver<Result<AudioStateSnapshot<TrackData>, AddError>>,
 	pub(crate) send_seek:         Sender<Seek>,
-	pub(crate) recv_seek:         Receiver<Result<(), SeekError>>,
-	pub(crate) send_next:         Sender<()>,
-	pub(crate) recv_next:         Receiver<Result<usize, NextError>>,
-	pub(crate) send_previous:     Sender<Previous>,
-	pub(crate) recv_previous:     Receiver<Result<usize, PreviousError>>,
+	pub(crate) recv_seek:         Receiver<Result<AudioStateSnapshot<TrackData>, SeekError>>,
 	pub(crate) send_skip:         Sender<Skip>,
-	pub(crate) recv_skip:         Receiver<Result<usize, SkipError>>,
+	pub(crate) recv_skip:         Receiver<Result<AudioStateSnapshot<TrackData>, SkipError>>,
 	pub(crate) send_back:         Sender<Back>,
-	pub(crate) recv_back:         Receiver<Result<usize, BackError>>,
+	pub(crate) recv_back:         Receiver<Result<AudioStateSnapshot<TrackData>, BackError>>,
 	pub(crate) send_set_index:    Sender<SetIndex>,
-	pub(crate) recv_set_index:    Receiver<Result<usize, SetIndexError>>,
+	pub(crate) recv_set_index:    Receiver<Result<AudioStateSnapshot<TrackData>, SetIndexError>>,
 	pub(crate) send_remove:       Sender<Remove>,
-	pub(crate) recv_remove:       Receiver<Result<usize, RemoveError>>,
+	pub(crate) recv_remove:       Receiver<Result<AudioStateSnapshot<TrackData>, RemoveError>>,
 	pub(crate) send_remove_range: Sender<RemoveRange>,
-	pub(crate) recv_remove_range: Receiver<Result<usize, RemoveRangeError>>,
+	pub(crate) recv_remove_range: Receiver<Result<AudioStateSnapshot<TrackData>, RemoveRangeError>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Signal Impl
@@ -98,6 +98,21 @@ where
 	}
 
 	/// TODO
+	fn shuffle(&mut self) {
+		try_send!(self.send_shuffle, ());
+	}
+
+	/// TODO
+	fn next(&mut self) {
+		try_send!(self.send_next, ());
+	}
+
+	/// TODO
+	fn previous(&mut self) {
+		try_send!(self.send_previous, ());
+	}
+
+	/// TODO
 	fn clear(&mut self, clear: Clear) {
 		try_send!(self.send_clear, clear);
 	}
@@ -105,11 +120,6 @@ where
 	/// TODO
 	fn restore(&mut self, restore: AudioState<TrackData>) {
 		try_send!(self.send_restore, restore);
-	}
-
-	/// TODO
-	fn shuffle(&mut self, shuffle: Shuffle) {
-		try_send!(self.send_shuffle, shuffle);
 	}
 
 	/// TODO
@@ -123,55 +133,43 @@ where
 	}
 
 	/// TODO
-	fn seek(&mut self, seek: Seek) -> Result<(), SeekError> {
+	fn seek(&mut self, seek: Seek) -> Result<AudioStateSnapshot<TrackData>, SeekError> {
 		send!(self.send_seek, seek);
 		recv!(self.recv_seek)
 	}
 
 	/// TODO
-	fn next(&mut self) -> Result<usize, NextError> {
-		send!(self.send_next, ());
-		recv!(self.recv_next)
-	}
-
-	/// TODO
-	fn previous(&mut self, previous: Previous) -> Result<usize, PreviousError> {
-		send!(self.send_previous, previous);
-		recv!(self.recv_previous)
-	}
-
-	/// TODO
-	fn skip(&mut self, skip: Skip) -> Result<usize, SkipError> {
+	fn skip(&mut self, skip: Skip) -> Result<AudioStateSnapshot<TrackData>, SkipError> {
 		send!(self.send_skip, skip);
 		recv!(self.recv_skip)
 	}
 
 	/// TODO
-	fn back(&mut self, back: Back) -> Result<usize, BackError> {
+	fn back(&mut self, back: Back) -> Result<AudioStateSnapshot<TrackData>, BackError> {
 		send!(self.send_back, back);
 		recv!(self.recv_back)
 	}
 
 	/// TODO
-	fn add(&mut self, add: Add) -> Result<(), AddError> {
+	fn add(&mut self, add: Add) -> Result<AudioStateSnapshot<TrackData>, AddError> {
 		send!(self.send_add, add);
 		recv!(self.recv_add)
 	}
 
 	/// TODO
-	fn set_index(&mut self, set_index: SetIndex) -> Result<usize, SetIndexError> {
+	fn set_index(&mut self, set_index: SetIndex) -> Result<AudioStateSnapshot<TrackData>, SetIndexError> {
 		send!(self.send_set_index, set_index);
 		recv!(self.recv_set_index)
 	}
 
 	/// TODO
-	fn remove(&mut self, remove: Remove) -> Result<usize, RemoveError> {
+	fn remove(&mut self, remove: Remove) -> Result<AudioStateSnapshot<TrackData>, RemoveError> {
 		send!(self.send_remove, remove);
 		recv!(self.recv_remove)
 	} // defines what happens on included remove song, other errors, etc
 
 	/// TODO
-	fn remove_range(&mut self, remove_range: RemoveRange) -> Result<usize, RemoveRangeError> {
+	fn remove_range(&mut self, remove_range: RemoveRange) -> Result<AudioStateSnapshot<TrackData>, RemoveRangeError> {
 		send!(self.send_remove_range, remove_range);
 		recv!(self.recv_remove_range)
 	} // defines what happens on included remove song, other errors, etc

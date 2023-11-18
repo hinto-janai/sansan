@@ -3,7 +3,7 @@ use std::thread::JoinHandle;
 use crossbeam::channel::{Sender, Receiver, Select};
 use crate::{
 	macros::{send,try_recv,try_send,debug2},
-	state::{AudioState,AudioStatePatch,ValidTrackData,AtomicAudioState},
+	state::{AudioState,AudioStatePatch,ValidTrackData,AtomicAudioState, AudioStateSnapshot},
 	actor::{
 		decode::{KernelToDecode,DecodeToKernel},
 		audio::AudioToKernel,
@@ -17,6 +17,7 @@ use crate::{
 		AddError,
 		Seek,
 		SeekError,
+		Next,
 		NextError,
 		Previous,
 		PreviousError,
@@ -93,34 +94,34 @@ pub(crate) struct Channels<TrackData: ValidTrackData> {
 	pub(crate) to_decode:   Sender<KernelToDecode>,
 	pub(crate) from_decode: Receiver<DecodeToKernel>,
 
-	// Signals that return `()`.
-	pub(crate) recv_toggle:  Receiver<()>,
-	pub(crate) recv_play:    Receiver<()>,
-	pub(crate) recv_pause:   Receiver<()>,
-	pub(crate) recv_clear:   Receiver<Clear>,
-	pub(crate) recv_shuffle: Receiver<Shuffle>,
-	pub(crate) recv_repeat:  Receiver<Repeat>,
-	pub(crate) recv_volume:  Receiver<Volume>,
-	pub(crate) recv_restore: Receiver<AudioState<TrackData>>,
+	// Signals that input/output `()`
+	pub(crate) recv_toggle:   Receiver<()>,
+	pub(crate) recv_play:     Receiver<()>,
+	pub(crate) recv_pause:    Receiver<()>,
+	pub(crate) recv_shuffle:  Receiver<()>,
+	pub(crate) recv_next:     Receiver<()>,
+	pub(crate) recv_previous: Receiver<()>,
 
-	// // Signals that return `Result<T, E>`.
-	pub(crate) send_add:          Sender<Result<(), AddError>>,
+	// Signals that have input and output `()`
+	pub(crate) recv_clear:    Receiver<Clear>,
+	pub(crate) recv_repeat:   Receiver<Repeat>,
+	pub(crate) recv_volume:   Receiver<Volume>,
+	pub(crate) recv_restore:  Receiver<AudioState<TrackData>>,
+
+	// Signals that return `Result<T, E>`
+	pub(crate) send_add:          Sender<Result<AudioStateSnapshot<TrackData>, AddError>>,
 	pub(crate) recv_add:          Receiver<Add>,
-	pub(crate) send_seek:         Sender<Result<(), SeekError>>,
+	pub(crate) send_seek:         Sender<Result<AudioStateSnapshot<TrackData>, SeekError>>,
 	pub(crate) recv_seek:         Receiver<Seek>,
-	pub(crate) send_next:         Sender<Result<usize, NextError>>,
-	pub(crate) recv_next:         Receiver<()>,
-	pub(crate) send_previous:     Sender<Result<usize, PreviousError>>,
-	pub(crate) recv_previous:     Receiver<Previous>,
-	pub(crate) send_skip:         Sender<Result<usize, SkipError>>,
+	pub(crate) send_skip:         Sender<Result<AudioStateSnapshot<TrackData>, SkipError>>,
 	pub(crate) recv_skip:         Receiver<Skip>,
-	pub(crate) send_back:         Sender<Result<usize, BackError>>,
+	pub(crate) send_back:         Sender<Result<AudioStateSnapshot<TrackData>, BackError>>,
 	pub(crate) recv_back:         Receiver<Back>,
-	pub(crate) send_set_index:    Sender<Result<usize, SetIndexError>>,
+	pub(crate) send_set_index:    Sender<Result<AudioStateSnapshot<TrackData>, SetIndexError>>,
 	pub(crate) recv_set_index:    Receiver<SetIndex>,
-	pub(crate) send_remove:       Sender<Result<usize, RemoveError>>,
+	pub(crate) send_remove:       Sender<Result<AudioStateSnapshot<TrackData>, RemoveError>>,
 	pub(crate) recv_remove:       Receiver<Remove>,
-	pub(crate) send_remove_range: Sender<Result<usize, RemoveRangeError>>,
+	pub(crate) send_remove_range: Sender<Result<AudioStateSnapshot<TrackData>, RemoveRangeError>>,
 	pub(crate) recv_remove_range: Receiver<RemoveRange>,
 }
 
@@ -183,13 +184,13 @@ where
 		assert_eq!(2,  select.recv(&channels.recv_pause));
 		assert_eq!(3,  select.recv(&channels.recv_clear));
 		assert_eq!(4,  select.recv(&channels.recv_shuffle));
-		assert_eq!(5,  select.recv(&channels.recv_repeat));
-		assert_eq!(6,  select.recv(&channels.recv_volume));
-		assert_eq!(7,  select.recv(&channels.recv_restore));
-		assert_eq!(8,  select.recv(&channels.recv_add));
-		assert_eq!(9,  select.recv(&channels.recv_seek));
-		assert_eq!(10, select.recv(&channels.recv_next));
-		assert_eq!(11, select.recv(&channels.recv_previous));
+		assert_eq!(5, select.recv(&channels.recv_next));
+		assert_eq!(6, select.recv(&channels.recv_previous));
+		assert_eq!(7,  select.recv(&channels.recv_repeat));
+		assert_eq!(8,  select.recv(&channels.recv_volume));
+		assert_eq!(9,  select.recv(&channels.recv_restore));
+		assert_eq!(10,  select.recv(&channels.recv_add));
+		assert_eq!(11,  select.recv(&channels.recv_seek));
 		assert_eq!(12, select.recv(&channels.recv_skip));
 		assert_eq!(13, select.recv(&channels.recv_back));
 		assert_eq!(14, select.recv(&channels.recv_set_index));
@@ -202,23 +203,24 @@ where
 		// to their appropriate handler function.
 		loop {
 			match select.select().index() {
-				0  => self.toggle(),
-				1  => self.play(),
-				2  => self.pause(),
-				3  => self.clear(),
-				5  => self.shuffle(),
-				4  => self.repeat(try_recv!(channels.recv_repeat)),
-				6  => self.volume(try_recv!(channels.recv_volume)),
-				7  => self.restore(),
-				8  => self.add(),
-				9  => self.seek(),
-				10 => self.next(),
-				11 => self.previous(),
-				12 => self.skip(),
-				13 => self.back(),
-				14 => self.set_index(),
-				15 => self.remove(),
-				16 => self.remove_range(),
+				0  => { try_recv!(channels.recv_toggle);   self.toggle()   },
+				1  => { try_recv!(channels.recv_play);     self.play()     },
+				2  => { try_recv!(channels.recv_pause);    self.pause()    },
+				3  => { try_recv!(channels.recv_clear);    self.clear()    },
+				4  => { try_recv!(channels.recv_shuffle);  self.shuffle()  },
+				5  => { try_recv!(channels.recv_next);     self.next()     },
+				6  => { try_recv!(channels.recv_previous); self.previous() },
+				7  => self.repeat      (try_recv!(channels.recv_repeat)),
+				8  => self.volume      (try_recv!(channels.recv_volume)),
+				9  => self.restore     (try_recv!(channels.recv_restore)),
+				10 => self.add         (try_recv!(channels.recv_add),          &channels.send_add),
+				11 => self.seek        (try_recv!(channels.recv_seek),         &channels.send_seek),
+				12 => self.skip        (try_recv!(channels.recv_skip),         &channels.send_skip),
+				13 => self.back        (try_recv!(channels.recv_back),         &channels.send_back),
+				14 => self.set_index   (try_recv!(channels.recv_set_index),    &channels.send_set_index),
+				15 => self.remove      (try_recv!(channels.recv_remove),       &channels.send_remove),
+				16 => self.remove_range(try_recv!(channels.recv_remove_range), &channels.send_remove_range),
+
 				17 => {
 					debug2!("Kernel - shutting down");
 					// Tell all actors to shutdown.
@@ -260,87 +262,129 @@ where
 
 	#[inline]
 	fn toggle(&mut self) {
-		todo!()
+		if self.playing() {
+			self.pause();
+		} else {
+			self.play();
+		}
 	}
 
 	#[inline]
 	fn play(&mut self) {
-		todo!()
+		if self.playing() || self.queue_empty() {
+			return;
+		}
+
+		todo!();
 	}
 
 	#[inline]
 	fn pause(&mut self) {
-		todo!()
+		if !self.playing() {
+			return;
+		}
+
+		todo!();
 	}
 
 	#[inline]
 	fn clear(&mut self) {
-		todo!()
+		if self.queue_empty() {
+			return;
+		}
+
+		todo!();
+	}
+
+	#[inline]
+	fn restore(&mut self, restore: AudioState<TrackData>) {
+		todo!();
 	}
 
 	#[inline]
 	fn shuffle(&mut self) {
-		todo!()
+		if self.queue_empty() {
+			return;
+		}
+
+		todo!();
 	}
 
 	#[inline]
 	fn repeat(&mut self, repeat: Repeat) {
-		self.atomic_state.repeat.set(repeat);
+		if self.audio_state.repeat == repeat {
+			return;
+		}
+
+		// self.atomic_state.repeat.set(repeat);
+		todo!();
 	}
 
 	#[inline]
 	fn volume(&mut self, volume: Volume) {
-		self.atomic_state.volume.set(volume);
-	}
+		if self.audio_state.volume == volume {
+			return;
+		}
 
-	#[inline]
-	fn add(&mut self) {
-		todo!()
-	}
-
-	#[inline]
-	fn seek(&mut self) {
-		todo!()
+		// self.atomic_state.volume.set(volume);
+		todo!();
 	}
 
 	#[inline]
 	fn next(&mut self) {
-		todo!()
+		todo!();
 	}
 
 	#[inline]
 	fn previous(&mut self) {
-		todo!()
+		todo!();
 	}
 
 	#[inline]
-	fn skip(&mut self) {
-		todo!()
+	fn add(&mut self, add: Add, sender: &Sender<Result<AudioStateSnapshot<TrackData>, AddError>>) {
+		todo!();
+		try_send!(sender, Ok(self.push_and_get()));
 	}
 
 	#[inline]
-	fn back(&mut self) {
-		todo!()
+	fn seek(&mut self, seek: Seek, sender: &Sender<Result<AudioStateSnapshot<TrackData>, SeekError>>) {
+		if !self.source_is_some() {
+			try_send!(sender, Err(SeekError::NoActiveSource));
+			return;
+		}
+
+		todo!();
+		try_send!(sender, Ok(self.push_and_get()));
 	}
 
 	#[inline]
-	fn restore(&mut self) {
-		todo!()
+	fn skip(&mut self, skip: Skip, sender: &Sender<Result<AudioStateSnapshot<TrackData>, SkipError>>) {
+		todo!();
+		try_send!(sender, Ok(self.push_and_get()));
 	}
 
 	#[inline]
-	fn set_index(&mut self) {
-		todo!()
+	fn back(&mut self, back: Back, sender: &Sender<Result<AudioStateSnapshot<TrackData>, BackError>>) {
+		todo!();
+		try_send!(sender, Ok(self.push_and_get()));
 	}
 
 	#[inline]
-	fn remove(&mut self) {
-		todo!()
+	fn set_index(&mut self, set_index: SetIndex, sender: &Sender<Result<AudioStateSnapshot<TrackData>, SetIndexError>>) {
+		todo!();
+		try_send!(sender, Ok(self.push_and_get()));
 	}
 
 	#[inline]
-	fn remove_range(&mut self) {
-		todo!()
+	fn remove(&mut self, remove: Remove, sender: &Sender<Result<AudioStateSnapshot<TrackData>, RemoveError>>) {
+		todo!();
+		try_send!(sender, Ok(self.push_and_get()));
+	}
+
+	#[inline]
+	fn remove_range(&mut self, remove_range: RemoveRange, sender: &Sender<Result<AudioStateSnapshot<TrackData>, RemoveRangeError>>) {
+		todo!();
+		try_send!(sender, Ok(self.push_and_get()));
 	}
 
 	//---------------------------------------------------------------------------------------------------- Misc Functions
@@ -357,5 +401,26 @@ where
 
 	fn tell_decode_to_discard(&mut self, to_decode: &Sender<KernelToDecode>) {
 		try_send!(to_decode, KernelToDecode::DiscardAudioAndStop);
+	}
+
+	fn queue_empty(&self) -> bool {
+		self.audio_state.queue.is_empty()
+	}
+
+	fn playing(&self) -> bool {
+		self.audio_state.playing
+	}
+
+	fn source_is_some(&self) -> bool {
+		self.audio_state.current.is_some()
+	}
+
+	fn push_and_get(&mut self) -> AudioStateSnapshot<TrackData> {
+		self.audio_state.push();
+		self.get()
+	}
+
+	fn get(&self) -> AudioStateSnapshot<TrackData> {
+		AudioStateSnapshot(self.audio_state.head_remote_ref())
 	}
 }

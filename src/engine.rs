@@ -118,14 +118,16 @@ where
 		// They are [unbounded()] to allow for immediate return.
 		//  |
 		//  v
-		let (send_toggle,  recv_toggle)  = unbounded();
-		let (send_play,    recv_play)    = unbounded();
-		let (send_pause,   recv_pause)   = unbounded();
-		let (send_clear,   recv_clear)   = unbounded();
-		let (send_restore, recv_restore) = unbounded();
-		let (send_repeat,  recv_repeat)  = unbounded();
-		let (send_shuffle, recv_shuffle) = unbounded();
-		let (send_volume,  recv_volume)  = unbounded();
+		let (send_toggle,   recv_toggle)   = unbounded();
+		let (send_play,     recv_play)     = unbounded();
+		let (send_pause,    recv_pause)    = unbounded();
+		let (send_clear,    recv_clear)    = unbounded();
+		let (send_restore,  recv_restore)  = unbounded();
+		let (send_repeat,   recv_repeat)   = unbounded();
+		let (send_shuffle,  recv_shuffle)  = unbounded();
+		let (send_volume,   recv_volume)   = unbounded();
+		let (send_next,     recv_next)     = unbounded();
+		let (send_previous, recv_previous) = unbounded();
 		// These must be labeled.
 		// Although semantically [bounded(0)] makes sense since [Kernel]
 		// and [Signal] must meet up, [bounded(1)] is faster.
@@ -135,10 +137,6 @@ where
 		let (k_send_add,          s_recv_add)          = bounded(1);
 		let (s_send_seek,         k_recv_seek)         = bounded(1);
 		let (k_send_seek,         s_recv_seek)         = bounded(1);
-		let (s_send_next,         k_recv_next)         = bounded(1);
-		let (k_send_next,         s_recv_next)         = bounded(1);
-		let (s_send_previous,     k_recv_previous)     = bounded(1);
-		let (k_send_previous,     s_recv_previous)     = bounded(1);
 		let (s_send_skip,         k_recv_skip)         = bounded(1);
 		let (k_send_skip,         s_recv_skip)         = bounded(1);
 		let (s_send_back,         k_recv_back)         = bounded(1);
@@ -159,15 +157,13 @@ where
 			send_repeat,
 			send_shuffle,
 			send_volume,
+			send_next,
+			send_previous,
 
 			send_add:          s_send_add,
 			recv_add:          s_recv_add,
 			send_seek:         s_send_seek,
 			recv_seek:         s_recv_seek,
-			send_next:         s_send_next,
-			recv_next:         s_recv_next,
-			send_previous:     s_send_previous,
-			recv_previous:     s_recv_previous,
 			send_skip:         s_send_skip,
 			recv_skip:         s_recv_skip,
 			send_back:         s_send_back,
@@ -316,6 +312,8 @@ where
 			recv_toggle,
 			recv_play,
 			recv_pause,
+			recv_next,
+			recv_previous,
 			to_audio:    k_to_a,
 			from_audio:  k_from_a,
 			to_decode:   k_to_d,
@@ -329,10 +327,6 @@ where
 			recv_add:          k_recv_add,
 			send_seek:         k_send_seek,
 			recv_seek:         k_recv_seek,
-			send_next:         k_send_next,
-			recv_next:         k_recv_next,
-			send_previous:     k_send_previous,
-			recv_previous:     k_recv_previous,
 			send_skip:         k_send_skip,
 			recv_skip:         k_recv_skip,
 			send_back:         k_send_back,
