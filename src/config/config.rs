@@ -39,39 +39,40 @@ where
 	/// TODO
 	pub audio_state: AudioStateConfig,
 
-	// // Filesystem
-	// file_open_error_behavior: FileOpenErrorBehavior,
-	// file_probe_error_behavior: FileProbeErrorBehavior,
-
-	// // Audio
+	// Audio Errors
 	/// TODO
-	pub audio_output_error_behavior: AudioErrorBehavior,
+	pub error_behavior_output: ErrorBehavior,
 	/// TODO
-	pub audio_seek_error_behavior: AudioErrorBehavior,
+	pub error_behavior_seek: ErrorBehavior,
 	/// TODO
-	pub audio_decode_error_behavior: AudioErrorBehavior,
+	pub error_behavior_decode: ErrorBehavior,
+	/// TODO
+	pub error_behavior_source: ErrorBehavior,
 
 	// // Media Controls
 	// media_controls: bool,
 }
 
 //---------------------------------------------------------------------------------------------------- AudioOutputErrorBehavior
-/// The action `sansan` will take on audio output errors
+/// The action `sansan` will take on various errors
 ///
-/// During playback, `sansan` may error when writing audio
-/// data to the audio output device - for various reason, e.g:
-/// - Device was disconnected
-/// - Device is not responding
-/// - Some other reason
+/// `sansan` can error in various situations:
+/// - During playback (e.g, audio device was unplugged)
+/// - During decoding (e.g, corrupted data)
+/// - During [`Source`] loading (e.g, file doesn't exist)
 ///
-/// When this error occurs, what should `sansan` do?
+/// When these errors occur, what should `sansan` do?
+///
+/// These are solely used in [`Config`], where each particular
+/// error point can be given a variant of [`ErrorBehavior`] that
+/// determines what action `sansan` will take in the case.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(AsRefStr,Display,EnumCount,EnumString,EnumVariantNames,IntoStaticStr)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[strum(serialize_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
-pub enum AudioErrorBehavior {
+pub enum ErrorBehavior {
 	/// Pause the audio stream.
 	///
 	/// This will set the [`AudioState`]'s `playing`
@@ -90,6 +91,9 @@ pub enum AudioErrorBehavior {
 	/// audio output device is not connected.
 	///
 	/// I.e, track progress will continue regardless of errors.
+	///
+	/// For `audio_source_behavior` in [`Config`], this does the same as [`Self::Skip`]
+	/// since we cannot "continue" a [`Source`] that does not work (i.e, missing file).
 	Continue,
 
 	/// Skip the current `(track|seek|packet)`.
@@ -97,34 +101,34 @@ pub enum AudioErrorBehavior {
 	/// This will "skip" something depending on the
 	/// context this variant is used in.
 	///
-	/// | [`Config`] field              | Behavior |
-	/// |-------------------------------|----------|
-	/// | `audio_output_error_behavior` | The current track is skipped
-	/// | `audio_seek_error_behavior`   | The seek operation is ignored (nothing happens)
-	/// | `audio_decode_behavior`       | The audio packet that errored is ignored, and decoding continues
-	///
+	/// | [`Config`] field        | Behavior |
+	/// |-------------------------|----------|
+	/// | `error_behavior_output` | The current track is skipped
+	/// | `error_behavior_seek`   | The seek operation is ignored (nothing happens)
+	/// | `error_behavior_decode` | The audio packet that errored is ignored, and decoding continues
+	/// | `error_behavior_source` | The track (source) that errored is skipped
 	Skip,
 
 	/// Panic on error.
 	///
-	/// This will cause the audio thread to panic
-	/// when encountering an audio output error.
+	/// This will cause the audio/decode thread
+	/// to panic when encountering an error.
 	///
 	/// This could be useful in situations where
 	/// you know failures are not possible.
 	Panic,
 }
 
-impl AudioErrorBehavior {
+impl ErrorBehavior {
 	/// ```rust
 	/// # use sansan::config::*;
-	/// assert_eq!(AudioErrorBehavior::DEFAULT, AudioErrorBehavior::Pause);
-	/// assert_eq!(AudioErrorBehavior::DEFAULT, AudioErrorBehavior::default());
+	/// assert_eq!(ErrorBehavior::DEFAULT, ErrorBehavior::Pause);
+	/// assert_eq!(ErrorBehavior::DEFAULT, ErrorBehavior::default());
 	/// ```
 	pub const DEFAULT: Self = Self::Pause;
 }
 
-impl Default for AudioErrorBehavior {
+impl Default for ErrorBehavior {
 	fn default() -> Self {
 		Self::DEFAULT
 	}
@@ -141,23 +145,25 @@ where
 	/// ```rust
 	/// # use sansan::config::*;
 	/// Config::<(), ()> {
-	///     callbacks:                   Callbacks::DEFAULT,
-	///     callback_low_priority:       true,
-	///     restore:                     None,
-	///     audio_state:                 AudioStateConfig::DEFAULT,
-	///     audio_output_error_behavior: AudioErrorBehavior::DEFAULT,
-	///     audio_seek_error_behavior:   AudioErrorBehavior::DEFAULT,
-	///     audio_decode_error_behavior: AudioErrorBehavior::DEFAULT,
+	///     callbacks:             Callbacks::DEFAULT,
+	///     callback_low_priority: true,
+	///     restore:               None,
+	///     audio_state:           AudioStateConfig::DEFAULT,
+	///     error_behavior_output: ErrorBehavior::DEFAULT,
+	///     error_behavior_seek:   ErrorBehavior::DEFAULT,
+	///     error_behavior_decode: ErrorBehavior::DEFAULT,
+	///     error_behavior_source: ErrorBehavior::DEFAULT,
 	/// };
 	/// ```
 	pub const DEFAULT: Self = Self {
-		callbacks:                   Callbacks::DEFAULT,
-		callback_low_priority:       true,
-		restore:                     None,
-		audio_state:                 AudioStateConfig::DEFAULT,
-		audio_output_error_behavior: AudioErrorBehavior::DEFAULT,
-		audio_seek_error_behavior:   AudioErrorBehavior::DEFAULT,
-		audio_decode_error_behavior: AudioErrorBehavior::DEFAULT,
+		callbacks:             Callbacks::DEFAULT,
+		callback_low_priority: true,
+		restore:               None,
+		audio_state:           AudioStateConfig::DEFAULT,
+		error_behavior_output: ErrorBehavior::DEFAULT,
+		error_behavior_seek:   ErrorBehavior::DEFAULT,
+		error_behavior_decode: ErrorBehavior::DEFAULT,
+		error_behavior_source: ErrorBehavior::DEFAULT,
 	};
 }
 
