@@ -4,7 +4,7 @@ use crossbeam::channel::{Receiver, Select, Sender};
 use strum::EnumCount;
 use crate::{
 	channel,
-	state::{AudioState,AudioStatePatch},
+	state::{AudioState,AudioStatePatch}, config::ErrorBehavior,
 };
 use symphonia::core::{audio::AudioBuffer, units::Time};
 use std::sync::{
@@ -42,13 +42,14 @@ pub(crate) struct Audio<Output>
 where
 	Output: AudioOutput,
 {
-	atomic_state:   Arc<AtomicAudioState>,
-	playing_local:  bool,
-	playing:        Arc<AtomicBool>,
-	elapsed:        f64,
-	ready_to_recv:  Arc<AtomicBool>,
-	shutdown_wait:  Arc<Barrier>,
-	output:         Output
+	atomic_state:  Arc<AtomicAudioState>, // Shared atomic audio state with the rest of the actors
+	playing_local: bool,                  // A local boolean so we don't have to atomic access each loop
+	playing:       Arc<AtomicBool>,       // The actual shared [playing] state between actors
+	elapsed:       f64,                   // Elapsed time, used for the elapsed callback (f64 is reset each call)
+	ready_to_recv: Arc<AtomicBool>,       // [Audio]'s way of telling [Decode] it is ready for samples
+	shutdown_wait: Arc<Barrier>,          // Shutdown barrier between all actors
+	output:        Output,                // Audio hardware/server connection
+	eb_output:     ErrorBehavior,         // Error behavior on audio output failure
 }
 
 //---------------------------------------------------------------------------------------------------- Channels
@@ -92,6 +93,7 @@ pub(crate) struct InitArgs {
 	pub(crate) from_decode:       Receiver<(AudioBuffer<f32>, Time)>,
 	pub(crate) to_kernel:         Sender<AudioToKernel>,
 	pub(crate) from_kernel:       Receiver<DiscardCurrentAudio>,
+	pub(crate) eb_output:         ErrorBehavior,
 }
 
 //---------------------------------------------------------------------------------------------------- Audio Impl
@@ -118,6 +120,7 @@ where
 					from_decode,
 					to_kernel,
 					from_kernel,
+					eb_output,
 				} = args;
 
 				let channels = Channels {
@@ -143,6 +146,7 @@ where
 					ready_to_recv,
 					shutdown_wait,
 					output,
+					eb_output,
 				};
 
 				Audio::main(this, channels);
@@ -261,7 +265,13 @@ where
 		if let Err(e) = self.output.write(audio, to_gc, volume) {
 			// TODO: Send error the engine backchannel
 			// or discard depending on user config.
-			todo!();
+			use ErrorBehavior as E;
+			match self.eb_output {
+				E::Pause    => (), // TODO: tell [Kernel] to pause
+				E::Continue => (),
+				E::Skip     => (), // TODO: tell [Kernel] to skip
+				E::Panic    => panic!("audio output error: {e}"),
+			}
 		}
 
 		// Notify [Caller] if enough time
