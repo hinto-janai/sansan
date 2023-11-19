@@ -267,6 +267,9 @@ where
 			from_audio:          d_from_a,
 			to_kernel:           d_to_k,
 			from_kernel:         d_from_k,
+			eb_seek:             config.error_behavior_seek,
+			eb_decode:           config.error_behavior_decode,
+			eb_source:           config.error_behavior_source,
 		}).expect("sansan [Engine] - could not spawn [Decode] thread");
 
 		//-------------------------------------------------------------- Spawn [Pool]

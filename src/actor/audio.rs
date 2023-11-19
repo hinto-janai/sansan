@@ -49,7 +49,7 @@ where
 	ready_to_recv: Arc<AtomicBool>,       // [Audio]'s way of telling [Decode] it is ready for samples
 	shutdown_wait: Arc<Barrier>,          // Shutdown barrier between all actors
 	output:        Output,                // Audio hardware/server connection
-	eb_output:     ErrorBehavior,         // Error behavior on audio output failure
+	eb_output:     ErrorBehavior,         // Behavior on audio output errors
 }
 
 //---------------------------------------------------------------------------------------------------- Channels

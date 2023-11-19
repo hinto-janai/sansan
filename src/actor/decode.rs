@@ -7,7 +7,7 @@ use crate::{
 	source::{Source, SourceInner},
 	state::{AudioState,AudioStatePatch},
 	actor::audio::TookAudioBuffer,
-	macros::{recv,send,try_send,debug2},
+	macros::{recv,send,try_send,debug2}, config::ErrorBehavior,
 };
 use symphonia::core::{
 	audio::AudioBuffer,
@@ -43,13 +43,16 @@ type ToAudio = (AudioBuffer<f32>, Time);
 
 //---------------------------------------------------------------------------------------------------- Decode
 pub(crate) struct Decode {
-	audio_ready_to_recv: Arc<AtomicBool>,
-	buffer:              VecDeque<ToAudio>,
-	source:              SourceInner,
-	done_decoding:       bool,
-	to_pool:             Sender<VecDeque<ToAudio>>,
-	from_pool:           Receiver<VecDeque<ToAudio>>,
-	shutdown_wait:       Arc<Barrier>,
+	audio_ready_to_recv: Arc<AtomicBool>,             // [Audio]'s way of telling [Decode] it is ready for samples
+	buffer:              VecDeque<ToAudio>,           // Local decoded packets, ready to send to [Audio]
+	source:              SourceInner,                 // Our current [Source] that we are decoding
+	done_decoding:       bool,                        // Whether we have finished decoding our current [Source]
+	to_pool:             Sender<VecDeque<ToAudio>>,   // Old buffer send to [Pool]
+	from_pool:           Receiver<VecDeque<ToAudio>>, // New buffer recv from [Pool]
+	shutdown_wait:       Arc<Barrier>,                // Shutdown barrier between all actors
+	eb_seek:             ErrorBehavior,               // Behavior on seek errors
+	eb_decode:           ErrorBehavior,               // Behavior on decoding errors
+	eb_source:           ErrorBehavior,               // Behavior on [Source] -> [SourceInner] errors
 }
 
 // See [src/actor/kernel.rs]'s [Channels]
@@ -100,6 +103,9 @@ pub(crate) struct InitArgs {
 	pub(crate) from_audio:          Receiver<TookAudioBuffer>,
 	pub(crate) to_kernel:           Sender<DecodeToKernel>,
 	pub(crate) from_kernel:         Receiver<KernelToDecode>,
+	pub(crate) eb_seek:             ErrorBehavior,
+	pub(crate) eb_decode:           ErrorBehavior,
+	pub(crate) eb_source:           ErrorBehavior,
 }
 
 //---------------------------------------------------------------------------------------------------- Decode Impl
@@ -122,6 +128,9 @@ impl Decode {
 					from_audio,
 					to_kernel,
 					from_kernel,
+					eb_seek,
+					eb_decode,
+					eb_source,
 				} = args;
 
 				let channels = Channels {
@@ -141,6 +150,9 @@ impl Decode {
 					to_pool,
 					from_pool,
 					shutdown_wait,
+					eb_seek,
+					eb_decode,
+					eb_source,
 				};
 
 				Decode::main(this, channels)
@@ -205,9 +217,9 @@ impl Decode {
 				},
 
 				// An actual error happened.
-				Err(error) => {
-					// TODO: handle error
-					todo!()
+				Err(e) => {
+					self.handle_error(e, self.eb_decode, "decode");
+					continue;
 				},
 			};
 
@@ -220,7 +232,7 @@ impl Decode {
 					self.send_or_store_audio(&channels.to_audio, (audio, time));
 				}
 
-				Err(err) => todo!(),
+				Err(e) => self.handle_error(e, self.eb_decode, "decode"),
 			}
 		}
 	}
@@ -277,10 +289,7 @@ impl Decode {
 				try_send!(to_gc, s);
 			},
 
-			Err(e) => {
-				// Handle error, tell engine.
-				todo!()
-			}
+			Err(e) => self.handle_error(e, self.eb_source, "source"),
 		}
 	}
 
@@ -336,8 +345,25 @@ impl Decode {
 			SeekMode::Coarse,
 			SeekTo::Time { time, track_id: None },
 		) {
-			// TODO: handle seek error.
-			todo!();
+			self.handle_error(e, self.eb_seek, "seek");
+		}
+	}
+
+	#[cold]
+	#[inline(never)]
+	fn handle_error<E: std::error::Error>(
+		&mut self,
+		error:      E,
+		behavior:   ErrorBehavior,
+		error_type: &'static str,
+	) {
+		use ErrorBehavior as E;
+
+		match behavior {
+			E::Pause    => (), // TODO: tell [Kernel] to pause
+			E::Continue => (),
+			E::Skip     => (), // TODO: tell [Kernel] to skip
+			E::Panic    => panic!("{error_type} error: {error}"),
 		}
 	}
 
