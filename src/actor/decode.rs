@@ -3,11 +3,11 @@ use std::thread::JoinHandle;
 use crossbeam::channel::{Receiver, Select, Sender};
 use crate::{
 	channel,
-	signal,
+	signal::{self,SeekError},
 	source::{Source, SourceInner},
 	state::{AudioState,AudioStatePatch},
 	actor::audio::TookAudioBuffer,
-	macros::{recv,send,try_send,debug2}, config::ErrorBehavior,
+	macros::{recv,send,try_send,debug2}, config::ErrorBehavior, error::SourceError,
 };
 use symphonia::core::{
 	audio::AudioBuffer,
@@ -57,12 +57,13 @@ pub(crate) struct Decode {
 
 // See [src/actor/kernel.rs]'s [Channels]
 struct Channels {
-	shutdown:    Receiver<()>,
-	to_gc:       Sender<SourceInner>,
-	to_audio:    Sender<ToAudio>,
-	from_audio:  Receiver<TookAudioBuffer>,
-	to_kernel:   Sender<DecodeToKernel>,
-	from_kernel: Receiver<KernelToDecode>,
+	shutdown:         Receiver<()>,
+	to_gc:            Sender<SourceInner>,
+	to_audio:         Sender<ToAudio>,
+	from_audio:       Receiver<TookAudioBuffer>,
+	to_kernel_seek:   Sender<Result<(), SeekError>>,
+	to_kernel_source: Sender<Result<(), SourceError>>,
+	from_kernel:      Receiver<KernelToDecode>,
 }
 
 //---------------------------------------------------------------------------------------------------- (Actual) Messages
@@ -81,16 +82,6 @@ pub(crate) enum KernelToDecode {
 	DiscardAudioAndStop,
 }
 
-pub(crate) enum DecodeToKernel {
-	// There was an error converting [Source] into [SourceInner]
-	SourceError,
-	// This was an error seeking in the current track
-	SeekError,
-}
-
-pub(crate) enum DecodeToPool {
-}
-
 //---------------------------------------------------------------------------------------------------- Decode Impl
 pub(crate) struct InitArgs {
 	pub(crate) audio_ready_to_recv: Arc<AtomicBool>,
@@ -101,7 +92,8 @@ pub(crate) struct InitArgs {
 	pub(crate) from_pool:           Receiver<VecDeque<ToAudio>>,
 	pub(crate) to_audio:            Sender<ToAudio>,
 	pub(crate) from_audio:          Receiver<TookAudioBuffer>,
-	pub(crate) to_kernel:           Sender<DecodeToKernel>,
+	pub(crate) to_kernel_seek:      Sender<Result<(), SeekError>>,
+	pub(crate) to_kernel_source:    Sender<Result<(), SourceError>>,
 	pub(crate) from_kernel:         Receiver<KernelToDecode>,
 	pub(crate) eb_seek:             ErrorBehavior,
 	pub(crate) eb_decode:           ErrorBehavior,
@@ -126,7 +118,8 @@ impl Decode {
 					from_pool,
 					to_audio,
 					from_audio,
-					to_kernel,
+					to_kernel_seek,
+					to_kernel_source,
 					from_kernel,
 					eb_seek,
 					eb_decode,
@@ -138,7 +131,8 @@ impl Decode {
 					to_gc,
 					to_audio,
 					from_audio,
-					to_kernel,
+					to_kernel_seek,
+					to_kernel_source,
 					from_kernel,
 				};
 

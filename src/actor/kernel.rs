@@ -2,10 +2,10 @@
 use std::thread::JoinHandle;
 use crossbeam::channel::{Sender, Receiver, Select};
 use crate::{
-	macros::{send,try_recv,try_send,debug2},
+	macros::{send,recv,try_recv,try_send,debug2},
 	state::{AudioState,AudioStatePatch,ValidTrackData,AtomicAudioState, AudioStateSnapshot},
 	actor::{
-		decode::{KernelToDecode,DecodeToKernel},
+		decode::KernelToDecode,
 		audio::AudioToKernel,
 	},
 	signal::{
@@ -31,7 +31,7 @@ use crate::{
 		RemoveError,
 		RemoveRange,
 		RemoveRangeError,
-	},
+	}, error::SourceError,
 };
 use std::sync::{
 	Arc,
@@ -91,8 +91,9 @@ pub(crate) struct Channels<TrackData: ValidTrackData> {
 	pub(crate) from_audio: Receiver<AudioToKernel>,
 
 	// [Decode]
-	pub(crate) to_decode:   Sender<KernelToDecode>,
-	pub(crate) from_decode: Receiver<DecodeToKernel>,
+	pub(crate) to_decode:          Sender<KernelToDecode>,
+	pub(crate) from_decode_seek:   Receiver<Result<(), SeekError>>,
+	pub(crate) from_decode_source: Receiver<Result<(), SourceError>>,
 
 	// Signals that input/output `()`
 	pub(crate) recv_toggle:   Receiver<()>,
@@ -171,7 +172,7 @@ where
 	//---------------------------------------------------------------------------------------------------- Main Loop
 	#[cold]
 	#[inline(never)]
-	fn main(mut self, channels: Channels<TrackData>) {
+	fn main(mut self, c: Channels<TrackData>) {
 		// Create channels that we will
 		// be selecting/listening to for all time.
 		let mut select = Select::new();
@@ -179,52 +180,52 @@ where
 		// INVARIANT:
 		// The order these are selected MUST match
 		// the order of the match function mappings below.
-		assert_eq!(0,  select.recv(&channels.recv_toggle));
-		assert_eq!(1,  select.recv(&channels.recv_play));
-		assert_eq!(2,  select.recv(&channels.recv_pause));
-		assert_eq!(3,  select.recv(&channels.recv_clear));
-		assert_eq!(4,  select.recv(&channels.recv_shuffle));
-		assert_eq!(5, select.recv(&channels.recv_next));
-		assert_eq!(6, select.recv(&channels.recv_previous));
-		assert_eq!(7,  select.recv(&channels.recv_repeat));
-		assert_eq!(8,  select.recv(&channels.recv_volume));
-		assert_eq!(9,  select.recv(&channels.recv_restore));
-		assert_eq!(10,  select.recv(&channels.recv_add));
-		assert_eq!(11,  select.recv(&channels.recv_seek));
-		assert_eq!(12, select.recv(&channels.recv_skip));
-		assert_eq!(13, select.recv(&channels.recv_back));
-		assert_eq!(14, select.recv(&channels.recv_set_index));
-		assert_eq!(15, select.recv(&channels.recv_remove));
-		assert_eq!(16, select.recv(&channels.recv_remove_range));
-		assert_eq!(17, select.recv(&channels.shutdown));
-		assert_eq!(18, select.recv(&channels.shutdown_hang));
+		assert_eq!(0,  select.recv(&c.recv_toggle));
+		assert_eq!(1,  select.recv(&c.recv_play));
+		assert_eq!(2,  select.recv(&c.recv_pause));
+		assert_eq!(3,  select.recv(&c.recv_clear));
+		assert_eq!(4,  select.recv(&c.recv_shuffle));
+		assert_eq!(5,  select.recv(&c.recv_next));
+		assert_eq!(6,  select.recv(&c.recv_previous));
+		assert_eq!(7,  select.recv(&c.recv_repeat));
+		assert_eq!(8,  select.recv(&c.recv_volume));
+		assert_eq!(9,  select.recv(&c.recv_restore));
+		assert_eq!(10, select.recv(&c.recv_add));
+		assert_eq!(11, select.recv(&c.recv_seek));
+		assert_eq!(12, select.recv(&c.recv_skip));
+		assert_eq!(13, select.recv(&c.recv_back));
+		assert_eq!(14, select.recv(&c.recv_set_index));
+		assert_eq!(15, select.recv(&c.recv_remove));
+		assert_eq!(16, select.recv(&c.recv_remove_range));
+		assert_eq!(17, select.recv(&c.shutdown));
+		assert_eq!(18, select.recv(&c.shutdown_hang));
 
 		// Loop, receiving signals and routing them
 		// to their appropriate handler function.
 		loop {
 			match select.select().index() {
-				0  => { try_recv!(channels.recv_toggle);   self.toggle()   },
-				1  => { try_recv!(channels.recv_play);     self.play()     },
-				2  => { try_recv!(channels.recv_pause);    self.pause()    },
-				3  => { try_recv!(channels.recv_clear);    self.clear()    },
-				4  => { try_recv!(channels.recv_shuffle);  self.shuffle()  },
-				5  => { try_recv!(channels.recv_next);     self.next()     },
-				6  => { try_recv!(channels.recv_previous); self.previous() },
-				7  => self.repeat      (try_recv!(channels.recv_repeat)),
-				8  => self.volume      (try_recv!(channels.recv_volume)),
-				9  => self.restore     (try_recv!(channels.recv_restore)),
-				10 => self.add         (try_recv!(channels.recv_add),          &channels.send_add),
-				11 => self.seek        (try_recv!(channels.recv_seek),         &channels.send_seek),
-				12 => self.skip        (try_recv!(channels.recv_skip),         &channels.send_skip),
-				13 => self.back        (try_recv!(channels.recv_back),         &channels.send_back),
-				14 => self.set_index   (try_recv!(channels.recv_set_index),    &channels.send_set_index),
-				15 => self.remove      (try_recv!(channels.recv_remove),       &channels.send_remove),
-				16 => self.remove_range(try_recv!(channels.recv_remove_range), &channels.send_remove_range),
+				0  => { try_recv!(c.recv_toggle);   self.toggle()   },
+				1  => { try_recv!(c.recv_play);     self.play()     },
+				2  => { try_recv!(c.recv_pause);    self.pause()    },
+				3  => { try_recv!(c.recv_clear);    self.clear()    },
+				4  => { try_recv!(c.recv_shuffle);  self.shuffle()  },
+				5  => { try_recv!(c.recv_next);     self.next()     },
+				6  => { try_recv!(c.recv_previous); self.previous() },
+				7  => self.repeat      (try_recv!(c.recv_repeat)),
+				8  => self.volume      (try_recv!(c.recv_volume)),
+				9  => self.restore     (try_recv!(c.recv_restore)),
+				10 => self.add         (try_recv!(c.recv_add),          &c.send_add),
+				11 => self.seek(try_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),
+				12 => self.skip        (try_recv!(c.recv_skip),         &c.send_skip),
+				13 => self.back        (try_recv!(c.recv_back),         &c.send_back),
+				14 => self.set_index   (try_recv!(c.recv_set_index),    &c.send_set_index),
+				15 => self.remove      (try_recv!(c.recv_remove),       &c.send_remove),
+				16 => self.remove_range(try_recv!(c.recv_remove_range), &c.send_remove_range),
 
 				17 => {
 					debug2!("Kernel - shutting down");
 					// Tell all actors to shutdown.
-					for actor in channels.shutdown_actor.iter() {
+					for actor in c.shutdown_actor.iter() {
 						try_send!(actor, ());
 					}
 					// Wait until all threads are ready to shutdown.
@@ -237,11 +238,11 @@ where
 				// allows the caller to return.
 				18 => {
 					debug2!("Kernel - shutting down (hang)");
-					for actor in channels.shutdown_actor.iter() {
+					for actor in c.shutdown_actor.iter() {
 						try_send!(actor, ());
 					}
 					self.shutdown_wait.wait();
-					try_send!(channels.shutdown_done, ());
+					try_send!(c.shutdown_done, ());
 					return;
 				},
 
@@ -341,50 +342,61 @@ where
 	}
 
 	#[inline]
-	fn add(&mut self, add: Add, sender: &Sender<Result<AudioStateSnapshot<TrackData>, AddError>>) {
+	fn add(&mut self, add: Add, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, AddError>>) {
 		todo!();
-		try_send!(sender, Ok(self.push_and_get()));
+		try_send!(to_engine, Ok(self.push_and_get()));
 	}
 
 	#[inline]
-	fn seek(&mut self, seek: Seek, sender: &Sender<Result<AudioStateSnapshot<TrackData>, SeekError>>) {
+	fn seek(
+		&mut self,
+		seek: Seek,
+		to_decode: &Sender<KernelToDecode>,
+		from_decode_seek: &Receiver<Result<(), SeekError>>,
+		to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, SeekError>>,
+	) {
+		// Return error to [Engine] if we don't have a [Source] loaded.
 		if !self.source_is_some() {
-			try_send!(sender, Err(SeekError::NoActiveSource));
+			try_send!(to_engine, Err(SeekError::NoActiveSource));
 			return;
 		}
 
-		todo!();
-		try_send!(sender, Ok(self.push_and_get()));
+		// Tell [Decode] to seek, return error if it errors.
+		try_send!(to_decode, KernelToDecode::Seek(seek));
+		match recv!(from_decode_seek) {
+			Ok(_)  => try_send!(to_engine, Ok(self.push_and_get())),
+			Err(e) => try_send!(to_engine, Err(e)),
+		}
 	}
 
 	#[inline]
-	fn skip(&mut self, skip: Skip, sender: &Sender<Result<AudioStateSnapshot<TrackData>, SkipError>>) {
+	fn skip(&mut self, skip: Skip, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, SkipError>>) {
 		todo!();
-		try_send!(sender, Ok(self.push_and_get()));
+		try_send!(to_engine, Ok(self.push_and_get()));
 	}
 
 	#[inline]
-	fn back(&mut self, back: Back, sender: &Sender<Result<AudioStateSnapshot<TrackData>, BackError>>) {
+	fn back(&mut self, back: Back, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, BackError>>) {
 		todo!();
-		try_send!(sender, Ok(self.push_and_get()));
+		try_send!(to_engine, Ok(self.push_and_get()));
 	}
 
 	#[inline]
-	fn set_index(&mut self, set_index: SetIndex, sender: &Sender<Result<AudioStateSnapshot<TrackData>, SetIndexError>>) {
+	fn set_index(&mut self, set_index: SetIndex, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, SetIndexError>>) {
 		todo!();
-		try_send!(sender, Ok(self.push_and_get()));
+		try_send!(to_engine, Ok(self.push_and_get()));
 	}
 
 	#[inline]
-	fn remove(&mut self, remove: Remove, sender: &Sender<Result<AudioStateSnapshot<TrackData>, RemoveError>>) {
+	fn remove(&mut self, remove: Remove, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, RemoveError>>) {
 		todo!();
-		try_send!(sender, Ok(self.push_and_get()));
+		try_send!(to_engine, Ok(self.push_and_get()));
 	}
 
 	#[inline]
-	fn remove_range(&mut self, remove_range: RemoveRange, sender: &Sender<Result<AudioStateSnapshot<TrackData>, RemoveRangeError>>) {
+	fn remove_range(&mut self, remove_range: RemoveRange, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, RemoveRangeError>>) {
 		todo!();
-		try_send!(sender, Ok(self.push_and_get()));
+		try_send!(to_engine, Ok(self.push_and_get()));
 	}
 
 	//---------------------------------------------------------------------------------------------------- Misc Functions

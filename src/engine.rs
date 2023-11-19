@@ -250,12 +250,13 @@ where
 		}).expect("sansan [Engine] - could not spawn [Audio] thread");
 
 		//-------------------------------------------------------------- Spawn [Decode]
-		let (d_to_k,     k_from_d)  = unbounded();
-		let (k_to_d,     d_from_k)  = unbounded();
-		let (d_to_gc,    gc_from_d) = unbounded();
-		let (d_shutdown, shutdown)  = bounded(1);
-		let (d_to_p,     p_from_d)  = bounded(1);
-		let (p_to_d,     d_from_p)  = bounded(1);
+		let (d_to_k_seek,   k_from_d_seek)   = bounded(1);
+		let (d_to_k_source, k_from_d_source) = bounded(1);
+		let (k_to_d,        d_from_k)        = unbounded();
+		let (d_to_gc,       gc_from_d)       = unbounded();
+		let (d_shutdown,    shutdown)        = bounded(1);
+		let (d_to_p,        p_from_d)        = bounded(1);
+		let (p_to_d,        d_from_p)        = bounded(1);
 		Decode::init(crate::actor::decode::InitArgs {
 			audio_ready_to_recv: Arc::clone(&audio_ready_to_recv),
 			shutdown_wait:       Arc::clone(&shutdown_wait),
@@ -265,7 +266,8 @@ where
 			from_pool:           d_from_p,
 			to_audio:            d_to_a,
 			from_audio:          d_from_a,
-			to_kernel:           d_to_k,
+			to_kernel_seek:      d_to_k_seek,
+			to_kernel_source:    d_to_k_source,
 			from_kernel:         d_from_k,
 			eb_seek:             config.error_behavior_seek,
 			eb_decode:           config.error_behavior_decode,
@@ -318,10 +320,11 @@ where
 			recv_pause,
 			recv_next,
 			recv_previous,
-			to_audio:    k_to_a,
-			from_audio:  k_from_a,
-			to_decode:   k_to_d,
-			from_decode: k_from_d,
+			to_audio:           k_to_a,
+			from_audio:         k_from_a,
+			to_decode:          k_to_d,
+			from_decode_seek:   k_from_d_seek,
+			from_decode_source: k_from_d_source,
 			recv_clear,
 			recv_repeat,
 			recv_shuffle,
