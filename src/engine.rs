@@ -1,8 +1,7 @@
 //---------------------------------------------------------------------------------------------------- Use
 use std::{thread::JoinHandle, marker::PhantomData};
 use crate::{
-	state::{AudioStateReader,AudioState,ValidTrackData, AtomicAudioState},
-	signal::{Signal,Volume,Repeat},
+	state::{AudioStateSnapshot,AudioStateReader,AudioState,ValidTrackData, AtomicAudioState},
 	config::{Config,Callbacks},
 	actor::{
 		audio::{Audio,AUDIO_BUFFER_LEN},
@@ -15,6 +14,12 @@ use crate::{
 	audio::{cubeb::Cubeb,rubato::Rubato},
 	channel::SansanSender,
 	macros::{send,recv,try_send,try_recv},
+};
+use crate::signal::{
+	Add,Append,Back,Clear,Previous,RemoveRange,Remove,
+	Repeat,Seek,SetIndex,Shuffle,Skip,Volume,
+	AddError,SeekError,Next,NextError,PreviousError,SkipError,
+	BackError,SetIndexError,RemoveError,RemoveRangeError,
 };
 use crossbeam::channel::{Sender,Receiver,bounded,unbounded};
 use symphonia::core::audio::AudioBuffer;
@@ -48,7 +53,6 @@ where
 {
 	// Data and objects.
 	audio:  AudioStateReader<TrackData>,
-	signal: Signal<TrackData>,
 	_config: PhantomData<CallbackSender>,
 
 	// Signal to [Kernel] to tell all of our internal
@@ -59,6 +63,36 @@ where
 	// [Kernel] telling us the shutdown
 	// process has been completed.
 	shutdown_done: Receiver<()>,
+
+	// Signals that input/output `()`
+	send_toggle:       Sender<()>,
+	send_play:         Sender<()>,
+	send_pause:        Sender<()>,
+	send_shuffle:      Sender<()>,
+	send_next:         Sender<()>,
+	send_previous:     Sender<()>,
+
+	// Signals that have input and output `()`
+	send_clear:        Sender<Clear>,
+	send_restore:      Sender<AudioState<TrackData>>,
+	send_repeat:       Sender<Repeat>,
+	send_volume:       Sender<Volume>,
+
+	// Signals that return `Result<T, E>`
+	send_add:          Sender<Add>,
+	recv_add:          Receiver<Result<AudioStateSnapshot<TrackData>, AddError>>,
+	send_seek:         Sender<Seek>,
+	recv_seek:         Receiver<Result<AudioStateSnapshot<TrackData>, SeekError>>,
+	send_skip:         Sender<Skip>,
+	recv_skip:         Receiver<Result<AudioStateSnapshot<TrackData>, SkipError>>,
+	send_back:         Sender<Back>,
+	recv_back:         Receiver<Result<AudioStateSnapshot<TrackData>, BackError>>,
+	send_set_index:    Sender<SetIndex>,
+	recv_set_index:    Receiver<Result<AudioStateSnapshot<TrackData>, SetIndexError>>,
+	send_remove:       Sender<Remove>,
+	recv_remove:       Receiver<Result<AudioStateSnapshot<TrackData>, RemoveError>>,
+	send_remove_range: Sender<RemoveRange>,
+	recv_remove_range: Receiver<Result<AudioStateSnapshot<TrackData>, RemoveRangeError>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Engine Impl
@@ -147,34 +181,6 @@ where
 		let (k_send_remove,       s_recv_remove)       = bounded(1);
 		let (s_send_remove_range, k_recv_remove_range) = bounded(1);
 		let (k_send_remove_range, s_recv_remove_range) = bounded(1);
-
-		let signal = Signal {
-			send_toggle,
-			send_play,
-			send_pause,
-			send_clear,
-			send_restore,
-			send_repeat,
-			send_shuffle,
-			send_volume,
-			send_next,
-			send_previous,
-
-			send_add:          s_send_add,
-			recv_add:          s_recv_add,
-			send_seek:         s_send_seek,
-			recv_seek:         s_recv_seek,
-			send_skip:         s_send_skip,
-			recv_skip:         s_recv_skip,
-			send_back:         s_send_back,
-			recv_back:         s_recv_back,
-			send_set_index:    s_send_set_index,
-			recv_set_index:    s_recv_set_index,
-			send_remove:       s_send_remove,
-			recv_remove:       s_recv_remove,
-			send_remove_range: s_send_remove_range,
-			recv_remove_range: s_recv_remove_range,
-		};
 
 		//-------------------------------------------------------------- Spawn [Caller]
 		// FIXME:
@@ -357,11 +363,34 @@ where
 		//-------------------------------------------------------------- Return
 		Ok(Self {
 			audio: audio_state_reader,
-			signal,
 			_config: PhantomData,
 			shutdown,
 			shutdown_hang,
 			shutdown_done,
+			send_toggle,
+			send_play,
+			send_pause,
+			send_clear,
+			send_restore,
+			send_repeat,
+			send_shuffle,
+			send_volume,
+			send_next,
+			send_previous,
+			send_add:          s_send_add,
+			recv_add:          s_recv_add,
+			send_seek:         s_send_seek,
+			recv_seek:         s_recv_seek,
+			send_skip:         s_send_skip,
+			recv_skip:         s_recv_skip,
+			send_back:         s_send_back,
+			recv_back:         s_recv_back,
+			send_set_index:    s_send_set_index,
+			recv_set_index:    s_recv_set_index,
+			send_remove:       s_send_remove,
+			recv_remove:       s_recv_remove,
+			send_remove_range: s_send_remove_range,
+			recv_remove_range: s_recv_remove_range,
 		})
 	}
 
@@ -370,40 +399,114 @@ where
 		AudioStateReader::clone(&self.audio)
 	}
 
-	/// TODO
-	//
-	// INVARIANT
-	//
-	// The `Engine`'s channel <-> return system relies
-	// on the fact that only 1 thread is `.recv()`'ing
-	// at any given moment, `&mut self` ensures this
-	// mutual exclusion.
+	//---------------------------------------------------------------------------------------------------- Signals
+	// INVARIANT: The `Engine`'s channel <-> return system
+	// relies on the fact that only 1 thread is `.recv()`'ing
+	// at any given moment, `&mut self` ensures this mutual exclusion.
 	//
 	// There is no "routing" so-to-speak so we must
 	// ensure the caller also `.recv()`'s the return value.
-	pub fn signal(&mut self) -> &mut Signal<TrackData> {
-		&mut self.signal
+	//
+	// SAFETY: The [Kernel] should always be listening.
+	// it is a logic error for [send()] or [recv()] to panic,
+	// as that would mean [Kernel] has disconnected, but the
+	// [Engine] is still alive, which doesn't make sense
+	// (unless [Kernel] panicked).
+	//
+	// Just in case [Kernel] panicked, we [unwrap()] as all
+	// bets are off since [Kernel] shouldn't be panicking.
+
+	/// TODO
+	pub fn toggle(&mut self) {
+		try_send!(self.send_toggle, ());
 	}
 
-	#[cold]
-	#[inline(never)]
 	/// TODO
-	pub fn shutdown(self) {
-		// Tell [Kernel] to shutdown,
-		// and to not notify us.
-		try_send!(self.shutdown, ());
+	pub fn play(&mut self) {
+		try_send!(self.send_play, ());
 	}
 
-	#[cold]
-	#[inline(never)]
 	/// TODO
-	pub fn shutdown_blocking(self) {
-		// Tell [Kernel] to shutdown,
-		// and to tell us when it's done.
-		try_send!(self.shutdown_hang, ());
-		// Hang until [Kernel] responds.
-		recv!(self.shutdown_done);
+	pub fn pause(&mut self) {
+		try_send!(self.send_pause, ());
 	}
+
+	/// TODO
+	pub fn shuffle(&mut self) {
+		try_send!(self.send_shuffle, ());
+	}
+
+	/// TODO
+	pub fn next(&mut self) {
+		try_send!(self.send_next, ());
+	}
+
+	/// TODO
+	pub fn previous(&mut self) {
+		try_send!(self.send_previous, ());
+	}
+
+	/// TODO
+	pub fn clear(&mut self, clear: Clear) {
+		try_send!(self.send_clear, clear);
+	}
+
+	/// TODO
+	pub fn restore(&mut self, restore: AudioState<TrackData>) {
+		try_send!(self.send_restore, restore);
+	}
+
+	/// TODO
+	pub fn repeat(&mut self, repeat: Repeat) {
+		try_send!(self.send_repeat, repeat);
+	}
+
+	/// TODO
+	pub fn volume(&mut self, volume: Volume) {
+		try_send!(self.send_volume, volume);
+	}
+
+	/// TODO
+	pub fn seek(&mut self, seek: Seek) -> Result<AudioStateSnapshot<TrackData>, SeekError> {
+		send!(self.send_seek, seek);
+		recv!(self.recv_seek)
+	}
+
+	/// TODO
+	pub fn skip(&mut self, skip: Skip) -> Result<AudioStateSnapshot<TrackData>, SkipError> {
+		send!(self.send_skip, skip);
+		recv!(self.recv_skip)
+	}
+
+	/// TODO
+	pub fn back(&mut self, back: Back) -> Result<AudioStateSnapshot<TrackData>, BackError> {
+		send!(self.send_back, back);
+		recv!(self.recv_back)
+	}
+
+	/// TODO
+	pub fn add(&mut self, add: Add) -> Result<AudioStateSnapshot<TrackData>, AddError> {
+		send!(self.send_add, add);
+		recv!(self.recv_add)
+	}
+
+	/// TODO
+	pub fn set_index(&mut self, set_index: SetIndex) -> Result<AudioStateSnapshot<TrackData>, SetIndexError> {
+		send!(self.send_set_index, set_index);
+		recv!(self.recv_set_index)
+	}
+
+	/// TODO
+	pub fn remove(&mut self, remove: Remove) -> Result<AudioStateSnapshot<TrackData>, RemoveError> {
+		send!(self.send_remove, remove);
+		recv!(self.recv_remove)
+	} // defines what happens on included remove song, other errors, etc
+
+	/// TODO
+	pub fn remove_range(&mut self, remove_range: RemoveRange) -> Result<AudioStateSnapshot<TrackData>, RemoveRangeError> {
+		send!(self.send_remove_range, remove_range);
+		recv!(self.recv_remove_range)
+	} // defines what happens on included remove song, other errors, etc
 }
 
 //---------------------------------------------------------------------------------------------------- Drop
@@ -415,7 +518,17 @@ where
 	#[cold]
 	#[inline(never)]
 	fn drop(&mut self) {
-		send!(self.shutdown, ());
+		if true /* TODO: config option */ {
+			// Tell [Kernel] to shutdown,
+			// and to not notify us.
+			try_send!(self.shutdown, ());
+		} else {
+			// Tell [Kernel] to shutdown,
+			// and to tell us when it's done.
+			try_send!(self.shutdown_hang, ());
+			// Hang until [Kernel] responds.
+			recv!(self.shutdown_done);
+		}
 	}
 }
 

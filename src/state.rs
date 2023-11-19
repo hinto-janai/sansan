@@ -80,19 +80,6 @@ impl AtomicAudioState {
 	};
 }
 
-//---------------------------------------------------------------------------------------------------- AudioState Apply (someday)
-// TODO: just for trait bounds
-#[derive(Debug)]
-pub(crate) struct AudioStatePatch;
-impl<TrackData> someday::Apply<AudioStatePatch> for AudioState<TrackData>
-where
-	TrackData: ValidTrackData,
-{
-	fn apply(patch: &mut AudioStatePatch, writer: &mut Self, reader: &Self) {
-		todo!();
-	}
-}
-
 //---------------------------------------------------------------------------------------------------- Types
 /// TODO
 pub trait ValidTrackData: Clone + Send + Sync + 'static {}

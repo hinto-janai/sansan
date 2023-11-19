@@ -3,9 +3,9 @@ use std::thread::JoinHandle;
 use crossbeam::channel::{Receiver, Select, Sender};
 use crate::{
 	channel,
-	signal::{self,SeekError},
+	signal::{self,SeekError,Signal},
 	source::{Source, SourceInner},
-	state::{AudioState,AudioStatePatch},
+	state::AudioState,
 	actor::audio::TookAudioBuffer,
 	macros::{recv,send,try_send,debug2}, config::ErrorBehavior, error::SourceError,
 };

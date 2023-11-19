@@ -4,7 +4,9 @@ use crossbeam::channel::{Receiver, Select, Sender};
 use strum::EnumCount;
 use crate::{
 	channel,
-	state::{AudioState,AudioStatePatch}, config::ErrorBehavior,
+	state::AudioState,
+	config::ErrorBehavior,
+	signal::Signal,
 };
 use symphonia::core::{audio::AudioBuffer, units::Time};
 use std::sync::{

@@ -43,11 +43,10 @@ mod skip;
 pub use skip::{Skip,SkipError};
 
 mod signal;
-pub use signal::Signal;
+pub(crate) use signal::Signal;
 
 mod volume;
 pub use volume::Volume;
 pub(crate) use volume::AtomicVolume;
-
 
 //---------------------------------------------------------------------------------------------------- Signal Etc

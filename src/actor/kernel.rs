@@ -3,12 +3,13 @@ use std::thread::JoinHandle;
 use crossbeam::channel::{Sender, Receiver, Select};
 use crate::{
 	macros::{send,recv,try_recv,try_send,debug2},
-	state::{AudioState,AudioStatePatch,ValidTrackData,AtomicAudioState, AudioStateSnapshot},
+	state::{AudioState,ValidTrackData,AtomicAudioState, AudioStateSnapshot},
 	actor::{
 		decode::KernelToDecode,
 		audio::AudioToKernel,
 	},
 	signal::{
+		Signal,
 		Clear,
 		Repeat,
 		Shuffle,
@@ -52,7 +53,7 @@ pub(crate) const QUEUE_LEN: usize = 256;
 #[derive(Debug)]
 pub(crate) struct Kernel<TrackData: ValidTrackData> {
 	atomic_state:        Arc<AtomicAudioState>,
-	audio_state:         someday::Writer<AudioState<TrackData>, AudioStatePatch>,
+	audio_state:         someday::Writer<AudioState<TrackData>, Signal>,
 	playing:             Arc<AtomicBool>,
 	audio_ready_to_recv: Arc<AtomicBool>,
 	shutdown_wait:       Arc<Barrier>,
@@ -132,7 +133,7 @@ pub(crate) struct InitArgs<TrackData: ValidTrackData> {
 	pub(crate) playing:             Arc<AtomicBool>,
 	pub(crate) audio_ready_to_recv: Arc<AtomicBool>,
 	pub(crate) shutdown_wait:       Arc<Barrier>,
-	pub(crate) audio_state:         someday::Writer<AudioState<TrackData>, AudioStatePatch>,
+	pub(crate) audio_state:         someday::Writer<AudioState<TrackData>, Signal>,
 	pub(crate) channels:            Channels<TrackData>,
 }
 
@@ -313,22 +314,17 @@ where
 
 	#[inline]
 	fn repeat(&mut self, repeat: Repeat) {
-		if self.audio_state.repeat == repeat {
-			return;
+		if self.audio_state.repeat != repeat {
+			self.atomic_state.repeat.set(repeat);
+			self.audio_state.add(repeat.into());
 		}
-
-		// self.atomic_state.repeat.set(repeat);
-		todo!();
 	}
 
 	#[inline]
 	fn volume(&mut self, volume: Volume) {
-		if self.audio_state.volume == volume {
-			return;
+		if self.audio_state.volume != volume {
+			self.atomic_state.volume.set(volume);
 		}
-
-		// self.atomic_state.volume.set(volume);
-		todo!();
 	}
 
 	#[inline]
@@ -344,7 +340,7 @@ where
 	#[inline]
 	fn add(&mut self, add: Add, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, AddError>>) {
 		todo!();
-		try_send!(to_engine, Ok(self.push_and_get()));
+		try_send!(to_engine, Ok(self.commit_push_get()));
 	}
 
 	#[inline]
@@ -364,7 +360,7 @@ where
 		// Tell [Decode] to seek, return error if it errors.
 		try_send!(to_decode, KernelToDecode::Seek(seek));
 		match recv!(from_decode_seek) {
-			Ok(_)  => try_send!(to_engine, Ok(self.push_and_get())),
+			Ok(_)  => try_send!(to_engine, Ok(self.commit_push_get())),
 			Err(e) => try_send!(to_engine, Err(e)),
 		}
 	}
@@ -372,31 +368,31 @@ where
 	#[inline]
 	fn skip(&mut self, skip: Skip, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, SkipError>>) {
 		todo!();
-		try_send!(to_engine, Ok(self.push_and_get()));
+		try_send!(to_engine, Ok(self.commit_push_get()));
 	}
 
 	#[inline]
 	fn back(&mut self, back: Back, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, BackError>>) {
 		todo!();
-		try_send!(to_engine, Ok(self.push_and_get()));
+		try_send!(to_engine, Ok(self.commit_push_get()));
 	}
 
 	#[inline]
 	fn set_index(&mut self, set_index: SetIndex, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, SetIndexError>>) {
 		todo!();
-		try_send!(to_engine, Ok(self.push_and_get()));
+		try_send!(to_engine, Ok(self.commit_push_get()));
 	}
 
 	#[inline]
 	fn remove(&mut self, remove: Remove, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, RemoveError>>) {
 		todo!();
-		try_send!(to_engine, Ok(self.push_and_get()));
+		try_send!(to_engine, Ok(self.commit_push_get()));
 	}
 
 	#[inline]
 	fn remove_range(&mut self, remove_range: RemoveRange, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, RemoveRangeError>>) {
 		todo!();
-		try_send!(to_engine, Ok(self.push_and_get()));
+		try_send!(to_engine, Ok(self.commit_push_get()));
 	}
 
 	//---------------------------------------------------------------------------------------------------- Misc Functions
@@ -427,9 +423,13 @@ where
 		self.audio_state.current.is_some()
 	}
 
-	fn push_and_get(&mut self) -> AudioStateSnapshot<TrackData> {
-		self.audio_state.push();
-		self.get()
+	fn add_commit_push(&mut self, signal: Signal) {
+		self.audio_state.add(signal);
+		self.audio_state.commit_and().push();
+	}
+
+	fn commit_push_get(&mut self) -> AudioStateSnapshot<TrackData> {
+		AudioStateSnapshot(self.audio_state.commit_and().push_and().head_remote_ref())
 	}
 
 	fn get(&self) -> AudioStateSnapshot<TrackData> {
