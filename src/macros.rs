@@ -13,10 +13,16 @@ macro_rules! unreachable2 {
 pub(crate) use unreachable2;
 
 //---------------------------------------------------------------------------------------------------- Channels
+// SAFETY:
+// These macros are used in situations where
+// a [send/recv] erroring is a logical error.
+//
+// Also, `.unwrap_unchecked()` panics in debug mode.
+
 // Receive a channel message, unwrap.
 macro_rules! recv {
     ($channel:expr) => {
-        $channel.recv().unwrap()
+        unsafe { $channel.recv().unwrap_unchecked() }
     }
 }
 pub(crate) use recv;
@@ -24,7 +30,7 @@ pub(crate) use recv;
 // Send a channel message, unwrap.
 macro_rules! send {
     ($channel:expr, $($msg:tt)+) => {
-        $channel.send($($msg)+).unwrap()
+        unsafe { $channel.send($($msg)+).unwrap_unchecked() }
     }
 }
 pub(crate) use send;
@@ -32,7 +38,7 @@ pub(crate) use send;
 // `try_send` a channel message, unwrap.
 macro_rules! try_send {
     ($channel:expr, $($msg:tt)+) => {
-        $channel.try_send($($msg)+).unwrap()
+        unsafe { $channel.try_send($($msg)+).unwrap_unchecked() }
     }
 }
 pub(crate) use try_send;
@@ -40,7 +46,7 @@ pub(crate) use try_send;
 // `try_recv` a channel message, unwrap.
 macro_rules! try_recv {
     ($channel:expr) => {
-        $channel.try_recv().unwrap()
+        unsafe { $channel.try_recv().unwrap_unchecked() }
     }
 }
 pub(crate) use try_recv;
