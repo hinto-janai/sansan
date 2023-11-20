@@ -2,7 +2,7 @@
 use crate::state::{AudioState,ValidTrackData};
 use crate::signal::{
 	Add,Append,Back,Clear,Previous,RemoveRange,Remove,
-	Repeat,Seek,SetIndex,Shuffle,Skip,Volume,
+	Repeat,Seek,SetIndex,Shuffle,Skip,Volume,Play,Pause,Toggle,
 	AddError,SeekError,Next,NextError,PreviousError,SkipError,
 	BackError,SetIndexError,RemoveError,RemoveRangeError,
 };
@@ -24,6 +24,9 @@ pub(crate) enum Signal {
 	Append(Append),
 	Back(Back),
 	Clear(Clear),
+	Next(Next),
+	Play(Play),
+	Pause(Pause),
 	Previous(Previous),
 	RemoveRange(RemoveRange),
 	Remove(Remove),
@@ -32,8 +35,8 @@ pub(crate) enum Signal {
 	SetIndex(SetIndex),
 	Shuffle(Shuffle),
 	Skip(Skip),
+	Toggle(Toggle),
 	Volume(Volume),
-	Next(Next),
 }
 
 //---------------------------------------------------------------------------------------------------- someday::Apply
@@ -58,6 +61,8 @@ impl<TrackData: ValidTrackData> Apply<Signal> for AudioState<TrackData> {
 			Signal::Append(signal)      => ApplyReturn::apply_return(signal, writer, reader),
 			Signal::Back(signal)        => ApplyReturn::apply_return(signal, writer, reader),
 			Signal::Clear(signal)       => ApplyReturn::apply_return(signal, writer, reader),
+			Signal::Play(signal)        => ApplyReturn::apply_return(signal, writer, reader),
+			Signal::Pause(signal)       => ApplyReturn::apply_return(signal, writer, reader),
 			Signal::Previous(signal)    => ApplyReturn::apply_return(signal, writer, reader),
 			Signal::RemoveRange(signal) => ApplyReturn::apply_return(signal, writer, reader),
 			Signal::Remove(signal)      => ApplyReturn::apply_return(signal, writer, reader),
@@ -65,6 +70,7 @@ impl<TrackData: ValidTrackData> Apply<Signal> for AudioState<TrackData> {
 			Signal::Seek(signal)        => ApplyReturn::apply_return(signal, writer, reader),
 			Signal::SetIndex(signal)    => ApplyReturn::apply_return(signal, writer, reader),
 			Signal::Skip(signal)        => ApplyReturn::apply_return(signal, writer, reader),
+			Signal::Toggle(signal)      => ApplyReturn::apply_return(signal, writer, reader),
 			Signal::Volume(signal)      => ApplyReturn::apply_return(signal, writer, reader),
 			Signal::Next(signal)        => ApplyReturn::apply_return(signal, writer, reader),
 
@@ -98,6 +104,9 @@ impl_from! {
 	Append,
 	Back,
 	Clear,
+	Next,
+	Play,
+	Pause,
 	Previous,
 	RemoveRange,
 	Remove,
@@ -106,6 +115,6 @@ impl_from! {
 	SetIndex,
 	Shuffle,
 	Skip,
+	Toggle,
 	Volume,
-	Next,
 }

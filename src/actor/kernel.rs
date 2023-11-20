@@ -12,6 +12,9 @@ use crate::{
 	},
 	signal::{
 		Signal,
+		Play,
+		Toggle,
+		Pause,
 		Clear,
 		Repeat,
 		Shuffle,
@@ -275,25 +278,21 @@ where
 
 	#[inline]
 	fn play(&mut self) {
-		if self.playing() || self.queue_empty() {
-			return;
+		if !self.playing() && self.source_is_some() {
+			self.add_commit_push(Play);
 		}
-
-		todo!();
 	}
 
 	#[inline]
 	fn pause(&mut self) {
-		if !self.playing() {
-			return;
+		if self.playing() && self.source_is_some() {
+			self.add_commit_push(Pause);
 		}
-
-		todo!();
 	}
 
 	#[inline]
 	fn clear(&mut self) {
-		if self.queue_empty() {
+		if !self.queue_empty() {
 			return;
 		}
 

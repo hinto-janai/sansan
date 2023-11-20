@@ -17,6 +17,12 @@ pub use clear::Clear;
 mod next;
 pub use next::{Next,NextError};
 
+mod pause;
+pub(crate) use pause::Pause;
+
+mod play;
+pub(crate) use play::Play;
+
 mod previous;
 pub use previous::{Previous,PreviousError};
 
@@ -44,6 +50,9 @@ pub use skip::{Skip,SkipError};
 
 mod signal;
 pub(crate) use signal::Signal;
+
+mod toggle;
+pub(crate) use toggle::Toggle;
 
 mod volume;
 pub use volume::Volume;
