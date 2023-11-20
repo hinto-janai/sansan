@@ -34,6 +34,9 @@ where
 	pub callback_low_priority: bool,
 
 	/// TODO
+	pub shutdown_blocking: bool,
+
+	/// TODO
 	pub restore: Option<AudioState<TrackData>>,
 
 	/// TODO
@@ -147,6 +150,7 @@ where
 	/// Config::<(), ()> {
 	///     callbacks:             Callbacks::DEFAULT,
 	///     callback_low_priority: true,
+	///     shutdown_blocking:     true,
 	///     restore:               None,
 	///     audio_state:           AudioStateConfig::DEFAULT,
 	///     error_behavior_output: ErrorBehavior::DEFAULT,
@@ -158,6 +162,7 @@ where
 	pub const DEFAULT: Self = Self {
 		callbacks:             Callbacks::DEFAULT,
 		callback_low_priority: true,
+		shutdown_blocking:     true,
 		restore:               None,
 		audio_state:           AudioStateConfig::DEFAULT,
 		error_behavior_output: ErrorBehavior::DEFAULT,

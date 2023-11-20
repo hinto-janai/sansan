@@ -63,6 +63,8 @@ where
 	// [Kernel] telling us the shutdown
 	// process has been completed.
 	shutdown_done: Receiver<()>,
+	// Should we block when shutting down? (`drop()`)
+	shutdown_blocking: bool,
 
 	// Signals that input/output `()`
 	send_toggle:       Sender<()>,
@@ -367,6 +369,7 @@ where
 			shutdown,
 			shutdown_hang,
 			shutdown_done,
+			shutdown_blocking: config.shutdown_blocking,
 			send_toggle,
 			send_play,
 			send_pause,
@@ -518,16 +521,16 @@ where
 	#[cold]
 	#[inline(never)]
 	fn drop(&mut self) {
-		if true /* TODO: config option */ {
-			// Tell [Kernel] to shutdown,
-			// and to not notify us.
-			try_send!(self.shutdown, ());
-		} else {
+		if self.shutdown_blocking {
 			// Tell [Kernel] to shutdown,
 			// and to tell us when it's done.
 			try_send!(self.shutdown_hang, ());
 			// Hang until [Kernel] responds.
 			recv!(self.shutdown_done);
+		} else {
+			// Tell [Kernel] to shutdown,
+			// and to not notify us.
+			try_send!(self.shutdown, ());
 		}
 	}
 }
