@@ -1,6 +1,6 @@
 //! Real-time music engine.
 //!
-//! This is the API reference documentation for [`sansan`](https://github.com/hinto-janai/sansan),
+//! This is the API reference for [`sansan`](https://github.com/hinto-janai/sansan),
 //! meant to solely document inputs/outputs and other note-worthy things.
 //!
 //! This documentation does not contain detailed commentary on usage.

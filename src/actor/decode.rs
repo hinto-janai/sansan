@@ -212,7 +212,7 @@ impl Decode {
 
 				// An actual error happened.
 				Err(e) => {
-					self.handle_error(e, self.eb_decode, "decode");
+					self.handle_error(e, self.eb_decode, "packet");
 					continue;
 				},
 			};

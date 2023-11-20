@@ -471,43 +471,43 @@ where
 
 	/// TODO
 	pub fn seek(&mut self, seek: Seek) -> Result<AudioStateSnapshot<TrackData>, SeekError> {
-		send!(self.send_seek, seek);
+		try_send!(self.send_seek, seek);
 		recv!(self.recv_seek)
 	}
 
 	/// TODO
 	pub fn skip(&mut self, skip: Skip) -> Result<AudioStateSnapshot<TrackData>, SkipError> {
-		send!(self.send_skip, skip);
+		try_send!(self.send_skip, skip);
 		recv!(self.recv_skip)
 	}
 
 	/// TODO
 	pub fn back(&mut self, back: Back) -> Result<AudioStateSnapshot<TrackData>, BackError> {
-		send!(self.send_back, back);
+		try_send!(self.send_back, back);
 		recv!(self.recv_back)
 	}
 
 	/// TODO
 	pub fn add(&mut self, add: Add) -> Result<AudioStateSnapshot<TrackData>, AddError> {
-		send!(self.send_add, add);
+		try_send!(self.send_add, add);
 		recv!(self.recv_add)
 	}
 
 	/// TODO
 	pub fn set_index(&mut self, set_index: SetIndex) -> Result<AudioStateSnapshot<TrackData>, SetIndexError> {
-		send!(self.send_set_index, set_index);
+		try_send!(self.send_set_index, set_index);
 		recv!(self.recv_set_index)
 	}
 
 	/// TODO
 	pub fn remove(&mut self, remove: Remove) -> Result<AudioStateSnapshot<TrackData>, RemoveError> {
-		send!(self.send_remove, remove);
+		try_send!(self.send_remove, remove);
 		recv!(self.recv_remove)
 	} // defines what happens on included remove song, other errors, etc
 
 	/// TODO
 	pub fn remove_range(&mut self, remove_range: RemoveRange) -> Result<AudioStateSnapshot<TrackData>, RemoveRangeError> {
-		send!(self.send_remove_range, remove_range);
+		try_send!(self.send_remove_range, remove_range);
 		recv!(self.recv_remove_range)
 	} // defines what happens on included remove song, other errors, etc
 }

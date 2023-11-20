@@ -316,7 +316,7 @@ where
 	fn repeat(&mut self, repeat: Repeat) {
 		if self.audio_state.repeat != repeat {
 			self.atomic_state.repeat.set(repeat);
-			self.audio_state.add(repeat.into());
+			self.add_commit_push(repeat);
 		}
 	}
 
@@ -324,6 +324,7 @@ where
 	fn volume(&mut self, volume: Volume) {
 		if self.audio_state.volume != volume {
 			self.atomic_state.volume.set(volume);
+			self.add_commit_push(volume);
 		}
 	}
 
@@ -423,8 +424,8 @@ where
 		self.audio_state.current.is_some()
 	}
 
-	fn add_commit_push(&mut self, signal: Signal) {
-		self.audio_state.add(signal);
+	fn add_commit_push(&mut self, signal: impl Into<Signal>) {
+		self.audio_state.add(signal.into());
 		self.audio_state.commit_and().push();
 	}
 
