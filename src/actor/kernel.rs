@@ -2,6 +2,7 @@
 use std::thread::JoinHandle;
 use crossbeam::channel::{Sender, Receiver, Select};
 use rand::SeedableRng;
+use someday::ApplyReturn;
 use crate::{
 	macros::{send,recv,try_recv,try_send,debug2},
 	state::{AudioState,ValidTrackData,AtomicAudioState, AudioStateSnapshot},
@@ -306,10 +307,15 @@ where
 
 	#[inline]
 	fn shuffle(&mut self, shuffle: Shuffle) {
-		if self.audio_state.queue.len() <= 1 {
+		if self.audio_state.queue.len() < 2 {
 			return;
 		}
-		self.add_commit_push(shuffle);
+
+		// INVARIANT: must be [push_clone()], see
+		// [crate::signal::signal.rs]'s [Apply]
+		// implementation for more info.
+		self.audio_state.commit_return(shuffle);
+		self.audio_state.push_clone();
 	}
 
 	#[inline]
@@ -424,9 +430,25 @@ where
 		self.audio_state.current.is_some()
 	}
 
-	fn add_commit_push(&mut self, signal: impl Into<Signal>) {
-		self.audio_state.add(signal.into());
-		self.audio_state.commit_and().push();
+	fn add_commit_push<Input>(&mut self, input: Input)
+	where
+		Input: Copy,
+		Signal: From<Input>,
+		AudioState<TrackData>: ApplyReturn<Signal, Input, ()>,
+	{
+		// SAFETY: [Shuffle] is special, it must always
+		// be cloned, so it should never be passed
+		// to this function.
+		#[cfg(debug_assertions)]
+		{
+			match input.into() {
+				Signal::Shuffle(_) => panic!("shuffle was passed to add_commit_push()"),
+				_ => (),
+			}
+		}
+
+		self.audio_state.commit_return(input);
+		self.audio_state.push();
 	}
 
 	fn commit_push_get(&mut self) -> AudioStateSnapshot<TrackData> {

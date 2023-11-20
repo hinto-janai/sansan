@@ -10,6 +10,7 @@ use strum::{
 	AsRefStr,Display,EnumCount,EnumVariantNames,
 	EnumDiscriminants,IntoStaticStr,
 };
+use someday::{Apply,ApplyReturn};
 
 //---------------------------------------------------------------------------------------------------- AudioState Apply (someday)
 #[derive(Copy,Clone,Debug,PartialEq,PartialOrd)]
@@ -35,159 +36,48 @@ pub(crate) enum Signal {
 	Next(Next),
 }
 
-//---------------------------------------------------------------------------------------------------- Signal Impl
-impl Signal {
-	fn add<T: ValidTrackData>(s: &mut Add, w: &mut AudioState<T>, r: &AudioState<T>) {
-		todo!();
-	}
-
-	fn append<T: ValidTrackData>(s: &mut Append, w: &mut AudioState<T>, r: &AudioState<T>) {
-		todo!();
-	}
-
-	fn back<T: ValidTrackData>(s: &mut Back, w: &mut AudioState<T>, r: &AudioState<T>) {
-		todo!();
-	}
-
-	fn clear<T: ValidTrackData>(s: &mut Clear, w: &mut AudioState<T>, r: &AudioState<T>) {
-		todo!();
-	}
-
-	fn previous<T: ValidTrackData>(s: &mut Previous, w: &mut AudioState<T>, r: &AudioState<T>) {
-		todo!();
-	}
-
-	fn remove_range<T: ValidTrackData>(s: &mut RemoveRange, w: &mut AudioState<T>, r: &AudioState<T>) {
-		todo!();
-	}
-
-	fn remove<T: ValidTrackData>(s: &mut Remove, w: &mut AudioState<T>, r: &AudioState<T>) {
-		todo!();
-	}
-
-	fn repeat<T: ValidTrackData>(s: &mut Repeat, w: &mut AudioState<T>, r: &AudioState<T>) {
-		todo!();
-	}
-
-	fn seek<T: ValidTrackData>(s: &mut Seek, w: &mut AudioState<T>, r: &AudioState<T>) {
-		todo!();
-	}
-
-	fn set_index<T: ValidTrackData>(s: &mut SetIndex, w: &mut AudioState<T>, r: &AudioState<T>) {
-		todo!();
-	}
-
-	fn shuffle<T: ValidTrackData>(s: &mut Shuffle, w: &mut AudioState<T>, r: &AudioState<T>) {
-		// INVARIANT: [Kernel] checks that
-		// the queue is at least 2 in length.
-		use rand::prelude::{Rng,SliceRandom};
-		let mut rng = rand::thread_rng();
-
-		let queue = w.queue.make_contiguous();
-
-		match s {
-			Shuffle::Queue => {
-				let index = w.current.as_ref().map(|t| t.index);
-
-				let Some(i) = index else {
-					queue.shuffle(&mut rng);
-					return;
-				};
-
-				// Leaves the current index intact,
-				// while shuffling everything else, e.g:
-				//
-				// [0, 1, 2, 3, 4]
-				//        ^
-				//   current (i)
-				//
-				// queue[..i]   == [0, 1]
-				// queue[i+1..] == [3, 4]
-				queue[..i].shuffle(&mut rng);
-				queue[i + 1..].shuffle(&mut rng);
-			},
-
-			Shuffle::QueueReset => {
-				queue.shuffle(&mut rng);
-				if let Some(current) = w.current.as_mut() {
-					current.index = 0;
-				}
-			},
-
-			Shuffle::QueueCurrent => {
-				queue.shuffle(&mut rng);
-				if let Some(current) = w.current.as_mut() {
-					current.index = rng.gen();
-				}
-			},
-		}
-	}
-
-	fn skip<T: ValidTrackData>(s: &mut Skip, w: &mut AudioState<T>, r: &AudioState<T>) {
-		todo!();
-	}
-
-	fn volume<T: ValidTrackData>(s: &mut Volume, w: &mut AudioState<T>, r: &AudioState<T>) {
-		todo!();
-	}
-
-	fn next<T: ValidTrackData>(s: &mut Next, w: &mut AudioState<T>, r: &AudioState<T>) {
-		todo!();
-	}
-}
-
 //---------------------------------------------------------------------------------------------------- someday::Apply
 // TODO: just for trait bounds
-impl<TrackData> someday::Apply<Signal> for AudioState<TrackData>
-where
-	TrackData: ValidTrackData,
-{
+macro_rules! todo_impl_signal {
+	($($signal:ident),* $(,)?) => {$(
+		impl<TrackData: ValidTrackData> ApplyReturn<Signal, $signal, ()> for AudioState<TrackData> {
+			fn apply_return(s: &mut $signal, w: &mut Self, r: &Self) {
+				todo!();
+			}
+		}
+	)*};
+}
+todo_impl_signal!(Add,Append,Back,Clear,Previous,RemoveRange,Remove,Repeat,Seek,SetIndex,Skip,Next);
+
+// [Apply] will just call the [ApplyReturn::apply_return]
+// implementation found in each respective signal's file.
+impl<TrackData: ValidTrackData> Apply<Signal> for AudioState<TrackData> {
 	fn apply(patch: &mut Signal, writer: &mut Self, reader: &Self) {
 		match patch {
-			Signal::Add(signal)         => Signal::add(signal, writer, reader),
-			Signal::Append(signal)      => Signal::append(signal, writer, reader),
-			Signal::Back(signal)        => Signal::back(signal, writer, reader),
-			Signal::Clear(signal)       => Signal::clear(signal, writer, reader),
-			Signal::Previous(signal)    => Signal::previous(signal, writer, reader),
-			Signal::RemoveRange(signal) => Signal::remove_range(signal, writer, reader),
-			Signal::Remove(signal)      => Signal::remove(signal, writer, reader),
-			Signal::Repeat(signal)      => Signal::repeat(signal, writer, reader),
-			Signal::Seek(signal)        => Signal::seek(signal, writer, reader),
-			Signal::SetIndex(signal)    => Signal::set_index(signal, writer, reader),
-			Signal::Shuffle(signal)     => Signal::shuffle(signal, writer, reader),
-			Signal::Skip(signal)        => Signal::skip(signal, writer, reader),
-			Signal::Volume(signal)      => Signal::volume(signal, writer, reader),
-			Signal::Next(signal)        => Signal::next(signal, writer, reader),
-		}
-	}
+			Signal::Add(signal)         => ApplyReturn::apply_return(signal, writer, reader),
+			Signal::Append(signal)      => ApplyReturn::apply_return(signal, writer, reader),
+			Signal::Back(signal)        => ApplyReturn::apply_return(signal, writer, reader),
+			Signal::Clear(signal)       => ApplyReturn::apply_return(signal, writer, reader),
+			Signal::Previous(signal)    => ApplyReturn::apply_return(signal, writer, reader),
+			Signal::RemoveRange(signal) => ApplyReturn::apply_return(signal, writer, reader),
+			Signal::Remove(signal)      => ApplyReturn::apply_return(signal, writer, reader),
+			Signal::Repeat(signal)      => ApplyReturn::apply_return(signal, writer, reader),
+			Signal::Seek(signal)        => ApplyReturn::apply_return(signal, writer, reader),
+			Signal::SetIndex(signal)    => ApplyReturn::apply_return(signal, writer, reader),
+			Signal::Skip(signal)        => ApplyReturn::apply_return(signal, writer, reader),
+			Signal::Volume(signal)      => ApplyReturn::apply_return(signal, writer, reader),
+			Signal::Next(signal)        => ApplyReturn::apply_return(signal, writer, reader),
 
-	// INVARIANT: patches must be deterministic across writer/reader [Apply]'s,
-	// however, [Shuffle] introduces RNG on the writer side which cannot easily
-	// be replicated from the readers, so, if [Shuffle] was found to be one
-	// of the patches, just copy the [Writer] data.
-	fn sync(old_patches: std::vec::Drain<'_, Signal>, old_data: &mut Self, latest_data: &Self) {
-		let mut shuffle = false;
-
-		// PERF:
-		// This is O(n) where [n] is the patch count
-		// but since each signal immediately applies patches
-		// this is [n] is always == 1, so, it's fine.
-		for patch in old_patches.as_slice().iter() {
-			match patch {
-				Signal::Shuffle(_) => {
-					shuffle = true;
-					break;
-				},
-				_ => continue,
-			}
-		}
-
-		if shuffle {
-			*old_data = latest_data.clone();
-		} else {
-			for mut patch in old_patches {
-				Self::apply(&mut patch, old_data, latest_data);
-			}
+			// SAFETY:
+			// Patches must be deterministic across writer/reader [Apply]'s,
+			// however, [Shuffle] introduces RNG on the writer side which cannot easily
+			// be replicated from the readers, so, when [Kernel] calls [shuffle()],
+			// it will use [writer.push_clone()] such that readers will always clone
+			// data instead, meaning this branch will (should) never be taken.
+			//
+			// [writer.sync()] should also never be taken
+			// as that gets skipped if [push_clone()] is used.
+			Signal::Shuffle(_) => crate::macros::unreachable2!(),
 		}
 	}
 }
