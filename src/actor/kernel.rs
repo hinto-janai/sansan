@@ -1,6 +1,7 @@
 //---------------------------------------------------------------------------------------------------- Use
 use std::thread::JoinHandle;
 use crossbeam::channel::{Sender, Receiver, Select};
+use rand::SeedableRng;
 use crate::{
 	macros::{send,recv,try_recv,try_send,debug2},
 	state::{AudioState,ValidTrackData,AtomicAudioState, AudioStateSnapshot},
@@ -100,7 +101,6 @@ pub(crate) struct Channels<TrackData: ValidTrackData> {
 	pub(crate) recv_toggle:   Receiver<()>,
 	pub(crate) recv_play:     Receiver<()>,
 	pub(crate) recv_pause:    Receiver<()>,
-	pub(crate) recv_shuffle:  Receiver<()>,
 	pub(crate) recv_next:     Receiver<()>,
 	pub(crate) recv_previous: Receiver<()>,
 
@@ -108,6 +108,7 @@ pub(crate) struct Channels<TrackData: ValidTrackData> {
 	pub(crate) recv_clear:    Receiver<Clear>,
 	pub(crate) recv_repeat:   Receiver<Repeat>,
 	pub(crate) recv_volume:   Receiver<Volume>,
+	pub(crate) recv_shuffle:  Receiver<Shuffle>,
 	pub(crate) recv_restore:  Receiver<AudioState<TrackData>>,
 
 	// Signals that return `Result<T, E>`
@@ -209,7 +210,7 @@ where
 				1  => { try_recv!(c.recv_play);     self.play()     },
 				2  => { try_recv!(c.recv_pause);    self.pause()    },
 				3  => { try_recv!(c.recv_clear);    self.clear()    },
-				4  => { try_recv!(c.recv_shuffle);  self.shuffle()  },
+				4  => self.shuffle(try_recv!(c.recv_shuffle)),
 				5  => { try_recv!(c.recv_next);     self.next()     },
 				6  => { try_recv!(c.recv_previous); self.previous() },
 				7  => self.repeat      (try_recv!(c.recv_repeat)),
@@ -304,12 +305,11 @@ where
 	}
 
 	#[inline]
-	fn shuffle(&mut self) {
-		if self.queue_empty() {
+	fn shuffle(&mut self, shuffle: Shuffle) {
+		if self.audio_state.queue.len() <= 1 {
 			return;
 		}
-
-		todo!();
+		self.add_commit_push(shuffle);
 	}
 
 	#[inline]

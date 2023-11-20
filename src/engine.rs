@@ -70,7 +70,6 @@ where
 	send_toggle:       Sender<()>,
 	send_play:         Sender<()>,
 	send_pause:        Sender<()>,
-	send_shuffle:      Sender<()>,
 	send_next:         Sender<()>,
 	send_previous:     Sender<()>,
 
@@ -79,6 +78,7 @@ where
 	send_restore:      Sender<AudioState<TrackData>>,
 	send_repeat:       Sender<Repeat>,
 	send_volume:       Sender<Volume>,
+	send_shuffle:      Sender<Shuffle>,
 
 	// Signals that return `Result<T, E>`
 	send_add:          Sender<Add>,
@@ -435,11 +435,6 @@ where
 	}
 
 	/// TODO
-	pub fn shuffle(&mut self) {
-		try_send!(self.send_shuffle, ());
-	}
-
-	/// TODO
 	pub fn next(&mut self) {
 		try_send!(self.send_next, ());
 	}
@@ -467,6 +462,11 @@ where
 	/// TODO
 	pub fn volume(&mut self, volume: Volume) {
 		try_send!(self.send_volume, volume);
+	}
+
+	/// TODO
+	pub fn shuffle(&mut self, shuffle: Shuffle) {
+		try_send!(self.send_shuffle, shuffle);
 	}
 
 	/// TODO

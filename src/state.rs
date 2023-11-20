@@ -98,6 +98,8 @@ pub struct Track<TrackData> {
 	/// TODO
 	pub data: TrackData,
 	/// TODO
+	pub index: usize,
+	/// TODO
 	pub elapsed_runtime: f32,
 	/// TODO
 	pub total_runtime: f32,

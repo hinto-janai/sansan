@@ -7,13 +7,9 @@
 #[derive(Copy,Clone,Debug,PartialEq,PartialOrd,Eq,Ord,Hash)]
 pub enum Shuffle {
 	/// TODO
-	Current,
-	/// TODO
 	Queue,
 	/// TODO
 	QueueReset,
 	/// TODO
 	QueueCurrent,
-	/// TODO
-	QueueCurrentReset,
 }

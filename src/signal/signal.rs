@@ -78,7 +78,49 @@ impl Signal {
 	}
 
 	fn shuffle<T: ValidTrackData>(s: &mut Shuffle, w: &mut AudioState<T>, r: &AudioState<T>) {
-		todo!();
+		// INVARIANT: [Kernel] checks that
+		// the queue is at least 2 in length.
+		use rand::prelude::{Rng,SliceRandom};
+		let mut rng = rand::thread_rng();
+
+		let queue = w.queue.make_contiguous();
+
+		match s {
+			Shuffle::Queue => {
+				let index = w.current.as_ref().map(|t| t.index);
+
+				let Some(i) = index else {
+					queue.shuffle(&mut rng);
+					return;
+				};
+
+				// Leaves the current index intact,
+				// while shuffling everything else, e.g:
+				//
+				// [0, 1, 2, 3, 4]
+				//        ^
+				//   current (i)
+				//
+				// queue[..i]   == [0, 1]
+				// queue[i+1..] == [3, 4]
+				queue[..i].shuffle(&mut rng);
+				queue[i + 1..].shuffle(&mut rng);
+			},
+
+			Shuffle::QueueReset => {
+				queue.shuffle(&mut rng);
+				if let Some(current) = w.current.as_mut() {
+					current.index = 0;
+				}
+			},
+
+			Shuffle::QueueCurrent => {
+				queue.shuffle(&mut rng);
+				if let Some(current) = w.current.as_mut() {
+					current.index = rng.gen();
+				}
+			},
+		}
 	}
 
 	fn skip<T: ValidTrackData>(s: &mut Skip, w: &mut AudioState<T>, r: &AudioState<T>) {
@@ -116,6 +158,36 @@ where
 			Signal::Skip(signal)        => Signal::skip(signal, writer, reader),
 			Signal::Volume(signal)      => Signal::volume(signal, writer, reader),
 			Signal::Next(signal)        => Signal::next(signal, writer, reader),
+		}
+	}
+
+	// INVARIANT: patches must be deterministic across writer/reader [Apply]'s,
+	// however, [Shuffle] introduces RNG on the writer side which cannot easily
+	// be replicated from the readers, so, if [Shuffle] was found to be one
+	// of the patches, just copy the [Writer] data.
+	fn sync(old_patches: std::vec::Drain<'_, Signal>, old_data: &mut Self, latest_data: &Self) {
+		let mut shuffle = false;
+
+		// PERF:
+		// This is O(n) where [n] is the patch count
+		// but since each signal immediately applies patches
+		// this is [n] is always == 1, so, it's fine.
+		for patch in old_patches.as_slice().iter() {
+			match patch {
+				Signal::Shuffle(_) => {
+					shuffle = true;
+					break;
+				},
+				_ => continue,
+			}
+		}
+
+		if shuffle {
+			*old_data = latest_data.clone();
+		} else {
+			for mut patch in old_patches {
+				Self::apply(&mut patch, old_data, latest_data);
+			}
 		}
 	}
 }
