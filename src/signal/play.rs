@@ -12,10 +12,10 @@ pub struct Play;
 //---------------------------------------------------------------------------------------------------- someday::Apply
 impl<TrackData: ValidTrackData> someday::ApplyReturn<Signal, Play, ()> for AudioState<TrackData> {
 	fn apply_return(s: &mut Play, w: &mut Self, r: &Self) {
-		// INVARIANT:
-		// [Kernel] checks things so we can assume:
-		//   1. [Source] is [Some]
-		//   2. [playing] is [false]
+		// INVARIANT: [Kernel] must check these.
+		debug_assert!(w.current.is_some());
+		debug_assert_eq!(w.playing, true);
+
 		w.playing = true
 	}
 }

@@ -2,7 +2,8 @@
 use crate::state::{AudioState,ValidTrackData};
 use crate::signal::{
 	Add,Append,Back,Clear,Previous,RemoveRange,Remove,
-	Repeat,Seek,SetIndex,Shuffle,Skip,Volume,Play,Pause,Toggle,
+	Repeat,Seek,SetIndex,Shuffle,Skip,Volume,Play,Pause,
+	Toggle,Stop,
 	AddError,SeekError,Next,NextError,PreviousError,SkipError,
 	BackError,SetIndexError,RemoveError,RemoveRangeError,
 };
@@ -35,6 +36,7 @@ pub(crate) enum Signal {
 	SetIndex(SetIndex),
 	Shuffle(Shuffle),
 	Skip(Skip),
+	Stop(Stop),
 	Toggle(Toggle),
 	Volume(Volume),
 }
@@ -44,13 +46,13 @@ pub(crate) enum Signal {
 macro_rules! todo_impl_signal {
 	($($signal:ident),* $(,)?) => {$(
 		impl<TrackData: ValidTrackData> ApplyReturn<Signal, $signal, ()> for AudioState<TrackData> {
-			fn apply_return(s: &mut $signal, w: &mut Self, r: &Self) {
+			fn apply_return(_: &mut $signal, _: &mut Self, _: &Self) {
 				todo!();
 			}
 		}
 	)*};
 }
-todo_impl_signal!(Add,Append,Back,Clear,Previous,RemoveRange,Remove,Repeat,Seek,SetIndex,Skip,Next);
+todo_impl_signal!(Add,Append,Back,Previous,RemoveRange,Remove,Repeat,Seek,SetIndex,Skip,Next);
 
 // [Apply] will just call the [ApplyReturn::apply_return]
 // implementation found in each respective signal's file.
@@ -70,6 +72,7 @@ impl<TrackData: ValidTrackData> Apply<Signal> for AudioState<TrackData> {
 			Signal::Seek(signal)        => ApplyReturn::apply_return(signal, writer, reader),
 			Signal::SetIndex(signal)    => ApplyReturn::apply_return(signal, writer, reader),
 			Signal::Skip(signal)        => ApplyReturn::apply_return(signal, writer, reader),
+			Signal::Stop(signal)        => ApplyReturn::apply_return(signal, writer, reader),
 			Signal::Toggle(signal)      => ApplyReturn::apply_return(signal, writer, reader),
 			Signal::Volume(signal)      => ApplyReturn::apply_return(signal, writer, reader),
 			Signal::Next(signal)        => ApplyReturn::apply_return(signal, writer, reader),
@@ -115,6 +118,7 @@ impl_from! {
 	SetIndex,
 	Shuffle,
 	Skip,
+	Stop,
 	Toggle,
 	Volume,
 }

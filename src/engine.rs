@@ -72,6 +72,7 @@ where
 	send_pause:        Sender<()>,
 	send_next:         Sender<()>,
 	send_previous:     Sender<()>,
+	send_stop:         Sender<()>,
 
 	// Signals that have input and output `()`
 	send_clear:        Sender<Clear>,
@@ -157,6 +158,7 @@ where
 		let (send_toggle,   recv_toggle)   = unbounded();
 		let (send_play,     recv_play)     = unbounded();
 		let (send_pause,    recv_pause)    = unbounded();
+		let (send_stop,     recv_stop)     = unbounded();
 		let (send_clear,    recv_clear)    = unbounded();
 		let (send_restore,  recv_restore)  = unbounded();
 		let (send_repeat,   recv_repeat)   = unbounded();
@@ -284,8 +286,8 @@ where
 
 		//-------------------------------------------------------------- Spawn [Pool]
 		let (p_shutdown, shutdown) = bounded(1);
-		let (p_to_k,    k_from_p)  = bounded(1);
-		let (k_to_p,    p_from_k)  = bounded(1);
+		let (p_to_k,    k_from_p)  = bounded(1); // TODO: get rid of
+		let (k_to_p,    p_from_k)  = bounded(1); // TODO: get rid of
 		let (p_to_gc_d, gc_from_d) = unbounded();
 		let (p_to_gc_k, gc_from_k) = unbounded();
 		Pool::<TrackData>::init(crate::actor::pool::InitArgs {
@@ -328,6 +330,7 @@ where
 			recv_pause,
 			recv_next,
 			recv_previous,
+			recv_stop,
 			to_audio:           k_to_a,
 			from_audio:         k_from_a,
 			to_decode:          k_to_d,
@@ -360,6 +363,7 @@ where
 			shutdown_wait: Arc::clone(&shutdown_wait),
 			audio_state: audio_state_writer,
 			channels,
+			to_gc: k_to_gc,
 		}).expect("sansan [Engine] - could not spawn [Kernel] thread");
 
 		//-------------------------------------------------------------- Return
@@ -373,6 +377,7 @@ where
 			send_toggle,
 			send_play,
 			send_pause,
+			send_stop,
 			send_clear,
 			send_restore,
 			send_repeat,

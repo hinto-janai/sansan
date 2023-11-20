@@ -1,11 +1,17 @@
 //---------------------------------------------------------------------------------------------------- Use
-use std::thread::JoinHandle;
+use std::{thread::JoinHandle, process::Output};
 use crossbeam::channel::{Sender, Receiver, Select};
 use rand::SeedableRng;
 use someday::ApplyReturn;
 use crate::{
 	macros::{send,recv,try_recv,try_send,debug2},
-	state::{AudioState,ValidTrackData,AtomicAudioState, AudioStateSnapshot},
+	state::{
+		AudioState,
+		ValidTrackData,
+		AtomicAudioState,
+		AudioStateSnapshot,
+		Track
+	},
 	actor::{
 		decode::KernelToDecode,
 		audio::AudioToKernel,
@@ -15,6 +21,7 @@ use crate::{
 		Play,
 		Toggle,
 		Pause,
+		Stop,
 		Clear,
 		Repeat,
 		Shuffle,
@@ -39,6 +46,7 @@ use crate::{
 		RemoveRangeError,
 	}, error::SourceError,
 };
+use std::collections::VecDeque;
 use std::sync::{
 	Arc,
 	Barrier,
@@ -62,6 +70,7 @@ pub(crate) struct Kernel<TrackData: ValidTrackData> {
 	playing:             Arc<AtomicBool>,
 	audio_ready_to_recv: Arc<AtomicBool>,
 	shutdown_wait:       Arc<Barrier>,
+	to_gc:               Sender<AudioState<TrackData>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Msg
@@ -107,6 +116,7 @@ pub(crate) struct Channels<TrackData: ValidTrackData> {
 	pub(crate) recv_pause:    Receiver<()>,
 	pub(crate) recv_next:     Receiver<()>,
 	pub(crate) recv_previous: Receiver<()>,
+	pub(crate) recv_stop:     Receiver<()>,
 
 	// Signals that have input and output `()`
 	pub(crate) recv_clear:    Receiver<Clear>,
@@ -140,6 +150,7 @@ pub(crate) struct InitArgs<TrackData: ValidTrackData> {
 	pub(crate) shutdown_wait:       Arc<Barrier>,
 	pub(crate) audio_state:         someday::Writer<AudioState<TrackData>, Signal>,
 	pub(crate) channels:            Channels<TrackData>,
+	pub(crate) to_gc:               Sender<AudioState<TrackData>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Kernel Impl
@@ -161,6 +172,7 @@ where
 					shutdown_wait,
 					audio_state,
 					channels,
+					to_gc,
 				} = args;
 
 				let this = Kernel {
@@ -169,6 +181,7 @@ where
 					audio_state,
 					audio_ready_to_recv,
 					shutdown_wait,
+					to_gc,
 				};
 
 				Kernel::main(this, channels);
@@ -189,22 +202,23 @@ where
 		assert_eq!(0,  select.recv(&c.recv_toggle));
 		assert_eq!(1,  select.recv(&c.recv_play));
 		assert_eq!(2,  select.recv(&c.recv_pause));
-		assert_eq!(3,  select.recv(&c.recv_clear));
-		assert_eq!(4,  select.recv(&c.recv_shuffle));
-		assert_eq!(5,  select.recv(&c.recv_next));
-		assert_eq!(6,  select.recv(&c.recv_previous));
-		assert_eq!(7,  select.recv(&c.recv_repeat));
-		assert_eq!(8,  select.recv(&c.recv_volume));
-		assert_eq!(9,  select.recv(&c.recv_restore));
-		assert_eq!(10, select.recv(&c.recv_add));
-		assert_eq!(11, select.recv(&c.recv_seek));
-		assert_eq!(12, select.recv(&c.recv_skip));
-		assert_eq!(13, select.recv(&c.recv_back));
-		assert_eq!(14, select.recv(&c.recv_set_index));
-		assert_eq!(15, select.recv(&c.recv_remove));
-		assert_eq!(16, select.recv(&c.recv_remove_range));
-		assert_eq!(17, select.recv(&c.shutdown));
-		assert_eq!(18, select.recv(&c.shutdown_hang));
+		assert_eq!(3,  select.recv(&c.recv_stop));
+		assert_eq!(4,  select.recv(&c.recv_clear));
+		assert_eq!(5,  select.recv(&c.recv_shuffle));
+		assert_eq!(6,  select.recv(&c.recv_next));
+		assert_eq!(7,  select.recv(&c.recv_previous));
+		assert_eq!(8,  select.recv(&c.recv_repeat));
+		assert_eq!(9,  select.recv(&c.recv_volume));
+		assert_eq!(10,  select.recv(&c.recv_restore));
+		assert_eq!(11, select.recv(&c.recv_add));
+		assert_eq!(12, select.recv(&c.recv_seek));
+		assert_eq!(13, select.recv(&c.recv_skip));
+		assert_eq!(14, select.recv(&c.recv_back));
+		assert_eq!(15, select.recv(&c.recv_set_index));
+		assert_eq!(16, select.recv(&c.recv_remove));
+		assert_eq!(17, select.recv(&c.recv_remove_range));
+		assert_eq!(18, select.recv(&c.shutdown));
+		assert_eq!(19, select.recv(&c.shutdown_hang));
 
 		// Loop, receiving signals and routing them
 		// to their appropriate handler function.
@@ -213,22 +227,23 @@ where
 				0  => { try_recv!(c.recv_toggle);   self.toggle()   },
 				1  => { try_recv!(c.recv_play);     self.play()     },
 				2  => { try_recv!(c.recv_pause);    self.pause()    },
-				3  => { try_recv!(c.recv_clear);    self.clear()    },
-				4  => self.shuffle(try_recv!(c.recv_shuffle)),
-				5  => { try_recv!(c.recv_next);     self.next()     },
-				6  => { try_recv!(c.recv_previous); self.previous() },
-				7  => self.repeat      (try_recv!(c.recv_repeat)),
-				8  => self.volume      (try_recv!(c.recv_volume)),
-				9  => self.restore     (try_recv!(c.recv_restore)),
-				10 => self.add         (try_recv!(c.recv_add),          &c.send_add),
-				11 => self.seek(try_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),
-				12 => self.skip        (try_recv!(c.recv_skip),         &c.send_skip),
-				13 => self.back        (try_recv!(c.recv_back),         &c.send_back),
-				14 => self.set_index   (try_recv!(c.recv_set_index),    &c.send_set_index),
-				15 => self.remove      (try_recv!(c.recv_remove),       &c.send_remove),
-				16 => self.remove_range(try_recv!(c.recv_remove_range), &c.send_remove_range),
+				3  => { try_recv!(c.recv_stop);     self.stop()     },
+				4  => self.clear(try_recv!(c.recv_clear)),
+				5  => self.shuffle(try_recv!(c.recv_shuffle)),
+				6  => { try_recv!(c.recv_next);     self.next()     },
+				7  => { try_recv!(c.recv_previous); self.previous() },
+				8  => self.repeat      (try_recv!(c.recv_repeat)),
+				9  => self.volume      (try_recv!(c.recv_volume)),
+				10  => self.restore     (try_recv!(c.recv_restore)),
+				11 => self.add         (try_recv!(c.recv_add),          &c.send_add),
+				12 => self.seek(try_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),
+				13 => self.skip        (try_recv!(c.recv_skip),         &c.send_skip),
+				14 => self.back        (try_recv!(c.recv_back),         &c.send_back),
+				15 => self.set_index   (try_recv!(c.recv_set_index),    &c.send_set_index),
+				16 => self.remove      (try_recv!(c.recv_remove),       &c.send_remove),
+				17 => self.remove_range(try_recv!(c.recv_remove_range), &c.send_remove_range),
 
-				17 => {
+				18 => {
 					debug2!("Kernel - shutting down");
 					// Tell all actors to shutdown.
 					for actor in c.shutdown_actor.iter() {
@@ -242,7 +257,7 @@ where
 				// Same as shutdown but sends a message to a
 				// hanging [Engine] indicating we're done, which
 				// allows the caller to return.
-				18 => {
+				19 => {
 					debug2!("Kernel - shutting down (hang)");
 					for actor in c.shutdown_actor.iter() {
 						try_send!(actor, ());
@@ -290,13 +305,22 @@ where
 		}
 	}
 
-	#[inline]
-	fn clear(&mut self) {
-		if !self.queue_empty() {
-			return;
+	fn stop(&mut self) {
+		if self.source_is_some() || !self.queue_empty() {
+			// INVARIANT: must be [push_clone()], see
+			// [crate::signal::signal.rs]'s [Apply]
+			// implementation for more info.
+			self.audio_state.commit_return(Stop);
+			self.audio_state.push_clone();
 		}
+	}
 
-		todo!();
+	fn clear(&mut self, clear: Clear) {
+		match clear {
+			Clear::Queue => if self.queue_empty() { return },
+			Clear::Source => if !self.source_is_some() { return },
+		}
+		self.add_commit_push(clear);
 	}
 
 	#[inline]
@@ -306,15 +330,13 @@ where
 
 	#[inline]
 	fn shuffle(&mut self, shuffle: Shuffle) {
-		if self.audio_state.queue.len() < 2 {
-			return;
+		if self.audio_state.queue.len() > 1 {
+			// INVARIANT: must be [push_clone()], see
+			// [crate::signal::signal.rs]'s [Apply]
+			// implementation for more info.
+			self.audio_state.commit_return(shuffle);
+			self.audio_state.push_clone();
 		}
-
-		// INVARIANT: must be [push_clone()], see
-		// [crate::signal::signal.rs]'s [Apply]
-		// implementation for more info.
-		self.audio_state.commit_return(shuffle);
-		self.audio_state.push_clone();
 	}
 
 	#[inline]
@@ -429,25 +451,27 @@ where
 		self.audio_state.current.is_some()
 	}
 
-	fn add_commit_push<Input>(&mut self, input: Input)
+	fn add_commit_push<Input, Output>(&mut self, input: Input) -> Output
 	where
 		Input: Copy,
 		Signal: From<Input>,
-		AudioState<TrackData>: ApplyReturn<Signal, Input, ()>,
+		AudioState<TrackData>: ApplyReturn<Signal, Input, Output>,
 	{
-		// SAFETY: [Shuffle] is special, it must always
-		// be cloned, so it should never be passed
+		// SAFETY: Special signals, they must always
+		// be cloned, so they should never be passed
 		// to this function.
 		#[cfg(debug_assertions)]
 		{
 			match input.into() {
 				Signal::Shuffle(_) => panic!("shuffle was passed to add_commit_push()"),
+				Signal::Stop(_)    => panic!("stop was passed to add_commit_push()"),
 				_ => (),
 			}
 		}
 
-		self.audio_state.commit_return(input);
+		let output = self.audio_state.commit_return(input);
 		self.audio_state.push();
+		output
 	}
 
 	fn commit_push_get(&mut self) -> AudioStateSnapshot<TrackData> {

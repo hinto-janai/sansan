@@ -4,7 +4,7 @@ use std::{
 	thread::JoinHandle,
 };
 use crate::{
-	state::{Track,ValidTrackData},
+	state::{AudioState,ValidTrackData},
 	macros::{debug2,warn2,try_recv},
 };
 use crossbeam::channel::{Receiver, Select};
@@ -17,7 +17,7 @@ pub(crate) struct Gc<TrackData: ValidTrackData> {
 	pub(crate) shutdown:      Receiver<()>,
 	pub(crate) from_audio:    Receiver<AudioBuffer<f32>>,
 	pub(crate) from_decode:   Receiver<AudioBuffer<f32>>,
-	pub(crate) from_kernel:   Receiver<Track<TrackData>>,
+	pub(crate) from_kernel:   Receiver<AudioState<TrackData>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Gc Impl

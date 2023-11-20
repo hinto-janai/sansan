@@ -48,6 +48,9 @@ pub use shuffle::Shuffle;
 mod skip;
 pub use skip::{Skip,SkipError};
 
+mod stop;
+pub(crate) use stop::Stop;
+
 mod signal;
 pub(crate) use signal::Signal;
 
@@ -57,5 +60,3 @@ pub(crate) use toggle::Toggle;
 mod volume;
 pub use volume::Volume;
 pub(crate) use volume::AtomicVolume;
-
-//---------------------------------------------------------------------------------------------------- Signal Etc
