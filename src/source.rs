@@ -153,10 +153,10 @@ where
 	TrackData: ValidTrackData
 {
 	/// TODO
-	Path((SourcePath, TrackData, Option<TrackMetadata>)),
+	Path((SourcePath, TrackData, TrackMetadata)),
 
 	/// TODO
-	Bytes((SourceBytes, TrackData, Option<TrackMetadata>)),
+	Bytes((SourceBytes, TrackData, TrackMetadata)),
 }
 
 impl<TrackData> From<(&'static str, TrackData)> for Source<TrackData>
@@ -165,7 +165,7 @@ where
 {
 	#[inline]
 	fn from(source: (&'static str, TrackData)) -> Self {
-		Source::Path((source.0.into(), source.1, None))
+		Source::Path((source.0.into(), source.1, TrackMetadata::DEFAULT))
 	}
 }
 impl<TrackData> From<(&'static str, TrackData, TrackMetadata)> for Source<TrackData>
@@ -174,7 +174,7 @@ where
 {
 	#[inline]
 	fn from(source: (&'static str, TrackData, TrackMetadata)) -> Self {
-		Source::Path((source.0.into(), source.1, Some(source.2)))
+		Source::Path((source.0.into(), source.1, source.2))
 	}
 }
 impl<TrackData> From<(String, TrackData)> for Source<TrackData>
@@ -183,7 +183,7 @@ where
 {
 	#[inline]
 	fn from(source: (String, TrackData)) -> Self {
-		Source::Path((source.0.into(), source.1, None))
+		Source::Path((source.0.into(), source.1, TrackMetadata::DEFAULT))
 	}
 }
 impl<TrackData> From<(String, TrackData, TrackMetadata)> for Source<TrackData>
@@ -192,7 +192,7 @@ where
 {
 	#[inline]
 	fn from(source: (String, TrackData, TrackMetadata)) -> Self {
-		Source::Path((source.0.into(), source.1, Some(source.2)))
+		Source::Path((source.0.into(), source.1, source.2))
 	}
 }
 
@@ -535,7 +535,7 @@ macro_rules! impl_source_path_path {
 			{
 				#[inline]
 				fn from(source: ($path, TrackData)) -> Self {
-					Source::Path((SourcePath::$enum(source.0), source.1, None))
+					Source::Path((SourcePath::$enum(source.0), source.1, TrackMetadata::DEFAULT))
 				}
 			}
 			impl<TrackData> From<($path, TrackData, TrackMetadata)> for Source<TrackData>
@@ -544,15 +544,6 @@ macro_rules! impl_source_path_path {
 			{
 				#[inline]
 				fn from(source: ($path, TrackData, TrackMetadata)) -> Self {
-					Source::Path((SourcePath::$enum(source.0), source.1, Some(source.2)))
-				}
-			}
-			impl<TrackData> From<($path, TrackData, Option<TrackMetadata>)> for Source<TrackData>
-			where
-				TrackData: ValidTrackData
-			{
-				#[inline]
-				fn from(source: ($path, TrackData, Option<TrackMetadata>)) -> Self {
 					Source::Path((SourcePath::$enum(source.0), source.1, source.2))
 				}
 			}
@@ -632,7 +623,7 @@ macro_rules! impl_source_bytes {
 			{
 				#[inline]
 				fn from(source: ($bytes, TrackData)) -> Self {
-					Source::Bytes((SourceBytes::$enum(source.0), source.1, None))
+					Source::Bytes((SourceBytes::$enum(source.0), source.1, TrackMetadata::DEFAULT))
 				}
 			}
 			impl<TrackData> From<($bytes, TrackData, TrackMetadata)> for Source<TrackData>
@@ -641,15 +632,6 @@ macro_rules! impl_source_bytes {
 			{
 				#[inline]
 				fn from(source: ($bytes, TrackData, TrackMetadata)) -> Self {
-					Source::Bytes((SourceBytes::$enum(source.0), source.1, Some(source.2)))
-				}
-			}
-			impl<TrackData> From<($bytes, TrackData, Option<TrackMetadata>)> for Source<TrackData>
-			where
-				TrackData: ValidTrackData
-			{
-				#[inline]
-				fn from(source: ($bytes, TrackData, Option<TrackMetadata>)) -> Self {
 					Source::Bytes((SourceBytes::$enum(source.0), source.1, source.2))
 				}
 			}

@@ -94,11 +94,14 @@ where
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq)]
-pub struct Track<TrackData> {
+pub struct Track<TrackData>
+where
+	TrackMetadata: ValidTrackData
+{
 	/// TODO
 	pub data: TrackData,
 	/// TODO
-	pub metadata: Option<TrackMetadata>,
+	pub metadata: TrackMetadata,
 	/// TODO
 	pub index: usize,
 	/// TODO
