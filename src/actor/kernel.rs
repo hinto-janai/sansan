@@ -27,7 +27,10 @@ use crate::{
 		Shuffle,
 		Volume,
 		Add,
+		AddMany,
+		AddManyError,
 		AddError,
+		InsertMethod,
 		Seek,
 		SeekError,
 		Next,
@@ -128,6 +131,8 @@ pub(crate) struct Channels<TrackData: ValidTrackData> {
 	// Signals that return `Result<T, E>`
 	pub(crate) send_add:          Sender<Result<AudioStateSnapshot<TrackData>, AddError>>,
 	pub(crate) recv_add:          Receiver<Add>,
+	pub(crate) send_add_many:     Sender<Result<AudioStateSnapshot<TrackData>, AddManyError>>,
+	pub(crate) recv_add_many:     Receiver<AddMany>,
 	pub(crate) send_seek:         Sender<Result<AudioStateSnapshot<TrackData>, SeekError>>,
 	pub(crate) recv_seek:         Receiver<Seek>,
 	pub(crate) send_skip:         Sender<Result<AudioStateSnapshot<TrackData>, SkipError>>,
@@ -211,14 +216,15 @@ where
 		assert_eq!(9,  select.recv(&c.recv_volume));
 		assert_eq!(10,  select.recv(&c.recv_restore));
 		assert_eq!(11, select.recv(&c.recv_add));
-		assert_eq!(12, select.recv(&c.recv_seek));
-		assert_eq!(13, select.recv(&c.recv_skip));
-		assert_eq!(14, select.recv(&c.recv_back));
-		assert_eq!(15, select.recv(&c.recv_set_index));
-		assert_eq!(16, select.recv(&c.recv_remove));
-		assert_eq!(17, select.recv(&c.recv_remove_range));
-		assert_eq!(18, select.recv(&c.shutdown));
-		assert_eq!(19, select.recv(&c.shutdown_hang));
+		assert_eq!(12, select.recv(&c.recv_add_many));
+		assert_eq!(13, select.recv(&c.recv_seek));
+		assert_eq!(14, select.recv(&c.recv_skip));
+		assert_eq!(15, select.recv(&c.recv_back));
+		assert_eq!(16, select.recv(&c.recv_set_index));
+		assert_eq!(17, select.recv(&c.recv_remove));
+		assert_eq!(18, select.recv(&c.recv_remove_range));
+		assert_eq!(19, select.recv(&c.shutdown));
+		assert_eq!(20, select.recv(&c.shutdown_hang));
 
 		// Loop, receiving signals and routing them
 		// to their appropriate handler function.
@@ -236,14 +242,15 @@ where
 				9  => self.volume      (try_recv!(c.recv_volume)),
 				10  => self.restore     (try_recv!(c.recv_restore)),
 				11 => self.add         (try_recv!(c.recv_add),          &c.send_add),
-				12 => self.seek(try_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),
-				13 => self.skip        (try_recv!(c.recv_skip),         &c.send_skip),
-				14 => self.back        (try_recv!(c.recv_back),         &c.send_back),
-				15 => self.set_index   (try_recv!(c.recv_set_index),    &c.send_set_index),
-				16 => self.remove      (try_recv!(c.recv_remove),       &c.send_remove),
-				17 => self.remove_range(try_recv!(c.recv_remove_range), &c.send_remove_range),
+				12 => self.add_many    (try_recv!(c.recv_add_many),     &c.send_add_many),
+				13 => self.seek(try_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),
+				14 => self.skip        (try_recv!(c.recv_skip),         &c.send_skip),
+				15 => self.back        (try_recv!(c.recv_back),         &c.send_back),
+				16 => self.set_index   (try_recv!(c.recv_set_index),    &c.send_set_index),
+				17 => self.remove      (try_recv!(c.recv_remove),       &c.send_remove),
+				18 => self.remove_range(try_recv!(c.recv_remove_range), &c.send_remove_range),
 
-				18 => {
+				19 => {
 					debug2!("Kernel - shutting down");
 					// Tell all actors to shutdown.
 					for actor in c.shutdown_actor.iter() {
@@ -257,7 +264,7 @@ where
 				// Same as shutdown but sends a message to a
 				// hanging [Engine] indicating we're done, which
 				// allows the caller to return.
-				19 => {
+				20 => {
 					debug2!("Kernel - shutting down (hang)");
 					for actor in c.shutdown_actor.iter() {
 						try_send!(actor, ());
@@ -367,6 +374,12 @@ where
 
 	#[inline]
 	fn add(&mut self, add: Add, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, AddError>>) {
+		todo!();
+		try_send!(to_engine, Ok(self.commit_push_get()));
+	}
+
+	#[inline]
+	fn add_many(&mut self, add_many: AddMany, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, AddManyError>>) {
 		todo!();
 		try_send!(to_engine, Ok(self.commit_push_get()));
 	}

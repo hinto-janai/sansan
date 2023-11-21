@@ -3,10 +3,7 @@
 use crate::Engine;
 
 mod add;
-pub use add::{Add,AddError};
-
-mod append;
-pub use append::Append;
+pub use add::{Add,AddError,AddMany,AddManyError,InsertMethod};
 
 mod back;
 pub use back::{Back,BackError};

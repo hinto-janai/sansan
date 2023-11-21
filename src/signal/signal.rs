@@ -1,11 +1,12 @@
 //---------------------------------------------------------------------------------------------------- use
 use crate::state::{AudioState,ValidTrackData};
 use crate::signal::{
-	Add,Append,Back,Clear,Previous,RemoveRange,Remove,
+	Add,AddMany,Back,Clear,Previous,RemoveRange,Remove,
 	Repeat,Seek,SetIndex,Shuffle,Skip,Volume,Play,Pause,
-	Toggle,Stop,
+	Toggle,Stop,InsertMethod,
 	AddError,SeekError,Next,NextError,PreviousError,SkipError,
 	BackError,SetIndexError,RemoveError,RemoveRangeError,
+	AddManyError,
 };
 use strum::{
 	AsRefStr,Display,EnumCount,EnumVariantNames,
@@ -14,15 +15,15 @@ use strum::{
 use someday::{Apply,ApplyReturn};
 
 //---------------------------------------------------------------------------------------------------- AudioState Apply (someday)
-#[derive(Copy,Clone,Debug,PartialEq,PartialOrd)]
+#[derive(Clone,Debug,PartialEq,PartialOrd)]
 #[derive(AsRefStr,Display,EnumCount,EnumVariantNames,EnumDiscriminants,IntoStaticStr)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
+// #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+// #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
+// #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
 pub(crate) enum Signal {
 	Add(Add),
-	Append(Append),
+	AddMany(AddMany),
 	Back(Back),
 	Clear(Clear),
 	Next(Next),
@@ -44,15 +45,17 @@ pub(crate) enum Signal {
 //---------------------------------------------------------------------------------------------------- someday::Apply
 // TODO: just for trait bounds
 macro_rules! todo_impl_signal {
-	($($signal:ident),* $(,)?) => {$(
-		impl<TrackData: ValidTrackData> ApplyReturn<Signal, $signal, ()> for AudioState<TrackData> {
-			fn apply_return(_: &mut $signal, _: &mut Self, _: &Self) {
-				todo!();
+	($($signal:ident),* $(,)?) => {
+		$(
+			impl<TrackData: ValidTrackData> ApplyReturn<Signal, $signal, ()> for AudioState<TrackData> {
+				fn apply_return(_: &mut $signal, _: &mut Self, _: &Self) {
+					todo!();
+				}
 			}
-		}
-	)*};
+		)*
+	}
 }
-todo_impl_signal!(Add,Append,Back,Previous,RemoveRange,Remove,Repeat,Seek,SetIndex,Skip,Next);
+todo_impl_signal!(Add,AddMany,Back,Previous,RemoveRange,Remove,Repeat,Seek,SetIndex,Skip,Next);
 
 // [Apply] will just call the [ApplyReturn::apply_return]
 // implementation found in each respective signal's file.
@@ -60,7 +63,7 @@ impl<TrackData: ValidTrackData> Apply<Signal> for AudioState<TrackData> {
 	fn apply(patch: &mut Signal, writer: &mut Self, reader: &Self) {
 		match patch {
 			Signal::Add(signal)         => ApplyReturn::apply_return(signal, writer, reader),
-			Signal::Append(signal)      => ApplyReturn::apply_return(signal, writer, reader),
+			Signal::AddMany(signal)     => ApplyReturn::apply_return(signal, writer, reader),
 			Signal::Back(signal)        => ApplyReturn::apply_return(signal, writer, reader),
 			Signal::Clear(signal)       => ApplyReturn::apply_return(signal, writer, reader),
 			Signal::Play(signal)        => ApplyReturn::apply_return(signal, writer, reader),
@@ -93,18 +96,20 @@ impl<TrackData: ValidTrackData> Apply<Signal> for AudioState<TrackData> {
 
 //---------------------------------------------------------------------------------------------------- Impl From
 macro_rules! impl_from {
-	($($signal:ident),* $(,)?) => { $(
-		impl From<$signal> for Signal {
-			fn from(value: $signal) -> Self {
-				Signal::$signal(value)
+	($($signal:ident),* $(,)?) => {
+		$(
+			impl From<$signal> for Signal {
+				fn from(value: $signal) -> Self {
+					Signal::$signal(value)
+				}
 			}
-		}
-	)* }
+		)*
+	}
 }
 
 impl_from! {
 	Add,
-	Append,
+	AddMany,
 	Back,
 	Clear,
 	Next,

@@ -14,12 +14,14 @@ use crate::{
 	audio::{cubeb::Cubeb,rubato::Rubato},
 	channel::SansanSender,
 	macros::{send,recv,try_send,try_recv},
+	source::Source,
 };
 use crate::signal::{
-	Add,Append,Back,Clear,Previous,RemoveRange,Remove,
-	Repeat,Seek,SetIndex,Shuffle,Skip,Volume,
+	Add,AddMany,Back,Clear,Previous,RemoveRange,Remove,
+	Repeat,Seek,SetIndex,Shuffle,Skip,Volume,InsertMethod,
 	AddError,SeekError,Next,NextError,PreviousError,SkipError,
 	BackError,SetIndexError,RemoveError,RemoveRangeError,
+	AddManyError,
 };
 use crossbeam::channel::{Sender,Receiver,bounded,unbounded};
 use symphonia::core::audio::AudioBuffer;
@@ -84,6 +86,8 @@ where
 	// Signals that return `Result<T, E>`
 	send_add:          Sender<Add>,
 	recv_add:          Receiver<Result<AudioStateSnapshot<TrackData>, AddError>>,
+	send_add_many:     Sender<AddMany>,
+	recv_add_many:     Receiver<Result<AudioStateSnapshot<TrackData>, AddManyError>>,
 	send_seek:         Sender<Seek>,
 	recv_seek:         Receiver<Result<AudioStateSnapshot<TrackData>, SeekError>>,
 	send_skip:         Sender<Skip>,
@@ -173,6 +177,8 @@ where
 		//  v
 		let (s_send_add,          k_recv_add)          = bounded(1);
 		let (k_send_add,          s_recv_add)          = bounded(1);
+		let (s_send_add_many,     k_recv_add_many)     = bounded(1);
+		let (k_send_add_many,     s_recv_add_many)     = bounded(1);
 		let (s_send_seek,         k_recv_seek)         = bounded(1);
 		let (k_send_seek,         s_recv_seek)         = bounded(1);
 		let (s_send_skip,         k_recv_skip)         = bounded(1);
@@ -343,6 +349,8 @@ where
 			recv_restore,
 			send_add:          k_send_add,
 			recv_add:          k_recv_add,
+			send_add_many:     k_send_add_many,
+			recv_add_many:     k_recv_add_many,
 			send_seek:         k_send_seek,
 			recv_seek:         k_recv_seek,
 			send_skip:         k_send_skip,
@@ -386,6 +394,8 @@ where
 			send_next,
 			send_previous,
 			send_add:          s_send_add,
+			send_add_many:     s_send_add_many,
+			recv_add_many:     s_recv_add_many,
 			recv_add:          s_recv_add,
 			send_seek:         s_send_seek,
 			recv_seek:         s_recv_seek,
@@ -494,8 +504,36 @@ where
 
 	/// TODO
 	pub fn add(&mut self, add: Add) -> Result<AudioStateSnapshot<TrackData>, AddError> {
+		if let InsertMethod::Index(index) = add.insert {
+			let queue_len = self.audio.get().queue.len();
+
+			// Ignore out of bounds if queue is empty.
+			if (queue_len != 0 && index != 0) && (queue_len < index) {
+				return Err(AddError::OutOfBounds);
+			}
+		}
+
 		try_send!(self.send_add, add);
 		recv!(self.recv_add)
+	}
+
+	/// TODO
+	pub fn add_many(&mut self, add_many: AddMany) -> Result<AudioStateSnapshot<TrackData>, AddManyError> {
+		if add_many.sources.is_empty() {
+			return Err(AddManyError::NoSources);
+		}
+
+		if let InsertMethod::Index(index) = add_many.insert {
+			let queue_len = self.audio.get().queue.len();
+
+			// Ignore out of bounds if queue is empty.
+			if (queue_len != 0 && index != 0) && (queue_len < index) {
+				return Err(AddManyError::OutOfBounds);
+			}
+		}
+
+		try_send!(self.send_add_many, add_many);
+		recv!(self.recv_add_many)
 	}
 
 	/// TODO

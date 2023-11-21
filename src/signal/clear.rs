@@ -17,8 +17,7 @@ pub enum Clear {
 //---------------------------------------------------------------------------------------------------- someday::ApplyReturn
 impl<TrackData: ValidTrackData> someday::ApplyReturn<Signal, Clear, ()> for AudioState<TrackData> {
 	fn apply_return(s: &mut Clear, w: &mut Self, _: &Self) {
-		// INVARIANT:
-		// [Kernel] checks debug invariants.
+		// INVARIANT: [Kernel] checks debug invariants.
 
 		match s {
 			Clear::Queue => {
