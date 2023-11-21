@@ -153,10 +153,10 @@ where
 	TrackData: ValidTrackData
 {
 	/// TODO
-	Path((SourcePath, TrackData, Option<SourceMetadata>)),
+	Path((SourcePath, TrackData, Option<TrackMetadata>)),
 
 	/// TODO
-	Bytes((SourceBytes, TrackData, Option<SourceMetadata>)),
+	Bytes((SourceBytes, TrackData, Option<TrackMetadata>)),
 }
 
 impl<TrackData> From<(&'static str, TrackData)> for Source<TrackData>
@@ -168,12 +168,12 @@ where
 		Source::Path((source.0.into(), source.1, None))
 	}
 }
-impl<TrackData> From<(&'static str, TrackData, SourceMetadata)> for Source<TrackData>
+impl<TrackData> From<(&'static str, TrackData, TrackMetadata)> for Source<TrackData>
 where
 	TrackData: ValidTrackData
 {
 	#[inline]
-	fn from(source: (&'static str, TrackData, SourceMetadata)) -> Self {
+	fn from(source: (&'static str, TrackData, TrackMetadata)) -> Self {
 		Source::Path((source.0.into(), source.1, Some(source.2)))
 	}
 }
@@ -186,22 +186,22 @@ where
 		Source::Path((source.0.into(), source.1, None))
 	}
 }
-impl<TrackData> From<(String, TrackData, SourceMetadata)> for Source<TrackData>
+impl<TrackData> From<(String, TrackData, TrackMetadata)> for Source<TrackData>
 where
 	TrackData: ValidTrackData
 {
 	#[inline]
-	fn from(source: (String, TrackData, SourceMetadata)) -> Self {
+	fn from(source: (String, TrackData, TrackMetadata)) -> Self {
 		Source::Path((source.0.into(), source.1, Some(source.2)))
 	}
 }
 
-//---------------------------------------------------------------------------------------------------- SourceMetadata
+//---------------------------------------------------------------------------------------------------- TrackMetadata
 /// TODO
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug,Clone,PartialEq,PartialOrd)]
-pub enum SourceMetadata {
+pub enum TrackMetadata {
 	#[allow(missing_docs)]
 	Owned {
 		artist_name:   Option<String>,
@@ -228,7 +228,7 @@ pub enum SourceMetadata {
 	},
 }
 
-impl SourceMetadata {
+impl TrackMetadata {
 	/// TODO
 	pub const DEFAULT: Self = Self::Static {
 		artist_name:   None,
@@ -284,7 +284,7 @@ impl SourceMetadata {
 	}
 }
 
-impl Default for SourceMetadata {
+impl Default for TrackMetadata {
 	fn default() -> Self {
 		Self::DEFAULT
 	}
@@ -538,21 +538,21 @@ macro_rules! impl_source_path_path {
 					Source::Path((SourcePath::$enum(source.0), source.1, None))
 				}
 			}
-			impl<TrackData> From<($path, TrackData, SourceMetadata)> for Source<TrackData>
+			impl<TrackData> From<($path, TrackData, TrackMetadata)> for Source<TrackData>
 			where
 				TrackData: ValidTrackData
 			{
 				#[inline]
-				fn from(source: ($path, TrackData, SourceMetadata)) -> Self {
+				fn from(source: ($path, TrackData, TrackMetadata)) -> Self {
 					Source::Path((SourcePath::$enum(source.0), source.1, Some(source.2)))
 				}
 			}
-			impl<TrackData> From<($path, TrackData, Option<SourceMetadata>)> for Source<TrackData>
+			impl<TrackData> From<($path, TrackData, Option<TrackMetadata>)> for Source<TrackData>
 			where
 				TrackData: ValidTrackData
 			{
 				#[inline]
-				fn from(source: ($path, TrackData, Option<SourceMetadata>)) -> Self {
+				fn from(source: ($path, TrackData, Option<TrackMetadata>)) -> Self {
 					Source::Path((SourcePath::$enum(source.0), source.1, source.2))
 				}
 			}
@@ -635,21 +635,21 @@ macro_rules! impl_source_bytes {
 					Source::Bytes((SourceBytes::$enum(source.0), source.1, None))
 				}
 			}
-			impl<TrackData> From<($bytes, TrackData, SourceMetadata)> for Source<TrackData>
+			impl<TrackData> From<($bytes, TrackData, TrackMetadata)> for Source<TrackData>
 			where
 				TrackData: ValidTrackData
 			{
 				#[inline]
-				fn from(source: ($bytes, TrackData, SourceMetadata)) -> Self {
+				fn from(source: ($bytes, TrackData, TrackMetadata)) -> Self {
 					Source::Bytes((SourceBytes::$enum(source.0), source.1, Some(source.2)))
 				}
 			}
-			impl<TrackData> From<($bytes, TrackData, Option<SourceMetadata>)> for Source<TrackData>
+			impl<TrackData> From<($bytes, TrackData, Option<TrackMetadata>)> for Source<TrackData>
 			where
 				TrackData: ValidTrackData
 			{
 				#[inline]
-				fn from(source: ($bytes, TrackData, Option<SourceMetadata>)) -> Self {
+				fn from(source: ($bytes, TrackData, Option<TrackMetadata>)) -> Self {
 					Source::Bytes((SourceBytes::$enum(source.0), source.1, source.2))
 				}
 			}
