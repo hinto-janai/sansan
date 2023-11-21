@@ -1,7 +1,7 @@
 //---------------------------------------------------------------------------------------------------- Use
-use crate::signal::{
+use crate::{signal::{
 	Volume,Repeat,AtomicVolume,AtomicRepeat,
-};
+}, source::SourceMetadata};
 use someday::{Reader, Commit, CommitRef};
 use std::{
 	sync::Arc,
@@ -97,6 +97,8 @@ where
 pub struct Track<TrackData> {
 	/// TODO
 	pub data: TrackData,
+	/// TODO
+	pub metadata: Option<SourceMetadata>,
 	/// TODO
 	pub index: usize,
 	/// TODO

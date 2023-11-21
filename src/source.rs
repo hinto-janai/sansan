@@ -6,6 +6,7 @@ use std::{
 	fs::File,
 	path::{Path,PathBuf},
 	sync::Arc,
+	borrow::Cow,
 };
 use symphonia::core::{
 	formats::{FormatReader,FormatOptions},
@@ -197,6 +198,8 @@ where
 
 //---------------------------------------------------------------------------------------------------- SourceMetadata
 /// TODO
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug,Clone,PartialEq,PartialOrd)]
 pub enum SourceMetadata {
 	#[allow(missing_docs)]
@@ -209,10 +212,10 @@ pub enum SourceMetadata {
 	},
 	#[allow(missing_docs)]
 	Static {
-		artist_name:   Option<&'static str>,
-		album_title:   Option<&'static str>,
-		track_title:   Option<&'static str>,
-		cover_path:    Option<&'static Path>,
+		artist_name:   Option<Cow<'static, str>>,
+		album_title:   Option<Cow<'static, str>>,
+		track_title:   Option<Cow<'static, str>>,
+		cover_path:    Option<Cow<'static, Path>>,
 		total_runtime: Option<Duration>
 	},
 	#[allow(missing_docs)]
