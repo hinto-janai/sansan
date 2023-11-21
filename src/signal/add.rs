@@ -27,34 +27,89 @@ where
 	pub play: bool,
 }
 
-impl<TrackData: ValidTrackData> ApplyReturn<Signal<TrackData>, Add<TrackData>, Result<(), AddError>> for AudioState<TrackData> {
-	fn apply_return(s: &mut Add<TrackData>, w: &mut Self, _: &Self) -> Result<(), AddError> {
+// This function returns an `Option<Source>` when the add
+// operation has made it such that we are setting our [current]
+// to the returned [Source].
+//
+// [Kernel] should forward this [Source] to [Decode].
+impl<TrackData: ValidTrackData> ApplyReturn<Signal<TrackData>, Add<TrackData>, Result<Option<Source<TrackData>>, AddError>> for AudioState<TrackData> {
+	fn apply_return(s: &mut Add<TrackData>, w: &mut Self, _: &Self) -> Result<Option<Source<TrackData>>, AddError> {
+		// INVARIANT: [Kernel] & [Engine] do not do any checks,
+		// we must do all safety checking here.
+
 		if s.clear {
 			w.queue.clear();
 		}
 
-		match s.insert {
+		// Re-route certain [Index] flavors into
+		// [Back/Front] and do safety checks.
+		let insert = match s.insert {
+			InsertMethod::Index(i) if i == 0             => { InsertMethod::Front },
+			InsertMethod::Index(i) if i == w.queue.len() => { InsertMethod::Back },
+			InsertMethod::Index(i) if i > w.queue.len()  => { return Err(AddError::OutOfBounds); },
+			_ => s.insert,
+		};
+
+		// [option] contains the [Source] we (Kernel) should
+		// send to [Decode], if we set our [current] to it.
+		let option = match insert {
 			InsertMethod::Back => {
-				
-				if w.current.is_none() {
-					// w.current = Some(Track {
-						// data: s.source.
-					// })
-				}
+				let option = if s.play && w.queue.is_empty() && w.current.is_none() {
+					Some(s.source.clone())
+				} else {
+					None
+				};
+
+				let track = Track {
+					source: s.source.clone(),
+					index: w.queue.len(),
+					elapsed: 0.0,
+				};
+
+				w.queue.push_back(track);
+
+				option
 			},
 
 			InsertMethod::Front => {
+				let option = if s.play && w.current.is_none() {
+					Some(s.source.clone())
+				} else {
+					None
+				};
+
+				let track = Track {
+					source: s.source.clone(),
+					index: 0,
+					elapsed: 0.0,
+				};
+
+				w.queue.push_front(track);
+
+				option
 			},
 
 			InsertMethod::Index(i) => {
+				debug_assert!(i > 0);
+				debug_assert!(i != w.queue.len());
+
+				let track = Track {
+					source: s.source.clone(),
+					index: i,
+					elapsed: 0.0,
+				};
+
+				w.queue.insert(i, track);
+
+				None
 			},
-		}
+		};
 
 		if s.play {
 			w.playing = true;
 		}
 
-		Ok(())
+		Ok(option)
 	}
 }
 
