@@ -4,7 +4,7 @@ use crossbeam::channel::{Receiver, Select, Sender};
 use crate::{
 	channel,
 	signal::{self,SeekError,Signal},
-	source::{Source, SourceInner},
+	source::{Source, SourceDecode},
 	state::{AudioState, ValidData},
 	actor::audio::TookAudioBuffer,
 	macros::{recv,send,try_send,debug2}, config::ErrorBehavior, error::SourceError,
@@ -45,21 +45,21 @@ type ToAudio = (AudioBuffer<f32>, Time);
 pub(crate) struct Decode<Data: ValidData> {
 	audio_ready_to_recv: Arc<AtomicBool>,             // [Audio]'s way of telling [Decode] it is ready for samples
 	buffer:              VecDeque<ToAudio>,           // Local decoded packets, ready to send to [Audio]
-	source:              SourceInner,                 // Our current [Source] that we are decoding
+	source:              SourceDecode,                 // Our current [Source] that we are decoding
 	done_decoding:       bool,                        // Whether we have finished decoding our current [Source]
 	to_pool:             Sender<VecDeque<ToAudio>>,   // Old buffer send to [Pool]
 	from_pool:           Receiver<VecDeque<ToAudio>>, // New buffer recv from [Pool]
 	shutdown_wait:       Arc<Barrier>,                // Shutdown barrier between all actors
 	eb_seek:             ErrorBehavior,               // Behavior on seek errors
 	eb_decode:           ErrorBehavior,               // Behavior on decoding errors
-	eb_source:           ErrorBehavior,               // Behavior on [Source] -> [SourceInner] errors
+	eb_source:           ErrorBehavior,               // Behavior on [Source] -> [SourceDecode] errors
 	_p:                  PhantomData<Data>,
 }
 
 // See [src/actor/kernel.rs]'s [Channels]
 struct Channels<Data: ValidData> {
 	shutdown:         Receiver<()>,
-	to_gc:            Sender<SourceInner>,
+	to_gc:            Sender<SourceDecode>,
 	to_audio:         Sender<ToAudio>,
 	from_audio:       Receiver<TookAudioBuffer>,
 	to_kernel_seek:   Sender<Result<(), SeekError>>,
@@ -70,7 +70,7 @@ struct Channels<Data: ValidData> {
 //---------------------------------------------------------------------------------------------------- (Actual) Messages
 pub(crate) enum KernelToDecode<Data: ValidData> {
 	// Convert this [Source] into a real
-	// [SourceInner] and start decoding it.
+	// [SourceDecode] and start decoding it.
 	//
 	// This also implicitly also means we
 	// should drop our old audio buffers.
@@ -88,7 +88,7 @@ pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) audio_ready_to_recv: Arc<AtomicBool>,
 	pub(crate) shutdown_wait:       Arc<Barrier>,
 	pub(crate) shutdown:            Receiver<()>,
-	pub(crate) to_gc:               Sender<SourceInner>,
+	pub(crate) to_gc:               Sender<SourceDecode>,
 	pub(crate) to_pool:             Sender<VecDeque<ToAudio>>,
 	pub(crate) from_pool:           Receiver<VecDeque<ToAudio>>,
 	pub(crate) to_audio:            Sender<ToAudio>,
@@ -140,7 +140,7 @@ impl<Data: ValidData> Decode<Data> {
 				let this = Decode {
 					audio_ready_to_recv,
 					buffer: VecDeque::with_capacity(DECODE_BUFFER_LEN),
-					source: SourceInner::dummy(),
+					source: SourceDecode::dummy(),
 					done_decoding: true,
 					to_pool,
 					from_pool,
@@ -199,7 +199,7 @@ impl<Data: ValidData> Decode<Data> {
 				continue;
 			}
 
-			// Continue decoding our current [SourceInner].
+			// Continue decoding our current [SourceDecode].
 
 			let packet = match self.source.reader.next_packet() {
 				Ok(p) => p,
@@ -277,7 +277,7 @@ impl<Data: ValidData> Decode<Data> {
 	}
 
 	#[inline]
-	fn new_source(&mut self, source: Source<Data>, to_gc: &Sender<SourceInner>) {
+	fn new_source(&mut self, source: Source<Data>, to_gc: &Sender<SourceDecode>) {
 		match source.try_into() {
 			Ok(mut s) => {
 				self.swap_audio_buffer();

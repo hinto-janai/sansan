@@ -150,16 +150,7 @@ use crate::state::AudioStateReader;
 /// let arc: Arc<[u8]> = Arc::from(AUDIO_BYTES);
 /// let arc_bytes: Source = Source::from(arc);
 /// ```
-pub enum Source<Data>
-where
-	Data: ValidData
-{
-	/// TODO
-	Path((SourcePath, Data, Metadata)),
-
-	/// TODO
-	Bytes((SourceBytes, Data, Metadata)),
-}
+pub struct Source<Data: ValidData>(SourceInner<Data>);
 
 impl<Data> Source<Data>
 where
@@ -168,57 +159,77 @@ where
 	#[inline]
 	/// TODO
 	pub fn data(&self) -> &Data {
-		match self {
-			Source::Path((_, track_data, _)) => track_data,
-			Source::Bytes((_, track_data, _)) => track_data,
+		match &self.0 {
+			SourceInner::ArcPath((_, data, _)) => data,
+			SourceInner::ArcByte((_, data, _)) => data,
+			SourceInner::CowPath((_, data, _)) => data,
+			SourceInner::CowByte((_, data, _)) => data,
 		}
 	}
 
 	#[inline]
 	/// TODO
 	pub fn metadata(&self) -> &Metadata {
-		match self {
-			Source::Path((_, _, track_metadata)) => track_metadata,
-			Source::Bytes((_, _, track_metadata)) => track_metadata,
+		match &self.0 {
+			SourceInner::ArcPath((_, _, meta)) => meta,
+			SourceInner::ArcByte((_, _, meta)) => meta,
+			SourceInner::CowPath((_, _, meta)) => meta,
+			SourceInner::CowByte((_, _, meta)) => meta,
 		}
 	}
 }
 
-impl<Data> From<(&'static str, Data)> for Source<Data>
-where
-	Data: ValidData
-{
-	#[inline]
-	fn from(source: (&'static str, Data)) -> Self {
-		Source::Path((source.0.into(), source.1, Metadata::DEFAULT))
+impl<Data: ValidData> From<(Arc<Path>, Data, Metadata)> for Source<Data> {
+	fn from(source: (Arc<Path>, Data, Metadata)) -> Self {
+		Self(SourceInner::ArcPath((source.0, source.1, source.2)))
 	}
 }
-impl<Data> From<(&'static str, Data, Metadata)> for Source<Data>
-where
-	Data: ValidData
-{
-	#[inline]
-	fn from(source: (&'static str, Data, Metadata)) -> Self {
-		Source::Path((source.0.into(), source.1, source.2))
+impl<Data: ValidData> From<(&Arc<Path>, Data, Metadata)> for Source<Data> {
+	fn from(source: (&Arc<Path>, Data, Metadata)) -> Self {
+		Self(SourceInner::ArcPath((Arc::clone(source.0), source.1, source.2)))
 	}
 }
-impl<Data> From<(String, Data)> for Source<Data>
-where
-	Data: ValidData
-{
-	#[inline]
-	fn from(source: (String, Data)) -> Self {
-		Source::Path((source.0.into(), source.1, Metadata::DEFAULT))
+impl<Data: ValidData> From<(&'static Path, Data, Metadata)> for Source<Data> {
+	fn from(source: (&'static Path, Data, Metadata)) -> Self {
+		Self(SourceInner::CowPath((Cow::Borrowed(source.0), source.1, source.2)))
 	}
 }
-impl<Data> From<(String, Data, Metadata)> for Source<Data>
-where
-	Data: ValidData
-{
-	#[inline]
-	fn from(source: (String, Data, Metadata)) -> Self {
-		Source::Path((source.0.into(), source.1, source.2))
+impl<Data: ValidData> From<(PathBuf, Data, Metadata)> for Source<Data> {
+	fn from(source: (PathBuf, Data, Metadata)) -> Self {
+		Self(SourceInner::CowPath((Cow::Owned(source.0), source.1, source.2)))
 	}
+}
+
+impl<Data: ValidData> From<(Arc<[u8]>, Data, Metadata)> for Source<Data> {
+	fn from(source: (Arc<[u8]>, Data, Metadata)) -> Self {
+		Self(SourceInner::ArcByte((source.0, source.1, source.2)))
+	}
+}
+impl<Data: ValidData> From<(&Arc<[u8]>, Data, Metadata)> for Source<Data> {
+	fn from(source: (&Arc<[u8]>, Data, Metadata)) -> Self {
+		Self(SourceInner::ArcByte((Arc::clone(source.0), source.1, source.2)))
+	}
+}
+impl<Data: ValidData> From<(&'static [u8], Data, Metadata)> for Source<Data> {
+	fn from(source: (&'static [u8], Data, Metadata)) -> Self {
+		Self(SourceInner::CowByte((Cow::Borrowed(source.0), source.1, source.2)))
+	}
+}
+impl<Data: ValidData> From<(Vec<u8>, Data, Metadata)> for Source<Data> {
+	fn from(source: (Vec<u8>, Data, Metadata)) -> Self {
+		Self(SourceInner::CowByte((Cow::Owned(source.0), source.1, source.2)))
+	}
+}
+
+//---------------------------------------------------------------------------------------------------- SourceInner
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
+#[derive(Debug,Clone,PartialEq,PartialOrd)]
+pub(crate) enum SourceInner<Data: ValidData> {
+	ArcPath((Arc<Path>,          Data, Metadata)),
+	ArcByte((Arc<[u8]>,          Data, Metadata)),
+	CowPath((Cow<'static, Path>, Data, Metadata)),
+	CowByte((Cow<'static, [u8]>, Data, Metadata)),
 }
 
 //---------------------------------------------------------------------------------------------------- Metadata
@@ -226,23 +237,149 @@ where
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug,Clone,PartialEq,PartialOrd)]
-pub enum Metadata {
-	#[allow(missing_docs)]
-	Owned {
+pub struct Metadata(pub(crate) MetadataInner);
+
+impl Metadata {
+	/// TODO
+	pub const DEFAULT: Self = Self(MetadataInner::DEFAULT);
+
+	/// TODO
+	pub fn from_arc(
+		artist_name:   Option<Arc<str>>,
+		album_title:   Option<Arc<str>>,
+		track_title:   Option<Arc<str>>,
+		cover_path:    Option<Arc<Path>>,
+		total_runtime: Option<Duration>
+	) -> Self {
+		Self(MetadataInner::Arc {
+			artist_name,
+			album_title,
+			track_title,
+			cover_path,
+			total_runtime,
+		})
+	}
+
+	/// TODO
+	pub fn from_borrowed(
+		artist_name:   Option<&str>,
+		album_title:   Option<&str>,
+		track_title:   Option<&str>,
+		cover_path:    Option<&Path>,
+		total_runtime: Option<Duration>
+	) -> Self {
+		Self(MetadataInner::Arc {
+			artist_name: artist_name.and_then(|x| Some(Arc::from(x))),
+			album_title: album_title.and_then(|x| Some(Arc::from(x))),
+			track_title: track_title.and_then(|x| Some(Arc::from(x))),
+			cover_path: cover_path.and_then(|x| Some(Arc::from(x))),
+			total_runtime,
+		})
+	}
+
+	/// TODO
+	pub fn from_owned(
 		artist_name:   Option<String>,
 		album_title:   Option<String>,
 		track_title:   Option<String>,
 		cover_path:    Option<PathBuf>,
 		total_runtime: Option<Duration>
-	},
-	#[allow(missing_docs)]
-	Static {
+	) -> Self {
+		Self(MetadataInner::Cow {
+			artist_name: artist_name.and_then(|x| Some(Cow::Owned(x))),
+			album_title: album_title.and_then(|x| Some(Cow::Owned(x))),
+			track_title: track_title.and_then(|x| Some(Cow::Owned(x))),
+			cover_path: cover_path.and_then(|x| Some(Cow::Owned(x))),
+			total_runtime,
+		})
+	}
+
+	/// TODO
+	pub fn from_static(
+		artist_name:   Option<&'static str>,
+		album_title:   Option<&'static str>,
+		track_title:   Option<&'static str>,
+		cover_path:    Option<&'static Path>,
+		total_runtime: Option<Duration>
+	) -> Self {
+		Self(MetadataInner::Cow {
+			artist_name: artist_name.and_then(|x| Some(Cow::Borrowed(x))),
+			album_title: album_title.and_then(|x| Some(Cow::Borrowed(x))),
+			track_title: track_title.and_then(|x| Some(Cow::Borrowed(x))),
+			cover_path: cover_path.and_then(|x| Some(Cow::Borrowed(x))),
+			total_runtime,
+		})
+	}
+
+	/// TODO
+	pub fn from_cow(
 		artist_name:   Option<Cow<'static, str>>,
 		album_title:   Option<Cow<'static, str>>,
 		track_title:   Option<Cow<'static, str>>,
 		cover_path:    Option<Cow<'static, Path>>,
 		total_runtime: Option<Duration>
-	},
+	) -> Self {
+		Self(MetadataInner::Cow {
+			artist_name,
+			album_title,
+			track_title,
+			cover_path,
+			total_runtime,
+		})
+	}
+
+	/// TODO
+	pub fn artist_name(&self) -> Option<&str> {
+		match &self.0 {
+			MetadataInner::Arc { artist_name, .. } => artist_name.as_deref(),
+			MetadataInner::Cow { artist_name, .. } => artist_name.as_deref(),
+		}
+	}
+
+	/// TODO
+	pub fn album_title(&self) -> Option<&str> {
+		match &self.0 {
+			MetadataInner::Arc { album_title, .. } => album_title.as_deref(),
+			MetadataInner::Cow { album_title, .. } => album_title.as_deref(),
+		}
+	}
+
+	/// TODO
+	pub fn track_title(&self) -> Option<&str> {
+		match &self.0 {
+			MetadataInner::Arc { track_title, .. } => track_title.as_deref(),
+			MetadataInner::Cow { track_title, .. } => track_title.as_deref(),
+		}
+	}
+
+	/// TODO
+	pub fn cover_path(&self) -> Option<&Path> {
+		match &self.0 {
+			MetadataInner::Arc { cover_path, .. } => cover_path.as_deref(),
+			MetadataInner::Cow { cover_path, .. } => cover_path.as_deref(),
+		}
+	}
+
+	/// TODO
+	pub fn total_runtime(&self) -> Option<Duration> {
+		match &self.0 {
+			MetadataInner::Arc { total_runtime, .. } => *total_runtime,
+			MetadataInner::Cow { total_runtime, .. } => *total_runtime,
+		}
+	}
+}
+
+impl Default for Metadata {
+	fn default() -> Self {
+		Self::DEFAULT
+	}
+}
+
+//---------------------------------------------------------------------------------------------------- MetadataInner
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
+#[derive(Debug,Clone,PartialEq,PartialOrd)]
+pub(crate) enum MetadataInner {
 	#[allow(missing_docs)]
 	Arc {
 		artist_name:   Option<Arc<str>>,
@@ -251,65 +388,27 @@ pub enum Metadata {
 		cover_path:    Option<Arc<Path>>,
 		total_runtime: Option<Duration>
 	},
+	#[allow(missing_docs)]
+	Cow {
+		artist_name:   Option<Cow<'static, str>>,
+		album_title:   Option<Cow<'static, str>>,
+		track_title:   Option<Cow<'static, str>>,
+		cover_path:    Option<Cow<'static, Path>>,
+		total_runtime: Option<Duration>
+	},
 }
 
-impl Metadata {
-	/// TODO
-	pub const DEFAULT: Self = Self::Static {
+impl MetadataInner {
+	pub(crate) const DEFAULT: Self = Self::Cow {
 		artist_name:   None,
 		album_title:   None,
 		track_title:   None,
 		cover_path:    None,
 		total_runtime: None,
 	};
-
-	/// TODO
-	pub fn artist_name(&self) -> Option<&str> {
-		match self {
-			Self::Owned  { artist_name, .. } => artist_name.as_deref(),
-			Self::Static { artist_name, .. } => artist_name.as_deref(),
-			Self::Arc    { artist_name, .. } => artist_name.as_deref(),
-		}
-	}
-
-	/// TODO
-	pub fn album_title(&self) -> Option<&str> {
-		match self {
-			Self::Owned  { album_title, .. } => album_title.as_deref(),
-			Self::Static { album_title, .. } => album_title.as_deref(),
-			Self::Arc    { album_title, .. } => album_title.as_deref(),
-		}
-	}
-
-	/// TODO
-	pub fn track_title(&self) -> Option<&str> {
-		match self {
-			Self::Owned  { track_title, .. } => track_title.as_deref(),
-			Self::Static { track_title, .. } => track_title.as_deref(),
-			Self::Arc    { track_title, .. } => track_title.as_deref(),
-		}
-	}
-
-	/// TODO
-	pub fn cover_path(&self) -> Option<&Path> {
-		match self {
-			Self::Owned  { cover_path, .. } => cover_path.as_deref(),
-			Self::Static { cover_path, .. } => cover_path.as_deref(),
-			Self::Arc    { cover_path, .. } => cover_path.as_deref(),
-		}
-	}
-
-	/// TODO
-	pub fn total_runtime(&self) -> Option<Duration> {
-		match self {
-			Self::Owned  { total_runtime, .. } => *total_runtime,
-			Self::Static { total_runtime, .. } => *total_runtime,
-			Self::Arc    { total_runtime, .. } => *total_runtime,
-		}
-	}
 }
 
-impl Default for Metadata {
+impl Default for MetadataInner {
 	fn default() -> Self {
 		Self::DEFAULT
 	}
@@ -485,8 +584,8 @@ where
 	type Error = SourceError;
 
 	fn try_into(self) -> Result<SourceDecode, Self::Error> {
-		match self {
-			Self::Path(path) => {
+		match self.0 {
+			SourceInner::ArcPath(path) => {
 				let file = File::open(path.0)?;
 				let mss = MediaSourceStream::new(
 					Box::new(file),
@@ -494,7 +593,23 @@ where
 				);
 				mss.try_into()
 			},
-			Self::Bytes(bytes) => {
+			SourceInner::CowPath(path) => {
+				let file = File::open(path.0)?;
+				let mss = MediaSourceStream::new(
+					Box::new(file),
+					MEDIA_SOURCE_STREAM_OPTIONS,
+				);
+				mss.try_into()
+			},
+			SourceInner::ArcByte(bytes) => {
+				let cursor = Cursor::new(bytes.0);
+				let mss = MediaSourceStream::new(
+					Box::new(cursor),
+					MEDIA_SOURCE_STREAM_OPTIONS,
+				);
+				mss.try_into()
+			},
+			SourceInner::CowByte(bytes) => {
 				let cursor = Cursor::new(bytes.0);
 				let mss = MediaSourceStream::new(
 					Box::new(cursor),
@@ -511,87 +626,20 @@ where
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug,Clone,PartialEq,PartialOrd)]
 /// [`Path`] variant of a [`Source`]
-///
-/// More variants may be added in the future.
-///
-/// See [`Source`] for more details.
-/// ```
-/// # use sansan::*;
-/// # use sansan::source::*;
-/// # use std::{sync::*,borrow::*,path::*};
-/// static AUDIO_PATH: &str = "/static/path/to/audio.flac";
-///
-/// let arc: Arc<Path> = Arc::from(Path::new(AUDIO_PATH));
-///
-/// let arc_path:    Source = Source::from(arc);
-/// let owned_path:  Source = Source::from(PathBuf::from(AUDIO_PATH));
-/// let static_path: Source = Source::from(Path::new(AUDIO_PATH));
-/// ```
-pub enum SourcePath {
-	/// TODO
-	Owned(PathBuf),
-	/// TODO
-	Static(Cow<'static, Path>),
+pub(crate) enum SourcePath {
 	/// TODO
 	Arc(Arc<Path>),
+	/// TODO
+	Cow(Cow<'static, Path>),
 }
 
 impl AsRef<Path> for SourcePath {
 	#[inline]
 	fn as_ref(&self) -> &Path {
 		match self {
-			Self::Owned(p)  => p,
-			Self::Static(p) => p,
-			Self::Arc(p)    => p,
+			Self::Arc(p) => p,
+			Self::Cow(p) => p,
 		}
-	}
-}
-
-macro_rules! impl_source_path_path {
-	($($enum:ident => $path:ty),* $(,)?) => {
-		$(
-			impl From<$path> for SourcePath {
-				#[inline]
-				fn from(path: $path) -> Self {
-					SourcePath::$enum(path)
-				}
-			}
-			impl<Data> From<($path, Data)> for Source<Data>
-			where
-				Data: ValidData
-			{
-				#[inline]
-				fn from(source: ($path, Data)) -> Self {
-					Source::Path((SourcePath::$enum(source.0), source.1, Metadata::DEFAULT))
-				}
-			}
-			impl<Data> From<($path, Data, Metadata)> for Source<Data>
-			where
-				Data: ValidData
-			{
-				#[inline]
-				fn from(source: ($path, Data, Metadata)) -> Self {
-					Source::Path((SourcePath::$enum(source.0), source.1, source.2))
-				}
-			}
-		)*
-	};
-}
-impl_source_path_path! {
-	Owned     => PathBuf,
-	Static    => Cow<'static, Path>,
-	Arc       => Arc<Path>,
-}
-impl From<&'static str> for SourcePath {
-	#[inline]
-	fn from(value: &'static str) -> Self {
-		SourcePath::Static(Cow::Borrowed(Path::new(value)))
-	}
-}
-impl From<String> for SourcePath {
-	#[inline]
-	fn from(value: String) -> Self {
-		SourcePath::Owned(value.into())
 	}
 }
 
@@ -635,40 +683,4 @@ impl AsRef<[u8]> for SourceBytes {
 			Self::Arc(b)    => b,
 		}
 	}
-}
-
-macro_rules! impl_source_bytes {
-	($($enum:ident => $bytes:ty),* $(,)?) => {
-		$(
-			impl From<$bytes> for SourceBytes {
-				#[inline]
-				fn from(bytes: $bytes) -> Self {
-					SourceBytes::$enum(bytes)
-				}
-			}
-			impl<Data> From<($bytes, Data)> for Source<Data>
-			where
-				Data: ValidData
-			{
-				#[inline]
-				fn from(source: ($bytes, Data)) -> Self {
-					Source::Bytes((SourceBytes::$enum(source.0), source.1, Metadata::DEFAULT))
-				}
-			}
-			impl<Data> From<($bytes, Data, Metadata)> for Source<Data>
-			where
-				Data: ValidData
-			{
-				#[inline]
-				fn from(source: ($bytes, Data, Metadata)) -> Self {
-					Source::Bytes((SourceBytes::$enum(source.0), source.1, source.2))
-				}
-			}
-		)*
-	};
-}
-impl_source_bytes! {
-	Static => Cow<'static, [u8]>,
-	Arc    => Arc<[u8]>,
-	Owned  => Vec<u8>,
 }
