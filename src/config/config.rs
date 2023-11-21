@@ -7,7 +7,7 @@ use crate::{
 	},
 	engine::Engine,
 	channel::SansanSender,
-	state::{AudioState,ValidTrackData},
+	state::{AudioState,ValidData},
 };
 use strum::{
 	AsRefStr,
@@ -23,13 +23,13 @@ use strum::{
 // #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug)]
 /// TODO
-pub struct Config<TrackData, CallbackSender>
+pub struct Config<Data, CallbackSender>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 	CallbackSender: SansanSender<()>,
 {
 	/// TODO
-	pub callbacks: Callbacks<TrackData, CallbackSender>,
+	pub callbacks: Callbacks<Data, CallbackSender>,
 	/// TODO
 	pub callback_low_priority: bool,
 
@@ -37,7 +37,7 @@ where
 	pub shutdown_blocking: bool,
 
 	/// TODO
-	pub restore: Option<AudioState<TrackData>>,
+	pub restore: Option<AudioState<Data>>,
 
 	/// TODO
 	pub audio_state: AudioStateConfig,
@@ -138,9 +138,9 @@ impl Default for ErrorBehavior {
 }
 
 //---------------------------------------------------------------------------------------------------- Config Impl
-impl<TrackData, CallbackSender> Config<TrackData, CallbackSender>
+impl<Data, CallbackSender> Config<Data, CallbackSender>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 	CallbackSender: SansanSender<()>,
 {
 	/// Return a reasonable default [`Config`].
@@ -172,9 +172,9 @@ where
 	};
 }
 
-impl<TrackData, CallbackSender> Default for Config<TrackData, CallbackSender>
+impl<Data, CallbackSender> Default for Config<Data, CallbackSender>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 	CallbackSender: SansanSender<()>,
 {
 	fn default() -> Self {

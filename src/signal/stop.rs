@@ -1,5 +1,5 @@
 //---------------------------------------------------------------------------------------------------- use
-use crate::state::{AudioState,ValidTrackData};
+use crate::state::{AudioState,ValidData};
 use crate::signal::Signal;
 
 //---------------------------------------------------------------------------------------------------- Stop
@@ -10,7 +10,7 @@ use crate::signal::Signal;
 pub(crate) struct Stop;
 
 //---------------------------------------------------------------------------------------------------- someday::ApplyReturn
-impl<TrackData: ValidTrackData> someday::ApplyReturn<Signal<TrackData>, Stop, ()> for AudioState<TrackData> {
+impl<Data: ValidData> someday::ApplyReturn<Signal<Data>, Stop, ()> for AudioState<Data> {
 	fn apply_return(_: &mut Stop, w: &mut Self, _: &Self) {
 		// INVARIANT: [Kernel] checks these.
 		debug_assert!(w.current.is_some() || !w.queue.is_empty());

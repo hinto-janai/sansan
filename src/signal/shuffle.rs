@@ -1,6 +1,6 @@
 //---------------------------------------------------------------------------------------------------- use
 use crate::signal::Signal;
-use crate::state::{AudioState,ValidTrackData};
+use crate::state::{AudioState,ValidData};
 
 //---------------------------------------------------------------------------------------------------- Shuffle
 /// TODO
@@ -17,7 +17,7 @@ pub enum Shuffle {
 }
 
 //---------------------------------------------------------------------------------------------------- someday::Apply
-impl<TrackData: ValidTrackData> someday::ApplyReturn<Signal<TrackData>, Shuffle, ()> for AudioState<TrackData> {
+impl<Data: ValidData> someday::ApplyReturn<Signal<Data>, Shuffle, ()> for AudioState<Data> {
 	fn apply_return(s: &mut Shuffle, w: &mut Self, r: &Self) {
 		use rand::prelude::{Rng,SliceRandom};
 		let mut rng = rand::thread_rng();

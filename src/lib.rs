@@ -61,7 +61,7 @@ pub mod state;
 // pub use state::{
 //     AudioStateReader,AudioState,
 //     AudioStateSnapshot,Track,
-// 	ValidTrackData,
+// 	ValidData,
 // };
 
 mod engine;
@@ -71,7 +71,7 @@ pub use engine::Engine;
 pub mod source;
 // pub use source::{
 	// Source,SourcePath,SourceBytes,
-	// SourceError,DecoderError,TrackMetadata,
+	// SourceError,DecoderError,Metadata,
 // };
 
 pub mod channel;

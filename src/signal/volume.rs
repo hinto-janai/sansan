@@ -1,5 +1,5 @@
 //---------------------------------------------------------------------------------------------------- use
-use crate::state::{AudioState,ValidTrackData};
+use crate::state::{AudioState,ValidData};
 use crate::signal::Signal;
 #[allow(unused_imports)] // docs
 use crate::engine::Engine;
@@ -235,7 +235,7 @@ impl From<f32> for Volume {
 }
 
 //---------------------------------------------------------------------------------------------------- someday::ApplyReturn
-impl<TrackData: ValidTrackData> someday::ApplyReturn<Signal<TrackData>, Volume, ()> for AudioState<TrackData> {
+impl<Data: ValidData> someday::ApplyReturn<Signal<Data>, Volume, ()> for AudioState<Data> {
 	fn apply_return(s: &mut Volume, w: &mut Self, _: &Self) {
 		w.volume = *s;
 	}

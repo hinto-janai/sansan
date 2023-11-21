@@ -19,7 +19,7 @@ use symphonia::core::{
 use symphonia::default::{
 	get_probe,get_codecs,
 };
-use crate::state::ValidTrackData;
+use crate::state::ValidData;
 
 #[allow(unused_imports)] // docs
 use crate::state::AudioState;
@@ -150,66 +150,83 @@ use crate::state::AudioStateReader;
 /// let arc: Arc<[u8]> = Arc::from(AUDIO_BYTES);
 /// let arc_bytes: Source = Source::from(arc);
 /// ```
-pub enum Source<TrackData>
+pub enum Source<Data>
 where
-	TrackData: ValidTrackData
+	Data: ValidData
 {
 	/// TODO
-	Path((SourcePath, TrackData, TrackMetadata)),
+	Path((SourcePath, Data, Metadata)),
 
 	/// TODO
-	Bytes((SourceBytes, TrackData, TrackMetadata)),
+	Bytes((SourceBytes, Data, Metadata)),
 }
 
-impl<TrackData> Source<TrackData>
+impl<Data> Source<Data>
 where
-	TrackData: ValidTrackData
-{
-}
-
-impl<TrackData> From<(&'static str, TrackData)> for Source<TrackData>
-where
-	TrackData: ValidTrackData
+	Data: ValidData
 {
 	#[inline]
-	fn from(source: (&'static str, TrackData)) -> Self {
-		Source::Path((source.0.into(), source.1, TrackMetadata::DEFAULT))
+	/// TODO
+	pub fn data(&self) -> &Data {
+		match self {
+			Source::Path((_, track_data, _)) => track_data,
+			Source::Bytes((_, track_data, _)) => track_data,
+		}
+	}
+
+	#[inline]
+	/// TODO
+	pub fn metadata(&self) -> &Metadata {
+		match self {
+			Source::Path((_, _, track_metadata)) => track_metadata,
+			Source::Bytes((_, _, track_metadata)) => track_metadata,
+		}
 	}
 }
-impl<TrackData> From<(&'static str, TrackData, TrackMetadata)> for Source<TrackData>
+
+impl<Data> From<(&'static str, Data)> for Source<Data>
 where
-	TrackData: ValidTrackData
+	Data: ValidData
 {
 	#[inline]
-	fn from(source: (&'static str, TrackData, TrackMetadata)) -> Self {
+	fn from(source: (&'static str, Data)) -> Self {
+		Source::Path((source.0.into(), source.1, Metadata::DEFAULT))
+	}
+}
+impl<Data> From<(&'static str, Data, Metadata)> for Source<Data>
+where
+	Data: ValidData
+{
+	#[inline]
+	fn from(source: (&'static str, Data, Metadata)) -> Self {
 		Source::Path((source.0.into(), source.1, source.2))
 	}
 }
-impl<TrackData> From<(String, TrackData)> for Source<TrackData>
+impl<Data> From<(String, Data)> for Source<Data>
 where
-	TrackData: ValidTrackData
+	Data: ValidData
 {
 	#[inline]
-	fn from(source: (String, TrackData)) -> Self {
-		Source::Path((source.0.into(), source.1, TrackMetadata::DEFAULT))
+	fn from(source: (String, Data)) -> Self {
+		Source::Path((source.0.into(), source.1, Metadata::DEFAULT))
 	}
 }
-impl<TrackData> From<(String, TrackData, TrackMetadata)> for Source<TrackData>
+impl<Data> From<(String, Data, Metadata)> for Source<Data>
 where
-	TrackData: ValidTrackData
+	Data: ValidData
 {
 	#[inline]
-	fn from(source: (String, TrackData, TrackMetadata)) -> Self {
+	fn from(source: (String, Data, Metadata)) -> Self {
 		Source::Path((source.0.into(), source.1, source.2))
 	}
 }
 
-//---------------------------------------------------------------------------------------------------- TrackMetadata
+//---------------------------------------------------------------------------------------------------- Metadata
 /// TODO
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug,Clone,PartialEq,PartialOrd)]
-pub enum TrackMetadata {
+pub enum Metadata {
 	#[allow(missing_docs)]
 	Owned {
 		artist_name:   Option<String>,
@@ -236,7 +253,7 @@ pub enum TrackMetadata {
 	},
 }
 
-impl TrackMetadata {
+impl Metadata {
 	/// TODO
 	pub const DEFAULT: Self = Self::Static {
 		artist_name:   None,
@@ -292,7 +309,7 @@ impl TrackMetadata {
 	}
 }
 
-impl Default for TrackMetadata {
+impl Default for Metadata {
 	fn default() -> Self {
 		Self::DEFAULT
 	}
@@ -461,9 +478,9 @@ impl TryFrom<MediaSourceStream> for SourceInner {
 }
 
 //---------------------------------------------------------------------------------------------------- Source -> SourceInner
-impl<TrackData> TryInto<SourceInner> for Source<TrackData>
+impl<Data> TryInto<SourceInner> for Source<Data>
 where
-	TrackData: ValidTrackData
+	Data: ValidData
 {
 	type Error = SourceError;
 
@@ -539,21 +556,21 @@ macro_rules! impl_source_path_path {
 					SourcePath::$enum(path)
 				}
 			}
-			impl<TrackData> From<($path, TrackData)> for Source<TrackData>
+			impl<Data> From<($path, Data)> for Source<Data>
 			where
-				TrackData: ValidTrackData
+				Data: ValidData
 			{
 				#[inline]
-				fn from(source: ($path, TrackData)) -> Self {
-					Source::Path((SourcePath::$enum(source.0), source.1, TrackMetadata::DEFAULT))
+				fn from(source: ($path, Data)) -> Self {
+					Source::Path((SourcePath::$enum(source.0), source.1, Metadata::DEFAULT))
 				}
 			}
-			impl<TrackData> From<($path, TrackData, TrackMetadata)> for Source<TrackData>
+			impl<Data> From<($path, Data, Metadata)> for Source<Data>
 			where
-				TrackData: ValidTrackData
+				Data: ValidData
 			{
 				#[inline]
-				fn from(source: ($path, TrackData, TrackMetadata)) -> Self {
+				fn from(source: ($path, Data, Metadata)) -> Self {
 					Source::Path((SourcePath::$enum(source.0), source.1, source.2))
 				}
 			}
@@ -629,21 +646,21 @@ macro_rules! impl_source_bytes {
 					SourceBytes::$enum(bytes)
 				}
 			}
-			impl<TrackData> From<($bytes, TrackData)> for Source<TrackData>
+			impl<Data> From<($bytes, Data)> for Source<Data>
 			where
-				TrackData: ValidTrackData
+				Data: ValidData
 			{
 				#[inline]
-				fn from(source: ($bytes, TrackData)) -> Self {
-					Source::Bytes((SourceBytes::$enum(source.0), source.1, TrackMetadata::DEFAULT))
+				fn from(source: ($bytes, Data)) -> Self {
+					Source::Bytes((SourceBytes::$enum(source.0), source.1, Metadata::DEFAULT))
 				}
 			}
-			impl<TrackData> From<($bytes, TrackData, TrackMetadata)> for Source<TrackData>
+			impl<Data> From<($bytes, Data, Metadata)> for Source<Data>
 			where
-				TrackData: ValidTrackData
+				Data: ValidData
 			{
 				#[inline]
-				fn from(source: ($bytes, TrackData, TrackMetadata)) -> Self {
+				fn from(source: ($bytes, Data, Metadata)) -> Self {
 					Source::Bytes((SourceBytes::$enum(source.0), source.1, source.2))
 				}
 			}

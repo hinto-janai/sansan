@@ -7,7 +7,7 @@ use crate::{
 	macros::{send,recv,try_recv,try_send,debug2},
 	state::{
 		AudioState,
-		ValidTrackData,
+		ValidData,
 		AtomicAudioState,
 		AudioStateSnapshot,
 		Track
@@ -62,18 +62,18 @@ use strum::EnumCount;
 //
 // This should be big enough such a resize never
 // occurs (in most situations) but not too big incase
-// the generic [TrackData] the user provides is large.
+// the generic [Data] the user provides is large.
 pub(crate) const QUEUE_LEN: usize = 256;
 
 //---------------------------------------------------------------------------------------------------- Kernel
 #[derive(Debug)]
-pub(crate) struct Kernel<TrackData: ValidTrackData> {
+pub(crate) struct Kernel<Data: ValidData> {
 	atomic_state:        Arc<AtomicAudioState>,
-	audio_state:         someday::Writer<AudioState<TrackData>, Signal<TrackData>>,
+	audio_state:         someday::Writer<AudioState<Data>, Signal<Data>>,
 	playing:             Arc<AtomicBool>,
 	audio_ready_to_recv: Arc<AtomicBool>,
 	shutdown_wait:       Arc<Barrier>,
-	to_gc:               Sender<AudioState<TrackData>>,
+	to_gc:               Sender<AudioState<Data>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Msg
@@ -95,7 +95,7 @@ pub(crate) struct DiscardCurrentAudio;
 // but since they're both behind [self], Rust complains, so the
 // receive channels are in this one-off [Recv] instead of within
 // [Kernel] as fields.
-pub(crate) struct Channels<TrackData: ValidTrackData> {
+pub(crate) struct Channels<Data: ValidData> {
 	// Shutdown signal.
 	pub(crate) shutdown: Receiver<()>,
 	pub(crate) shutdown_hang: Receiver<()>,
@@ -109,7 +109,7 @@ pub(crate) struct Channels<TrackData: ValidTrackData> {
 	pub(crate) from_audio: Receiver<AudioToKernel>,
 
 	// [Decode]
-	pub(crate) to_decode:          Sender<KernelToDecode<TrackData>>,
+	pub(crate) to_decode:          Sender<KernelToDecode<Data>>,
 	pub(crate) from_decode_seek:   Receiver<Result<(), SeekError>>,
 	pub(crate) from_decode_source: Receiver<Result<(), SourceError>>,
 
@@ -126,47 +126,47 @@ pub(crate) struct Channels<TrackData: ValidTrackData> {
 	pub(crate) recv_repeat:   Receiver<Repeat>,
 	pub(crate) recv_volume:   Receiver<Volume>,
 	pub(crate) recv_shuffle:  Receiver<Shuffle>,
-	pub(crate) recv_restore:  Receiver<AudioState<TrackData>>,
+	pub(crate) recv_restore:  Receiver<AudioState<Data>>,
 
 	// Signals that return `Result<T, E>`
-	pub(crate) send_add:          Sender<Result<AudioStateSnapshot<TrackData>, AddError>>,
-	pub(crate) recv_add:          Receiver<Add<TrackData>>,
-	pub(crate) send_add_many:     Sender<Result<AudioStateSnapshot<TrackData>, AddManyError>>,
-	pub(crate) recv_add_many:     Receiver<AddMany<TrackData>>,
-	pub(crate) send_seek:         Sender<Result<AudioStateSnapshot<TrackData>, SeekError>>,
+	pub(crate) send_add:          Sender<Result<AudioStateSnapshot<Data>, AddError>>,
+	pub(crate) recv_add:          Receiver<Add<Data>>,
+	pub(crate) send_add_many:     Sender<Result<AudioStateSnapshot<Data>, AddManyError>>,
+	pub(crate) recv_add_many:     Receiver<AddMany<Data>>,
+	pub(crate) send_seek:         Sender<Result<AudioStateSnapshot<Data>, SeekError>>,
 	pub(crate) recv_seek:         Receiver<Seek>,
-	pub(crate) send_skip:         Sender<Result<AudioStateSnapshot<TrackData>, SkipError>>,
+	pub(crate) send_skip:         Sender<Result<AudioStateSnapshot<Data>, SkipError>>,
 	pub(crate) recv_skip:         Receiver<Skip>,
-	pub(crate) send_back:         Sender<Result<AudioStateSnapshot<TrackData>, BackError>>,
+	pub(crate) send_back:         Sender<Result<AudioStateSnapshot<Data>, BackError>>,
 	pub(crate) recv_back:         Receiver<Back>,
-	pub(crate) send_set_index:    Sender<Result<AudioStateSnapshot<TrackData>, SetIndexError>>,
+	pub(crate) send_set_index:    Sender<Result<AudioStateSnapshot<Data>, SetIndexError>>,
 	pub(crate) recv_set_index:    Receiver<SetIndex>,
-	pub(crate) send_remove:       Sender<Result<AudioStateSnapshot<TrackData>, RemoveError>>,
+	pub(crate) send_remove:       Sender<Result<AudioStateSnapshot<Data>, RemoveError>>,
 	pub(crate) recv_remove:       Receiver<Remove>,
-	pub(crate) send_remove_range: Sender<Result<AudioStateSnapshot<TrackData>, RemoveRangeError>>,
+	pub(crate) send_remove_range: Sender<Result<AudioStateSnapshot<Data>, RemoveRangeError>>,
 	pub(crate) recv_remove_range: Receiver<RemoveRange>,
 }
 
 //---------------------------------------------------------------------------------------------------- Kernel Impl
-pub(crate) struct InitArgs<TrackData: ValidTrackData> {
+pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) atomic_state:        Arc<AtomicAudioState>,
 	pub(crate) playing:             Arc<AtomicBool>,
 	pub(crate) audio_ready_to_recv: Arc<AtomicBool>,
 	pub(crate) shutdown_wait:       Arc<Barrier>,
-	pub(crate) audio_state:         someday::Writer<AudioState<TrackData>, Signal<TrackData>>,
-	pub(crate) channels:            Channels<TrackData>,
-	pub(crate) to_gc:               Sender<AudioState<TrackData>>,
+	pub(crate) audio_state:         someday::Writer<AudioState<Data>, Signal<Data>>,
+	pub(crate) channels:            Channels<Data>,
+	pub(crate) to_gc:               Sender<AudioState<Data>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Kernel Impl
-impl<TrackData> Kernel<TrackData>
+impl<Data> Kernel<Data>
 where
-	TrackData: ValidTrackData
+	Data: ValidData
 {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]
-	pub(crate) fn init(args: InitArgs<TrackData>) -> Result<JoinHandle<()>, std::io::Error> {
+	pub(crate) fn init(args: InitArgs<Data>) -> Result<JoinHandle<()>, std::io::Error> {
 		std::thread::Builder::new()
 			.name("Kernel".into())
 			.spawn(move || {
@@ -196,7 +196,7 @@ where
 	//---------------------------------------------------------------------------------------------------- Main Loop
 	#[cold]
 	#[inline(never)]
-	fn main(mut self, c: Channels<TrackData>) {
+	fn main(mut self, c: Channels<Data>) {
 		// Create channels that we will
 		// be selecting/listening to for all time.
 		let mut select = Select::new();
@@ -331,7 +331,7 @@ where
 	}
 
 	#[inline]
-	fn restore(&mut self, restore: AudioState<TrackData>) {
+	fn restore(&mut self, restore: AudioState<Data>) {
 		todo!();
 	}
 
@@ -373,7 +373,7 @@ where
 	}
 
 	#[inline]
-	fn add(&mut self, add: Add<TrackData>, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, AddError>>) {
+	fn add(&mut self, add: Add<Data>, to_engine: &Sender<Result<AudioStateSnapshot<Data>, AddError>>) {
 		match self.add_commit_push(add) {
 			Ok(_)  => try_send!(to_engine, Ok(self.commit_push_get())),
 			Err(e) => try_send!(to_engine, Err(e)),
@@ -381,7 +381,7 @@ where
 	}
 
 	#[inline]
-	fn add_many(&mut self, add_many: AddMany<TrackData>, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, AddManyError>>) {
+	fn add_many(&mut self, add_many: AddMany<Data>, to_engine: &Sender<Result<AudioStateSnapshot<Data>, AddManyError>>) {
 		todo!();
 		try_send!(to_engine, Ok(self.commit_push_get()));
 	}
@@ -390,9 +390,9 @@ where
 	fn seek(
 		&mut self,
 		seek: Seek,
-		to_decode: &Sender<KernelToDecode<TrackData>>,
+		to_decode: &Sender<KernelToDecode<Data>>,
 		from_decode_seek: &Receiver<Result<(), SeekError>>,
-		to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, SeekError>>,
+		to_engine: &Sender<Result<AudioStateSnapshot<Data>, SeekError>>,
 	) {
 		// Return error to [Engine] if we don't have a [Source] loaded.
 		if !self.source_is_some() {
@@ -409,31 +409,31 @@ where
 	}
 
 	#[inline]
-	fn skip(&mut self, skip: Skip, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, SkipError>>) {
+	fn skip(&mut self, skip: Skip, to_engine: &Sender<Result<AudioStateSnapshot<Data>, SkipError>>) {
 		todo!();
 		try_send!(to_engine, Ok(self.commit_push_get()));
 	}
 
 	#[inline]
-	fn back(&mut self, back: Back, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, BackError>>) {
+	fn back(&mut self, back: Back, to_engine: &Sender<Result<AudioStateSnapshot<Data>, BackError>>) {
 		todo!();
 		try_send!(to_engine, Ok(self.commit_push_get()));
 	}
 
 	#[inline]
-	fn set_index(&mut self, set_index: SetIndex, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, SetIndexError>>) {
+	fn set_index(&mut self, set_index: SetIndex, to_engine: &Sender<Result<AudioStateSnapshot<Data>, SetIndexError>>) {
 		todo!();
 		try_send!(to_engine, Ok(self.commit_push_get()));
 	}
 
 	#[inline]
-	fn remove(&mut self, remove: Remove, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, RemoveError>>) {
+	fn remove(&mut self, remove: Remove, to_engine: &Sender<Result<AudioStateSnapshot<Data>, RemoveError>>) {
 		todo!();
 		try_send!(to_engine, Ok(self.commit_push_get()));
 	}
 
 	#[inline]
-	fn remove_range(&mut self, remove_range: RemoveRange, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, RemoveRangeError>>) {
+	fn remove_range(&mut self, remove_range: RemoveRange, to_engine: &Sender<Result<AudioStateSnapshot<Data>, RemoveRangeError>>) {
 		todo!();
 		try_send!(to_engine, Ok(self.commit_push_get()));
 	}
@@ -450,7 +450,7 @@ where
 		try_send!(to_audio, DiscardCurrentAudio);
 	}
 
-	fn tell_decode_to_discard(&mut self, to_decode: &Sender<KernelToDecode<TrackData>>) {
+	fn tell_decode_to_discard(&mut self, to_decode: &Sender<KernelToDecode<Data>>) {
 		try_send!(to_decode, KernelToDecode::DiscardAudioAndStop);
 	}
 
@@ -469,8 +469,8 @@ where
 	fn add_commit_push<Input, Output>(&mut self, input: Input) -> Output
 	where
 		Input: Clone,
-		Signal<TrackData>: From<Input>,
-		AudioState<TrackData>: ApplyReturn<Signal<TrackData>, Input, Output>,
+		Signal<Data>: From<Input>,
+		AudioState<Data>: ApplyReturn<Signal<Data>, Input, Output>,
 	{
 		// SAFETY: Special signals, they must always
 		// be cloned, so they should never be passed
@@ -489,11 +489,11 @@ where
 		output
 	}
 
-	fn commit_push_get(&mut self) -> AudioStateSnapshot<TrackData> {
+	fn commit_push_get(&mut self) -> AudioStateSnapshot<Data> {
 		AudioStateSnapshot(self.audio_state.commit_and().push_and().head_remote_ref())
 	}
 
-	fn get(&self) -> AudioStateSnapshot<TrackData> {
+	fn get(&self) -> AudioStateSnapshot<Data> {
 		AudioStateSnapshot(self.audio_state.head_remote_ref())
 	}
 }

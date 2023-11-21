@@ -5,7 +5,7 @@ use strum::{
 	EnumString,EnumVariantNames,IntoStaticStr,
 };
 use someday::ApplyReturn;
-use crate::state::{AudioState,ValidTrackData, Track};
+use crate::state::{AudioState,ValidData, Track};
 use crate::signal::Signal;
 
 //---------------------------------------------------------------------------------------------------- Add
@@ -13,12 +13,12 @@ use crate::signal::Signal;
 // #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq,PartialOrd)]
-pub struct Add<TrackData>
+pub struct Add<Data>
 where
-	TrackData: ValidTrackData
+	Data: ValidData
 {
 	/// The [`Source`] to add to the queue
-	pub source: Source<TrackData>,
+	pub source: Source<Data>,
 	/// How should we add this [`Source`] to the queue?
 	pub insert: InsertMethod,
 	/// Should we clear the queue before adding?
@@ -32,8 +32,8 @@ where
 // to the returned [Source].
 //
 // [Kernel] should forward this [Source] to [Decode].
-impl<TrackData: ValidTrackData> ApplyReturn<Signal<TrackData>, Add<TrackData>, Result<Option<Source<TrackData>>, AddError>> for AudioState<TrackData> {
-	fn apply_return(s: &mut Add<TrackData>, w: &mut Self, _: &Self) -> Result<Option<Source<TrackData>>, AddError> {
+impl<Data: ValidData> ApplyReturn<Signal<Data>, Add<Data>, Result<Option<Source<Data>>, AddError>> for AudioState<Data> {
+	fn apply_return(s: &mut Add<Data>, w: &mut Self, _: &Self) -> Result<Option<Source<Data>>, AddError> {
 		// INVARIANT: [Kernel] & [Engine] do not do any checks,
 		// we must do all safety checking here.
 
@@ -60,13 +60,7 @@ impl<TrackData: ValidTrackData> ApplyReturn<Signal<TrackData>, Add<TrackData>, R
 					None
 				};
 
-				let track = Track {
-					source: s.source.clone(),
-					index: w.queue.len(),
-					elapsed: 0.0,
-				};
-
-				w.queue.push_back(track);
+				w.queue.push_back(s.source.clone());
 
 				option
 			},
@@ -78,13 +72,7 @@ impl<TrackData: ValidTrackData> ApplyReturn<Signal<TrackData>, Add<TrackData>, R
 					None
 				};
 
-				let track = Track {
-					source: s.source.clone(),
-					index: 0,
-					elapsed: 0.0,
-				};
-
-				w.queue.push_front(track);
+				w.queue.push_front(s.source.clone());
 
 				option
 			},
@@ -93,13 +81,7 @@ impl<TrackData: ValidTrackData> ApplyReturn<Signal<TrackData>, Add<TrackData>, R
 				debug_assert!(i > 0);
 				debug_assert!(i != w.queue.len());
 
-				let track = Track {
-					source: s.source.clone(),
-					index: i,
-					elapsed: 0.0,
-				};
-
-				w.queue.insert(i, track);
+				w.queue.insert(i, s.source.clone());
 
 				None
 			},
@@ -132,12 +114,12 @@ pub enum AddError {
 // #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq,PartialOrd)]
-pub struct AddMany<TrackData>
+pub struct AddMany<Data>
 where
-	TrackData: ValidTrackData
+	Data: ValidData
 {
 	/// The [`Source`](s) to add to the queue
-	pub sources: Vec<Source<TrackData>>,
+	pub sources: Vec<Source<Data>>,
 	/// How should we add these [`Source`](s) to the queue?
 	pub insert: InsertMethod,
 	/// Should we clear the queue before adding?
@@ -146,8 +128,8 @@ where
 	pub play: bool,
 }
 
-impl<TrackData: ValidTrackData> ApplyReturn<Signal<TrackData>, AddMany<TrackData>, Result<(), AddManyError>> for AudioState<TrackData> {
-	fn apply_return(s: &mut AddMany<TrackData>, w: &mut Self, _: &Self) -> Result<(), AddManyError> {
+impl<Data: ValidData> ApplyReturn<Signal<Data>, AddMany<Data>, Result<(), AddManyError>> for AudioState<Data> {
+	fn apply_return(s: &mut AddMany<Data>, w: &mut Self, _: &Self) -> Result<(), AddManyError> {
 		Ok(())
 	}
 }

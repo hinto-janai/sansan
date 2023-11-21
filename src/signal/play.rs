@@ -1,6 +1,6 @@
 //---------------------------------------------------------------------------------------------------- use
 use crate::signal::Signal;
-use crate::state::{AudioState,ValidTrackData};
+use crate::state::{AudioState,ValidData};
 
 //---------------------------------------------------------------------------------------------------- Play
 /// TODO
@@ -10,7 +10,7 @@ use crate::state::{AudioState,ValidTrackData};
 pub struct Play;
 
 //---------------------------------------------------------------------------------------------------- someday::Apply
-impl<TrackData: ValidTrackData> someday::ApplyReturn<Signal<TrackData>, Play, ()> for AudioState<TrackData> {
+impl<Data: ValidData> someday::ApplyReturn<Signal<Data>, Play, ()> for AudioState<Data> {
 	fn apply_return(s: &mut Play, w: &mut Self, r: &Self) {
 		// INVARIANT: [Kernel] must check these.
 		debug_assert!(w.current.is_some());

@@ -3,7 +3,7 @@ use std::thread::JoinHandle;
 use crossbeam::channel::{Receiver, Select, Sender};
 use crate::{
 	config::{Callback,Callbacks},
-	state::{AudioState,AudioStateReader,ValidTrackData},
+	state::{AudioState,AudioStateReader,ValidData},
 	macros::{send,try_recv,debug2,try_send},
 	channel::SansanSender,
 };
@@ -16,13 +16,13 @@ use std::sync::{
 //---------------------------------------------------------------------------------------------------- Constants
 
 //---------------------------------------------------------------------------------------------------- Caller
-pub(crate) struct Caller<TrackData, CallbackSender>
+pub(crate) struct Caller<Data, CallbackSender>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 	CallbackSender: SansanSender<()>,
 {
-	callbacks:     Callbacks<TrackData, CallbackSender>,
-	audio_state:   AudioStateReader<TrackData>,
+	callbacks:     Callbacks<Data, CallbackSender>,
+	audio_state:   AudioStateReader<Data>,
 	shutdown_wait: Arc<Barrier>,
 }
 
@@ -37,14 +37,14 @@ struct Channels {
 }
 
 //---------------------------------------------------------------------------------------------------- Caller Impl
-pub(crate) struct InitArgs<TrackData, CallbackSender>
+pub(crate) struct InitArgs<Data, CallbackSender>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 	CallbackSender: SansanSender<()>,
 {
 	pub(crate) low_priority:  bool,
-	pub(crate) callbacks:     Callbacks<TrackData, CallbackSender>,
-	pub(crate) audio_state:   AudioStateReader<TrackData>,
+	pub(crate) callbacks:     Callbacks<Data, CallbackSender>,
+	pub(crate) audio_state:   AudioStateReader<Data>,
 	pub(crate) shutdown_wait: Arc<Barrier>,
 	pub(crate) shutdown:      Receiver<()>,
 	pub(crate) next:          Receiver<()>,
@@ -54,15 +54,15 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- Caller Impl
-impl<TrackData, CallbackSender> Caller<TrackData, CallbackSender>
+impl<Data, CallbackSender> Caller<Data, CallbackSender>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 	CallbackSender: SansanSender<()>,
 {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]
-	pub(crate) fn init(args: InitArgs<TrackData, CallbackSender>) -> Result<JoinHandle<()>, std::io::Error> {
+	pub(crate) fn init(args: InitArgs<Data, CallbackSender>) -> Result<JoinHandle<()>, std::io::Error> {
 		std::thread::Builder::new()
 			.name("Caller".into())
 			.spawn(move || {
@@ -164,8 +164,8 @@ where
 
 	#[inline]
 	fn call(
-		audio_state: &AudioState<TrackData>,
-		callback: &mut Option<Callback<TrackData, CallbackSender>>
+		audio_state: &AudioState<Data>,
+		callback: &mut Option<Callback<Data, CallbackSender>>
 	) {
 		if let Some(cb) = callback.as_mut() {
 			cb.call(audio_state);

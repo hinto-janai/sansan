@@ -1,5 +1,5 @@
 //---------------------------------------------------------------------------------------------------- use
-use crate::state::{AudioState,ValidTrackData};
+use crate::state::{AudioState,ValidData};
 use crate::signal::{
 	Add,AddMany,Back,Clear,Previous,RemoveRange,Remove,
 	Repeat,Seek,SetIndex,Shuffle,Skip,Volume,Play,Pause,
@@ -21,9 +21,9 @@ use someday::{Apply,ApplyReturn};
 // #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 // #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
-pub(crate) enum Signal<TrackData: ValidTrackData> {
-	Add(Add<TrackData>),
-	AddMany(AddMany<TrackData>),
+pub(crate) enum Signal<Data: ValidData> {
+	Add(Add<Data>),
+	AddMany(AddMany<Data>),
 	Back(Back),
 	Clear(Clear),
 	Next(Next),
@@ -47,7 +47,7 @@ pub(crate) enum Signal<TrackData: ValidTrackData> {
 macro_rules! todo_impl_signal {
 	($($signal:ident),* $(,)?) => {
 		$(
-			impl<TrackData: ValidTrackData> ApplyReturn<Signal<TrackData>, $signal, ()> for AudioState<TrackData> {
+			impl<Data: ValidData> ApplyReturn<Signal<Data>, $signal, ()> for AudioState<Data> {
 				fn apply_return(_: &mut $signal, _: &mut Self, _: &Self) {
 					todo!();
 				}
@@ -59,8 +59,8 @@ todo_impl_signal!(Back,Previous,RemoveRange,Remove,Repeat,Seek,SetIndex,Skip,Nex
 
 // [Apply] will just call the [ApplyReturn::apply_return]
 // implementation found in each respective signal's file.
-impl<TrackData: ValidTrackData> Apply<Signal<TrackData>> for AudioState<TrackData> {
-	fn apply(patch: &mut Signal<TrackData>, writer: &mut Self, reader: &Self) {
+impl<Data: ValidData> Apply<Signal<Data>> for AudioState<Data> {
+	fn apply(patch: &mut Signal<Data>, writer: &mut Self, reader: &Self) {
 		match patch {
 			Signal::Add(signal)         => drop(ApplyReturn::apply_return(signal, writer, reader)),
 			Signal::AddMany(signal)     => drop(ApplyReturn::apply_return(signal, writer, reader)),
@@ -98,7 +98,7 @@ impl<TrackData: ValidTrackData> Apply<Signal<TrackData>> for AudioState<TrackDat
 macro_rules! impl_from {
 	($($signal:ident),* $(,)?) => {
 		$(
-			impl<TrackData: ValidTrackData> From<$signal> for Signal<TrackData> {
+			impl<Data: ValidData> From<$signal> for Signal<Data> {
 				fn from(value: $signal) -> Self {
 					Signal::$signal(value)
 				}
@@ -111,8 +111,8 @@ impl_from!(Back,Clear,Next,Play,Pause,Previous,RemoveRange,Remove,Repeat,Seek,Se
 macro_rules! impl_from_generic {
 	($($signal:ident),* $(,)?) => {
 		$(
-			impl<TrackData: ValidTrackData> From<$signal<TrackData>> for Signal<TrackData> {
-				fn from(value: $signal<TrackData>) -> Self {
+			impl<Data: ValidData> From<$signal<Data>> for Signal<Data> {
+				fn from(value: $signal<Data>) -> Self {
 					Signal::$signal(value)
 				}
 			}

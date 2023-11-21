@@ -3,7 +3,7 @@ use crate::{
 	signal::{
 		Volume,Repeat,AtomicVolume,AtomicRepeat,
 	},
-	source::{Source,TrackMetadata},
+	source::{Source,Metadata},
 };
 use someday::{Reader, Commit, CommitRef};
 use std::{
@@ -15,16 +15,16 @@ use std::{
 //---------------------------------------------------------------------------------------------------- AudioStateReader
 /// TODO
 #[derive(Clone,Debug)]
-pub struct AudioStateReader<TrackData: ValidTrackData>(pub(crate) Reader<AudioState<TrackData>>);
+pub struct AudioStateReader<Data: ValidData>(pub(crate) Reader<AudioState<Data>>);
 
 //---------------------------------------------------------------------------------------------------- AudioStateReader Impl
-impl<TrackData> AudioStateReader<TrackData>
+impl<Data> AudioStateReader<Data>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 {
 	#[inline]
 	/// TODO
-	pub fn get(&self) -> AudioStateSnapshot<TrackData> {
+	pub fn get(&self) -> AudioStateSnapshot<Data> {
 		AudioStateSnapshot(self.0.head_spin())
 	}
 }
@@ -34,12 +34,12 @@ where
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq)]
-pub struct AudioState<TrackData>
+pub struct AudioState<Data>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 {
 	/// The current song queue.
-	pub queue: VecDeque<Track<TrackData>>,
+	pub queue: VecDeque<Source<Data>>,
 
 	/// Are we playing audio right now?
 	pub playing: bool,
@@ -51,13 +51,13 @@ where
 	pub volume: Volume,
 
 	/// The currently playing index in the queue.
-	pub current: Option<Track<TrackData>>,
+	pub current: Option<Track<Data>>,
 }
 
 //---------------------------------------------------------------------------------------------------- AudioState Impl
-impl<TrackData> AudioState<TrackData>
+impl<Data> AudioState<Data>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 {
 	/// TODO
 	pub const DUMMY: Self = Self {
@@ -85,9 +85,9 @@ impl AtomicAudioState {
 
 //---------------------------------------------------------------------------------------------------- Types
 /// TODO
-pub trait ValidTrackData: Clone + Send + Sync + 'static {}
+pub trait ValidData: Clone + Send + Sync + 'static {}
 
-impl<T> ValidTrackData for T
+impl<T> ValidData for T
 where
 	T: Clone + Send + Sync + 'static
 {}
@@ -97,64 +97,47 @@ where
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq)]
-pub struct Track<TrackData>
+pub struct Track<Data>
 where
-	TrackData: ValidTrackData
+	Data: ValidData
 {
 	/// TODO
-	pub source: Source<TrackData>,
+	pub source: Source<Data>,
 	/// TODO
 	pub index: usize,
 	/// TODO
 	pub elapsed: f32,
 }
 
-impl<TrackData> Track<TrackData>
+impl<Data> Track<Data>
 where
-	TrackData: ValidTrackData
+	Data: ValidData
 {
-	#[inline]
-	/// TODO
-	pub fn track_data(&self) -> &TrackData {
-		match &self.source {
-			Source::Path((_, track_data, _)) => track_data,
-			Source::Bytes((_, track_data, _)) => track_data,
-		}
-	}
-
-	#[inline]
-	/// TODO
-	pub fn track_metadata(&self) -> &TrackMetadata {
-		match &self.source {
-			Source::Path((_, _, track_metadata)) => track_metadata,
-			Source::Bytes((_, _, track_metadata)) => track_metadata,
-		}
-	}
 }
 
 //---------------------------------------------------------------------------------------------------- AudioStateSnapshot
 // Wrapper around `someday::CommitRef` so that users don't have to handle `someday` types.
 //
 /// TODO
-pub struct AudioStateSnapshot<TrackData: ValidTrackData>(pub(crate) CommitRef<AudioState<TrackData>>);
+pub struct AudioStateSnapshot<Data: ValidData>(pub(crate) CommitRef<AudioState<Data>>);
 
-impl<TrackData> std::ops::Deref for AudioStateSnapshot<TrackData>
+impl<Data> std::ops::Deref for AudioStateSnapshot<Data>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 {
-	type Target = AudioState<TrackData>;
+	type Target = AudioState<Data>;
 	#[inline]
 	fn deref(&self) -> &Self::Target {
 		&self.0
 	}
 }
 
-impl<TrackData> AsRef<AudioState<TrackData>> for AudioStateSnapshot<TrackData>
+impl<Data> AsRef<AudioState<Data>> for AudioStateSnapshot<Data>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 {
 	#[inline]
-	fn as_ref(&self) -> &AudioState<TrackData> {
+	fn as_ref(&self) -> &AudioState<Data> {
 		&self.0
 	}
 }

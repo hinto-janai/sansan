@@ -1,5 +1,5 @@
 //---------------------------------------------------------------------------------------------------- use
-use crate::state::{AudioState,ValidTrackData};
+use crate::state::{AudioState,ValidData};
 use crate::signal::Signal;
 
 //---------------------------------------------------------------------------------------------------- Clear
@@ -15,7 +15,7 @@ pub enum Clear {
 }
 
 //---------------------------------------------------------------------------------------------------- someday::ApplyReturn
-impl<TrackData: ValidTrackData> someday::ApplyReturn<Signal<TrackData>, Clear, ()> for AudioState<TrackData> {
+impl<Data: ValidData> someday::ApplyReturn<Signal<Data>, Clear, ()> for AudioState<Data> {
 	fn apply_return(s: &mut Clear, w: &mut Self, _: &Self) {
 		// INVARIANT: [Kernel] checks debug invariants.
 

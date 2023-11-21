@@ -1,7 +1,7 @@
 //---------------------------------------------------------------------------------------------------- Use
 use std::{thread::JoinHandle, marker::PhantomData};
 use crate::{
-	state::{AudioStateSnapshot,AudioStateReader,AudioState,ValidTrackData, AtomicAudioState},
+	state::{AudioStateSnapshot,AudioStateReader,AudioState,ValidData, AtomicAudioState},
 	config::{Config,Callbacks},
 	actor::{
 		audio::{Audio,AUDIO_BUFFER_LEN},
@@ -48,13 +48,13 @@ pub(crate) const ACTOR_COUNT: usize = 3;
 //---------------------------------------------------------------------------------------------------- Engine
 /// TODO
 #[derive(Debug)]
-pub struct Engine<TrackData, CallbackSender>
+pub struct Engine<Data, CallbackSender>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 	CallbackSender: SansanSender<()>,
 {
 	// Data and objects.
-	audio:  AudioStateReader<TrackData>,
+	audio:  AudioStateReader<Data>,
 	_config: PhantomData<CallbackSender>,
 
 	// Signal to [Kernel] to tell all of our internal
@@ -78,40 +78,40 @@ where
 
 	// Signals that have input and output `()`
 	send_clear:        Sender<Clear>,
-	send_restore:      Sender<AudioState<TrackData>>,
+	send_restore:      Sender<AudioState<Data>>,
 	send_repeat:       Sender<Repeat>,
 	send_volume:       Sender<Volume>,
 	send_shuffle:      Sender<Shuffle>,
 
 	// Signals that return `Result<T, E>`
-	send_add:          Sender<Add<TrackData>>,
-	recv_add:          Receiver<Result<AudioStateSnapshot<TrackData>, AddError>>,
-	send_add_many:     Sender<AddMany<TrackData>>,
-	recv_add_many:     Receiver<Result<AudioStateSnapshot<TrackData>, AddManyError>>,
+	send_add:          Sender<Add<Data>>,
+	recv_add:          Receiver<Result<AudioStateSnapshot<Data>, AddError>>,
+	send_add_many:     Sender<AddMany<Data>>,
+	recv_add_many:     Receiver<Result<AudioStateSnapshot<Data>, AddManyError>>,
 	send_seek:         Sender<Seek>,
-	recv_seek:         Receiver<Result<AudioStateSnapshot<TrackData>, SeekError>>,
+	recv_seek:         Receiver<Result<AudioStateSnapshot<Data>, SeekError>>,
 	send_skip:         Sender<Skip>,
-	recv_skip:         Receiver<Result<AudioStateSnapshot<TrackData>, SkipError>>,
+	recv_skip:         Receiver<Result<AudioStateSnapshot<Data>, SkipError>>,
 	send_back:         Sender<Back>,
-	recv_back:         Receiver<Result<AudioStateSnapshot<TrackData>, BackError>>,
+	recv_back:         Receiver<Result<AudioStateSnapshot<Data>, BackError>>,
 	send_set_index:    Sender<SetIndex>,
-	recv_set_index:    Receiver<Result<AudioStateSnapshot<TrackData>, SetIndexError>>,
+	recv_set_index:    Receiver<Result<AudioStateSnapshot<Data>, SetIndexError>>,
 	send_remove:       Sender<Remove>,
-	recv_remove:       Receiver<Result<AudioStateSnapshot<TrackData>, RemoveError>>,
+	recv_remove:       Receiver<Result<AudioStateSnapshot<Data>, RemoveError>>,
 	send_remove_range: Sender<RemoveRange>,
-	recv_remove_range: Receiver<Result<AudioStateSnapshot<TrackData>, RemoveRangeError>>,
+	recv_remove_range: Receiver<Result<AudioStateSnapshot<Data>, RemoveRangeError>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Engine Impl
-impl<TrackData, CallbackSender> Engine<TrackData, CallbackSender>
+impl<Data, CallbackSender> Engine<Data, CallbackSender>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 	CallbackSender: SansanSender<()>,
 {
 	/// TODO
 	#[cold]
 	#[inline(never)]
-	pub fn init(config: Config<TrackData, CallbackSender>) -> Result<Self, EngineInitError> {
+	pub fn init(config: Config<Data, CallbackSender>) -> Result<Self, EngineInitError> {
 		// Initialize the `AudioStateReader`.
 		let (audio_state_reader, audio_state_writer) = someday::new(AudioState::DUMMY);
 		let audio_state_reader = AudioStateReader(audio_state_reader);
@@ -220,7 +220,7 @@ where
 		if callbacks.all_none() {
 			drop((callbacks, shutdown, next, queue_end, repeat, elapsed));
 		} else {
-			Caller::<TrackData, CallbackSender>::init(crate::actor::caller::InitArgs {
+			Caller::<Data, CallbackSender>::init(crate::actor::caller::InitArgs {
 				low_priority: config.callback_low_priority,
 				callbacks,
 				audio_state:   AudioStateReader::clone(&audio_state_reader),
@@ -296,7 +296,7 @@ where
 		let (k_to_p,    p_from_k)  = bounded(1); // TODO: get rid of
 		let (p_to_gc_d, gc_from_d) = unbounded();
 		let (p_to_gc_k, gc_from_k) = unbounded();
-		Pool::<TrackData>::init(crate::actor::pool::InitArgs {
+		Pool::<Data>::init(crate::actor::pool::InitArgs {
 			shutdown_wait: Arc::clone(&shutdown_wait),
 			shutdown,
 			to_decode:     p_to_d,
@@ -310,7 +310,7 @@ where
 		//-------------------------------------------------------------- Spawn [Gc]
 		let (gc_shutdown, shutdown)  = bounded(1);
 		let (k_to_gc,     gc_from_k) = unbounded();
-		Gc::<TrackData>::init(Gc {
+		Gc::<Data>::init(Gc {
 			shutdown_wait: Arc::clone(&shutdown_wait),
 			shutdown,
 			from_audio: gc_from_a,
@@ -364,7 +364,7 @@ where
 			send_remove_range: k_send_remove_range,
 			recv_remove_range: k_recv_remove_range,
 		};
-		Kernel::<TrackData>::init(crate::actor::kernel::InitArgs {
+		Kernel::<Data>::init(crate::actor::kernel::InitArgs {
 			atomic_state,
 			playing,
 			audio_ready_to_recv,
@@ -413,7 +413,7 @@ where
 	}
 
 	/// TODO
-	pub fn reader(&self) -> AudioStateReader<TrackData> {
+	pub fn reader(&self) -> AudioStateReader<Data> {
 		AudioStateReader::clone(&self.audio)
 	}
 
@@ -465,7 +465,7 @@ where
 	}
 
 	/// TODO
-	pub fn restore(&mut self, restore: AudioState<TrackData>) {
+	pub fn restore(&mut self, restore: AudioState<Data>) {
 		try_send!(self.send_restore, restore);
 	}
 
@@ -485,31 +485,31 @@ where
 	}
 
 	/// TODO
-	pub fn seek(&mut self, seek: Seek) -> Result<AudioStateSnapshot<TrackData>, SeekError> {
+	pub fn seek(&mut self, seek: Seek) -> Result<AudioStateSnapshot<Data>, SeekError> {
 		try_send!(self.send_seek, seek);
 		recv!(self.recv_seek)
 	}
 
 	/// TODO
-	pub fn skip(&mut self, skip: Skip) -> Result<AudioStateSnapshot<TrackData>, SkipError> {
+	pub fn skip(&mut self, skip: Skip) -> Result<AudioStateSnapshot<Data>, SkipError> {
 		try_send!(self.send_skip, skip);
 		recv!(self.recv_skip)
 	}
 
 	/// TODO
-	pub fn back(&mut self, back: Back) -> Result<AudioStateSnapshot<TrackData>, BackError> {
+	pub fn back(&mut self, back: Back) -> Result<AudioStateSnapshot<Data>, BackError> {
 		try_send!(self.send_back, back);
 		recv!(self.recv_back)
 	}
 
 	/// TODO
-	pub fn add(&mut self, add: Add<TrackData>) -> Result<AudioStateSnapshot<TrackData>, AddError> {
+	pub fn add(&mut self, add: Add<Data>) -> Result<AudioStateSnapshot<Data>, AddError> {
 		try_send!(self.send_add, add);
 		recv!(self.recv_add)
 	}
 
 	/// TODO
-	pub fn add_many(&mut self, add_many: AddMany<TrackData>) -> Result<AudioStateSnapshot<TrackData>, AddManyError> {
+	pub fn add_many(&mut self, add_many: AddMany<Data>) -> Result<AudioStateSnapshot<Data>, AddManyError> {
 		if add_many.sources.is_empty() {
 			return Err(AddManyError::NoSources);
 		}
@@ -519,28 +519,28 @@ where
 	}
 
 	/// TODO
-	pub fn set_index(&mut self, set_index: SetIndex) -> Result<AudioStateSnapshot<TrackData>, SetIndexError> {
+	pub fn set_index(&mut self, set_index: SetIndex) -> Result<AudioStateSnapshot<Data>, SetIndexError> {
 		try_send!(self.send_set_index, set_index);
 		recv!(self.recv_set_index)
 	}
 
 	/// TODO
-	pub fn remove(&mut self, remove: Remove) -> Result<AudioStateSnapshot<TrackData>, RemoveError> {
+	pub fn remove(&mut self, remove: Remove) -> Result<AudioStateSnapshot<Data>, RemoveError> {
 		try_send!(self.send_remove, remove);
 		recv!(self.recv_remove)
 	} // defines what happens on included remove song, other errors, etc
 
 	/// TODO
-	pub fn remove_range(&mut self, remove_range: RemoveRange) -> Result<AudioStateSnapshot<TrackData>, RemoveRangeError> {
+	pub fn remove_range(&mut self, remove_range: RemoveRange) -> Result<AudioStateSnapshot<Data>, RemoveRangeError> {
 		try_send!(self.send_remove_range, remove_range);
 		recv!(self.recv_remove_range)
 	} // defines what happens on included remove song, other errors, etc
 }
 
 //---------------------------------------------------------------------------------------------------- Drop
-impl<TrackData, CallbackSender> Drop for Engine<TrackData, CallbackSender>
+impl<Data, CallbackSender> Drop for Engine<Data, CallbackSender>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 	CallbackSender: SansanSender<()>,
 {
 	#[cold]

@@ -1,6 +1,6 @@
 //---------------------------------------------------------------------------------------------------- use
 use crate::{
-	state::{AudioState,ValidTrackData},
+	state::{AudioState,ValidData},
 	channel::SansanSender,
 };
 use std::{
@@ -10,23 +10,23 @@ use std::{
 
 //---------------------------------------------------------------------------------------------------- Callback
 /// TODO
-pub enum Callback<TrackData, CallbackSender>
+pub enum Callback<Data, CallbackSender>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 	CallbackSender: SansanSender<()>,
 {
 	/// Dynamically dispatched function
-	Dynamic(Box<dyn FnMut(&AudioState<TrackData>) + Send + Sync + 'static>),
+	Dynamic(Box<dyn FnMut(&AudioState<Data>) + Send + Sync + 'static>),
 	/// Channel message
 	Channel(CallbackSender),
 	/// Function pointer
-	Pointer(fn(&AudioState<TrackData>)),
+	Pointer(fn(&AudioState<Data>)),
 }
 
 //---------------------------------------------------------------------------------------------------- Callback Impl
-impl<TrackData, CallbackSender> Callback<TrackData, CallbackSender>
+impl<Data, CallbackSender> Callback<Data, CallbackSender>
 	where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 	CallbackSender: SansanSender<()>,
 {
 	#[inline]
@@ -37,7 +37,7 @@ impl<TrackData, CallbackSender> Callback<TrackData, CallbackSender>
 	///
 	/// If [`Self`] is [`Callback::Channel`], it will send an empty
 	/// message `()`, acting as a notification.
-	pub(crate) fn call(&mut self, audio_state: &AudioState<TrackData>) {
+	pub(crate) fn call(&mut self, audio_state: &AudioState<Data>) {
 		match self {
 			Self::Dynamic(x) => { x(audio_state); },
 			Self::Channel(x) => { let _ = x.try_send(()); },
@@ -47,19 +47,19 @@ impl<TrackData, CallbackSender> Callback<TrackData, CallbackSender>
 }
 
 //---------------------------------------------------------------------------------------------------- Callback Trait Impl
-impl<TrackData, CallbackSender> From<Box<dyn FnMut(&AudioState<TrackData>) + Send + Sync + 'static>> for Callback<TrackData, CallbackSender>
+impl<Data, CallbackSender> From<Box<dyn FnMut(&AudioState<Data>) + Send + Sync + 'static>> for Callback<Data, CallbackSender>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 	CallbackSender: SansanSender<()>,
 {
-	fn from(b: Box<dyn FnMut(&AudioState<TrackData>) + Send + Sync + 'static>) -> Self {
+	fn from(b: Box<dyn FnMut(&AudioState<Data>) + Send + Sync + 'static>) -> Self {
 		Self::Dynamic(b)
 	}
 }
 
-impl<TrackData, CallbackSender> From<CallbackSender> for Callback<TrackData, CallbackSender>
+impl<Data, CallbackSender> From<CallbackSender> for Callback<Data, CallbackSender>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 	CallbackSender: SansanSender<()>,
 {
 	fn from(c: CallbackSender) -> Self {
@@ -67,19 +67,19 @@ where
 	}
 }
 
-impl<TrackData, CallbackSender> From<fn(&AudioState<TrackData>)> for Callback<TrackData, CallbackSender>
+impl<Data, CallbackSender> From<fn(&AudioState<Data>)> for Callback<Data, CallbackSender>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 	CallbackSender: SansanSender<()>,
 {
-	fn from(f: fn(&AudioState<TrackData>)) -> Self {
+	fn from(f: fn(&AudioState<Data>)) -> Self {
 		Self::Pointer(f)
 	}
 }
 
-impl<TrackData, CallbackSender> std::fmt::Debug for Callback<TrackData, CallbackSender>
+impl<Data, CallbackSender> std::fmt::Debug for Callback<Data, CallbackSender>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 	CallbackSender: SansanSender<()>,
 {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -133,25 +133,25 @@ where
 /// let duration = std::time::Duration::from_secs(1);
 /// callbacks.elapsed(Callback::Channel(elapsed_send), duration);
 /// ```
-pub struct Callbacks<TrackData, CallbackSender>
+pub struct Callbacks<Data, CallbackSender>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 	CallbackSender: SansanSender<()>
 {
 	/// TODO
-	pub next:      Option<Callback<TrackData, CallbackSender>>,
+	pub next:      Option<Callback<Data, CallbackSender>>,
 	/// TODO
-	pub queue_end: Option<Callback<TrackData, CallbackSender>>,
+	pub queue_end: Option<Callback<Data, CallbackSender>>,
 	/// TODO
-	pub repeat:    Option<Callback<TrackData, CallbackSender>>,
+	pub repeat:    Option<Callback<Data, CallbackSender>>,
 	/// TODO
-	pub elapsed:   Option<(Callback<TrackData, CallbackSender>, Duration)>,
+	pub elapsed:   Option<(Callback<Data, CallbackSender>, Duration)>,
 }
 
 //---------------------------------------------------------------------------------------------------- Callbacks Impl
-impl<TrackData, CallbackSender> Callbacks<TrackData, CallbackSender>
+impl<Data, CallbackSender> Callbacks<Data, CallbackSender>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 	CallbackSender: SansanSender<()>,
 {
 	/// A fresh [`Self`] with no callbacks, same as [`Self::new()`]
@@ -178,25 +178,25 @@ where
 	}
 
 	/// TODO
-	pub fn next(&mut self, callback: Callback<TrackData, CallbackSender>) -> &mut Self {
+	pub fn next(&mut self, callback: Callback<Data, CallbackSender>) -> &mut Self {
 		self.next = Some(callback);
 		self
 	}
 
 	/// TODO
-	pub fn queue_end(&mut self, callback: Callback<TrackData, CallbackSender>) -> &mut Self {
+	pub fn queue_end(&mut self, callback: Callback<Data, CallbackSender>) -> &mut Self {
 		self.queue_end = Some(callback);
 		self
 	}
 
 	/// TODO
-	pub fn repeat(&mut self, callback: Callback<TrackData, CallbackSender>) -> &mut Self {
+	pub fn repeat(&mut self, callback: Callback<Data, CallbackSender>) -> &mut Self {
 		self.repeat = Some(callback);
 		self
 	}
 
 	/// TODO
-	pub fn elapsed(&mut self, callback: Callback<TrackData, CallbackSender>, duration: Duration) -> &mut Self {
+	pub fn elapsed(&mut self, callback: Callback<Data, CallbackSender>, duration: Duration) -> &mut Self {
 		self.elapsed = Some((callback, duration));
 		self
 	}
@@ -219,9 +219,9 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- Callbacks Trait Impl
-impl<TrackData, CallbackSender> Default for Callbacks<TrackData, CallbackSender>
+impl<Data, CallbackSender> Default for Callbacks<Data, CallbackSender>
 where
-	TrackData: ValidTrackData,
+	Data: ValidData,
 	CallbackSender: SansanSender<()>,
 {
 	#[inline]

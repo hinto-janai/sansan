@@ -4,7 +4,7 @@ use std::{
 	thread::JoinHandle,
 };
 use crate::{
-	state::{AudioState,ValidTrackData},
+	state::{AudioState,ValidData},
 	macros::{debug2,warn2,try_recv},
 };
 use crossbeam::channel::{Receiver, Select};
@@ -12,16 +12,16 @@ use symphonia::core::audio::AudioBuffer;
 
 //---------------------------------------------------------------------------------------------------- Gc
 // The [G]arbage [c]ollector.
-pub(crate) struct Gc<TrackData: ValidTrackData> {
+pub(crate) struct Gc<Data: ValidData> {
 	pub(crate) shutdown_wait: Arc<Barrier>,
 	pub(crate) shutdown:      Receiver<()>,
 	pub(crate) from_audio:    Receiver<AudioBuffer<f32>>,
 	pub(crate) from_decode:   Receiver<AudioBuffer<f32>>,
-	pub(crate) from_kernel:   Receiver<AudioState<TrackData>>,
+	pub(crate) from_kernel:   Receiver<AudioState<Data>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Gc Impl
-impl<TrackData: ValidTrackData> Gc<TrackData> {
+impl<Data: ValidData> Gc<Data> {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]

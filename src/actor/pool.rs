@@ -4,7 +4,7 @@ use crossbeam::channel::{Receiver, Select, Sender};
 use crate::{
 	signal,
 	source::Source,
-	state::{Track,ValidTrackData},
+	state::{Track,ValidData},
 	actor::audio::TookAudioBuffer,
 	actor::decode::DECODE_BUFFER_LEN,
 	actor::kernel::QUEUE_LEN,
@@ -27,41 +27,41 @@ use strum::EnumCount;
 type ToDecode = (AudioBuffer<f32>, Time);
 
 //---------------------------------------------------------------------------------------------------- Pool
-pub(crate) struct Pool<TrackData: ValidTrackData> {
+pub(crate) struct Pool<Data: ValidData> {
 	shutdown_wait: Arc<Barrier>,
 	buffer_decode: VecDeque<ToDecode>,
-	buffer_kernel: VecDeque<Track<TrackData>>,
+	buffer_kernel: VecDeque<Track<Data>>,
 }
 
 // See [src/actor/kernel.rs]'s [Channels]
-struct Channels<TrackData: ValidTrackData> {
+struct Channels<Data: ValidData> {
 	shutdown:     Receiver<()>,
 	to_decode:    Sender<VecDeque<ToDecode>>,
 	from_decode:  Receiver<VecDeque<ToDecode>>,
-	to_kernel:    Sender<VecDeque<Track<TrackData>>>,
-	from_kernel:  Receiver<VecDeque<Track<TrackData>>>,
+	to_kernel:    Sender<VecDeque<Track<Data>>>,
+	from_kernel:  Receiver<VecDeque<Track<Data>>>,
 	to_gc_decode: Sender<AudioBuffer<f32>>,
-	to_gc_kernel: Sender<Track<TrackData>>,
+	to_gc_kernel: Sender<Track<Data>>,
 }
 
 //---------------------------------------------------------------------------------------------------- InitArgs
-pub(crate) struct InitArgs<TrackData: ValidTrackData> {
+pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) shutdown_wait: Arc<Barrier>,
 	pub(crate) shutdown:      Receiver<()>,
 	pub(crate) to_decode:     Sender<VecDeque<ToDecode>>,
 	pub(crate) from_decode:   Receiver<VecDeque<ToDecode>>,
-	pub(crate) to_kernel:     Sender<VecDeque<Track<TrackData>>>,
-	pub(crate) from_kernel:   Receiver<VecDeque<Track<TrackData>>>,
+	pub(crate) to_kernel:     Sender<VecDeque<Track<Data>>>,
+	pub(crate) from_kernel:   Receiver<VecDeque<Track<Data>>>,
 	pub(crate) to_gc_decode:  Sender<AudioBuffer<f32>>,
-	pub(crate) to_gc_kernel:  Sender<Track<TrackData>>,
+	pub(crate) to_gc_kernel:  Sender<Track<Data>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Pool Impl
-impl<TrackData: ValidTrackData> Pool<TrackData> {
+impl<Data: ValidData> Pool<Data> {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]
-	pub(crate) fn init(args: InitArgs<TrackData>) -> Result<JoinHandle<()>, std::io::Error> {
+	pub(crate) fn init(args: InitArgs<Data>) -> Result<JoinHandle<()>, std::io::Error> {
 		std::thread::Builder::new()
 			.name("Pool".into())
 			.spawn(move || {
@@ -116,7 +116,7 @@ impl<TrackData: ValidTrackData> Pool<TrackData> {
 	//---------------------------------------------------------------------------------------------------- Main Loop
 	#[cold]
 	#[inline(never)]
-	fn main(mut self, channels: Channels<TrackData>) {
+	fn main(mut self, channels: Channels<Data>) {
 		// Create channels that we will
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
@@ -152,7 +152,7 @@ impl<TrackData: ValidTrackData> Pool<TrackData> {
 	// to exact messages/signals from the other actors.
 
 	#[inline]
-	fn from_decode(&mut self, channels: &Channels<TrackData>) {
+	fn from_decode(&mut self, channels: &Channels<Data>) {
 		// Receive old buffer.
 		let mut buffer = try_recv!(channels.from_decode);
 
@@ -174,7 +174,7 @@ impl<TrackData: ValidTrackData> Pool<TrackData> {
 	}
 
 	#[inline]
-	fn from_kernel(&mut self, channels: &Channels<TrackData>) {
+	fn from_kernel(&mut self, channels: &Channels<Data>) {
 		let mut buffer = try_recv!(channels.from_kernel);
 
 		std::mem::swap(&mut self.buffer_kernel, &mut buffer);
