@@ -52,6 +52,8 @@ const MEDIA_SOURCE_STREAM_OPTIONS: MediaSourceStreamOptions = MediaSourceStreamO
 //---------------------------------------------------------------------------------------------------- Source
 #[allow(unused_imports)] // docs
 use crate::state::AudioStateReader;
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug,Clone,PartialEq,PartialOrd)]
 /// Audio source
 ///
@@ -157,6 +159,12 @@ where
 
 	/// TODO
 	Bytes((SourceBytes, TrackData, TrackMetadata)),
+}
+
+impl<TrackData> Source<TrackData>
+where
+	TrackData: ValidTrackData
+{
 }
 
 impl<TrackData> From<(&'static str, TrackData)> for Source<TrackData>
@@ -482,6 +490,8 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- SourcePath
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug,Clone,PartialEq,PartialOrd)]
 /// [`Path`] variant of a [`Source`]
 ///
@@ -504,7 +514,7 @@ pub enum SourcePath {
 	/// TODO
 	Owned(PathBuf),
 	/// TODO
-	Static(&'static Path),
+	Static(Cow<'static, Path>),
 	/// TODO
 	Arc(Arc<Path>),
 }
@@ -552,23 +562,25 @@ macro_rules! impl_source_path_path {
 }
 impl_source_path_path! {
 	Owned     => PathBuf,
-	Static    => &'static Path,
+	Static    => Cow<'static, Path>,
 	Arc       => Arc<Path>,
 }
 impl From<&'static str> for SourcePath {
 	#[inline]
 	fn from(value: &'static str) -> Self {
-		SourcePath::Static(Path::new(value))
+		SourcePath::Static(Cow::Borrowed(Path::new(value)))
 	}
 }
 impl From<String> for SourcePath {
 	#[inline]
 	fn from(value: String) -> Self {
-		SourcePath::Owned(PathBuf::from(value))
+		SourcePath::Owned(value.into())
 	}
 }
 
 //---------------------------------------------------------------------------------------------------- SourceBytes
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug,Clone,PartialEq,PartialOrd)]
 /// Bytes variant of a [`Source`]
 ///
@@ -592,7 +604,7 @@ pub enum SourceBytes {
 	/// TODO
 	Owned(Vec<u8>),
 	/// TODO
-	Static(&'static [u8]),
+	Static(Cow<'static, [u8]>),
 	/// TODO
 	Arc(Arc<[u8]>),
 }
@@ -639,7 +651,7 @@ macro_rules! impl_source_bytes {
 	};
 }
 impl_source_bytes! {
-	Static => &'static [u8],
+	Static => Cow<'static, [u8]>,
 	Arc    => Arc<[u8]>,
 	Owned  => Vec<u8>,
 }

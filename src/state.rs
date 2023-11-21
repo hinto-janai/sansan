@@ -1,7 +1,10 @@
 //---------------------------------------------------------------------------------------------------- Use
-use crate::{signal::{
-	Volume,Repeat,AtomicVolume,AtomicRepeat,
-}, source::TrackMetadata};
+use crate::{
+	signal::{
+		Volume,Repeat,AtomicVolume,AtomicRepeat,
+	},
+	source::{Source,TrackMetadata},
+};
 use someday::{Reader, Commit, CommitRef};
 use std::{
 	sync::Arc,
@@ -96,18 +99,37 @@ where
 #[derive(Clone,Debug,PartialEq)]
 pub struct Track<TrackData>
 where
-	TrackMetadata: ValidTrackData
+	TrackData: ValidTrackData
 {
 	/// TODO
-	pub data: TrackData,
-	/// TODO
-	pub metadata: TrackMetadata,
+	pub source: Source<TrackData>,
 	/// TODO
 	pub index: usize,
 	/// TODO
-	pub elapsed_runtime: f32,
+	pub elapsed: f32,
+}
+
+impl<TrackData> Track<TrackData>
+where
+	TrackData: ValidTrackData
+{
+	#[inline]
 	/// TODO
-	pub total_runtime: f32,
+	pub fn track_data(&self) -> &TrackData {
+		match &self.source {
+			Source::Path((_, track_data, _)) => track_data,
+			Source::Bytes((_, track_data, _)) => track_data,
+		}
+	}
+
+	#[inline]
+	/// TODO
+	pub fn track_metadata(&self) -> &TrackMetadata {
+		match &self.source {
+			Source::Path((_, _, track_metadata)) => track_metadata,
+			Source::Bytes((_, _, track_metadata)) => track_metadata,
+		}
+	}
 }
 
 //---------------------------------------------------------------------------------------------------- AudioStateSnapshot

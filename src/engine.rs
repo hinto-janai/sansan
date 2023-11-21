@@ -504,15 +504,6 @@ where
 
 	/// TODO
 	pub fn add(&mut self, add: Add<TrackData>) -> Result<AudioStateSnapshot<TrackData>, AddError> {
-		if let InsertMethod::Index(index) = add.insert {
-			let queue_len = self.audio.get().queue.len();
-
-			// Ignore out of bounds if queue is empty.
-			if (queue_len != 0 && index != 0) && (queue_len < index) {
-				return Err(AddError::OutOfBounds);
-			}
-		}
-
 		try_send!(self.send_add, add);
 		recv!(self.recv_add)
 	}
@@ -521,15 +512,6 @@ where
 	pub fn add_many(&mut self, add_many: AddMany<TrackData>) -> Result<AudioStateSnapshot<TrackData>, AddManyError> {
 		if add_many.sources.is_empty() {
 			return Err(AddManyError::NoSources);
-		}
-
-		if let InsertMethod::Index(index) = add_many.insert {
-			let queue_len = self.audio.get().queue.len();
-
-			// Ignore out of bounds if queue is empty.
-			if (queue_len != 0 && index != 0) && (queue_len < index) {
-				return Err(AddManyError::OutOfBounds);
-			}
 		}
 
 		try_send!(self.send_add_many, add_many);
