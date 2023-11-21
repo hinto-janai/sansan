@@ -4,21 +4,58 @@ use strum::{
 	AsRefStr,Display,EnumCount,EnumIter,
 	EnumString,EnumVariantNames,IntoStaticStr,
 };
+use someday::ApplyReturn;
+use crate::state::{AudioState,ValidTrackData, Track};
+use crate::signal::Signal;
 
 //---------------------------------------------------------------------------------------------------- Add
 /// TODO
 // #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq,PartialOrd)]
-pub struct Add {
+pub struct Add<TrackData>
+where
+	TrackData: ValidTrackData
+{
 	/// The [`Source`] to add to the queue
-	pub source: Source,
+	pub source: Source<TrackData>,
 	/// How should we add this [`Source`] to the queue?
 	pub insert: InsertMethod,
 	/// Should we clear the queue before adding?
 	pub clear: bool,
 	/// Should we start playing after adding?
 	pub play: bool,
+}
+
+impl<TrackData: ValidTrackData> ApplyReturn<Signal<TrackData>, Add<TrackData>, Result<(), AddError>> for AudioState<TrackData> {
+	fn apply_return(s: &mut Add<TrackData>, w: &mut Self, _: &Self) -> Result<(), AddError> {
+		if s.clear {
+			w.queue.clear();
+		}
+
+		match s.insert {
+			InsertMethod::Back => {
+				
+				if w.current.is_none() {
+					// w.current = Some(Track {
+						// data: s.source.
+					// })
+				}
+			},
+
+			InsertMethod::Front => {
+			},
+
+			InsertMethod::Index(i) => {
+			},
+		}
+
+		if s.play {
+			w.playing = true;
+		}
+
+		Ok(())
+	}
 }
 
 //---------------------------------------------------------------------------------------------------- AddError
@@ -40,15 +77,24 @@ pub enum AddError {
 // #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq,PartialOrd)]
-pub struct AddMany {
+pub struct AddMany<TrackData>
+where
+	TrackData: ValidTrackData
+{
 	/// The [`Source`](s) to add to the queue
-	pub sources: Vec<Source>,
+	pub sources: Vec<Source<TrackData>>,
 	/// How should we add these [`Source`](s) to the queue?
 	pub insert: InsertMethod,
 	/// Should we clear the queue before adding?
 	pub clear: bool,
 	/// Should we start playing after adding?
 	pub play: bool,
+}
+
+impl<TrackData: ValidTrackData> ApplyReturn<Signal<TrackData>, AddMany<TrackData>, Result<(), AddManyError>> for AudioState<TrackData> {
+	fn apply_return(s: &mut AddMany<TrackData>, w: &mut Self, _: &Self) -> Result<(), AddManyError> {
+		Ok(())
+	}
 }
 
 //---------------------------------------------------------------------------------------------------- AddManyError

@@ -84,9 +84,9 @@ where
 	send_shuffle:      Sender<Shuffle>,
 
 	// Signals that return `Result<T, E>`
-	send_add:          Sender<Add>,
+	send_add:          Sender<Add<TrackData>>,
 	recv_add:          Receiver<Result<AudioStateSnapshot<TrackData>, AddError>>,
-	send_add_many:     Sender<AddMany>,
+	send_add_many:     Sender<AddMany<TrackData>>,
 	recv_add_many:     Receiver<Result<AudioStateSnapshot<TrackData>, AddManyError>>,
 	send_seek:         Sender<Seek>,
 	recv_seek:         Receiver<Result<AudioStateSnapshot<TrackData>, SeekError>>,
@@ -503,7 +503,7 @@ where
 	}
 
 	/// TODO
-	pub fn add(&mut self, add: Add) -> Result<AudioStateSnapshot<TrackData>, AddError> {
+	pub fn add(&mut self, add: Add<TrackData>) -> Result<AudioStateSnapshot<TrackData>, AddError> {
 		if let InsertMethod::Index(index) = add.insert {
 			let queue_len = self.audio.get().queue.len();
 
@@ -518,7 +518,7 @@ where
 	}
 
 	/// TODO
-	pub fn add_many(&mut self, add_many: AddMany) -> Result<AudioStateSnapshot<TrackData>, AddManyError> {
+	pub fn add_many(&mut self, add_many: AddMany<TrackData>) -> Result<AudioStateSnapshot<TrackData>, AddManyError> {
 		if add_many.sources.is_empty() {
 			return Err(AddManyError::NoSources);
 		}

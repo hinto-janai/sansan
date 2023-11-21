@@ -17,7 +17,7 @@ pub enum Shuffle {
 }
 
 //---------------------------------------------------------------------------------------------------- someday::Apply
-impl<TrackData: ValidTrackData> someday::ApplyReturn<Signal, Shuffle, ()> for AudioState<TrackData> {
+impl<TrackData: ValidTrackData> someday::ApplyReturn<Signal<TrackData>, Shuffle, ()> for AudioState<TrackData> {
 	fn apply_return(s: &mut Shuffle, w: &mut Self, r: &Self) {
 		use rand::prelude::{Rng,SliceRandom};
 		let mut rng = rand::thread_rng();

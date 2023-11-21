@@ -1,11 +1,11 @@
 //---------------------------------------------------------------------------------------------------- Use
-use std::thread::JoinHandle;
+use std::{thread::JoinHandle, marker::PhantomData};
 use crossbeam::channel::{Receiver, Select, Sender};
 use crate::{
 	channel,
 	signal::{self,SeekError,Signal},
 	source::{Source, SourceInner},
-	state::AudioState,
+	state::{AudioState, ValidTrackData},
 	actor::audio::TookAudioBuffer,
 	macros::{recv,send,try_send,debug2}, config::ErrorBehavior, error::SourceError,
 };
@@ -42,7 +42,7 @@ pub(crate) const DECODE_BUFFER_LEN: usize = 16_000;
 type ToAudio = (AudioBuffer<f32>, Time);
 
 //---------------------------------------------------------------------------------------------------- Decode
-pub(crate) struct Decode {
+pub(crate) struct Decode<TrackData: ValidTrackData> {
 	audio_ready_to_recv: Arc<AtomicBool>,             // [Audio]'s way of telling [Decode] it is ready for samples
 	buffer:              VecDeque<ToAudio>,           // Local decoded packets, ready to send to [Audio]
 	source:              SourceInner,                 // Our current [Source] that we are decoding
@@ -53,27 +53,28 @@ pub(crate) struct Decode {
 	eb_seek:             ErrorBehavior,               // Behavior on seek errors
 	eb_decode:           ErrorBehavior,               // Behavior on decoding errors
 	eb_source:           ErrorBehavior,               // Behavior on [Source] -> [SourceInner] errors
+	_p:                  PhantomData<TrackData>,
 }
 
 // See [src/actor/kernel.rs]'s [Channels]
-struct Channels {
+struct Channels<TrackData: ValidTrackData> {
 	shutdown:         Receiver<()>,
 	to_gc:            Sender<SourceInner>,
 	to_audio:         Sender<ToAudio>,
 	from_audio:       Receiver<TookAudioBuffer>,
 	to_kernel_seek:   Sender<Result<(), SeekError>>,
 	to_kernel_source: Sender<Result<(), SourceError>>,
-	from_kernel:      Receiver<KernelToDecode>,
+	from_kernel:      Receiver<KernelToDecode<TrackData>>,
 }
 
 //---------------------------------------------------------------------------------------------------- (Actual) Messages
-pub(crate) enum KernelToDecode {
+pub(crate) enum KernelToDecode<TrackData: ValidTrackData> {
 	// Convert this [Source] into a real
 	// [SourceInner] and start decoding it.
 	//
 	// This also implicitly also means we
 	// should drop our old audio buffers.
-	NewSource(Source),
+	NewSource(Source<TrackData>),
 	// Seek to this timestamp in the currently
 	// playing track and start decoding from there
 	Seek(signal::Seek),
@@ -83,7 +84,7 @@ pub(crate) enum KernelToDecode {
 }
 
 //---------------------------------------------------------------------------------------------------- Decode Impl
-pub(crate) struct InitArgs {
+pub(crate) struct InitArgs<TrackData: ValidTrackData> {
 	pub(crate) audio_ready_to_recv: Arc<AtomicBool>,
 	pub(crate) shutdown_wait:       Arc<Barrier>,
 	pub(crate) shutdown:            Receiver<()>,
@@ -94,18 +95,18 @@ pub(crate) struct InitArgs {
 	pub(crate) from_audio:          Receiver<TookAudioBuffer>,
 	pub(crate) to_kernel_seek:      Sender<Result<(), SeekError>>,
 	pub(crate) to_kernel_source:    Sender<Result<(), SourceError>>,
-	pub(crate) from_kernel:         Receiver<KernelToDecode>,
+	pub(crate) from_kernel:         Receiver<KernelToDecode<TrackData>>,
 	pub(crate) eb_seek:             ErrorBehavior,
 	pub(crate) eb_decode:           ErrorBehavior,
 	pub(crate) eb_source:           ErrorBehavior,
 }
 
 //---------------------------------------------------------------------------------------------------- Decode Impl
-impl Decode {
+impl<TrackData: ValidTrackData> Decode<TrackData> {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]
-	pub(crate) fn init(args: InitArgs) -> Result<JoinHandle<()>, std::io::Error> {
+	pub(crate) fn init(args: InitArgs<TrackData>) -> Result<JoinHandle<()>, std::io::Error> {
 		std::thread::Builder::new()
 			.name("Decode".into())
 			.spawn(move || {
@@ -147,6 +148,7 @@ impl Decode {
 					eb_seek,
 					eb_decode,
 					eb_source,
+					_p: PhantomData,
 				};
 
 				Decode::main(this, channels)
@@ -156,7 +158,7 @@ impl Decode {
 	//---------------------------------------------------------------------------------------------------- Main Loop
 	#[cold]
 	#[inline(never)]
-	fn main(mut self, channels: Channels) {
+	fn main(mut self, channels: Channels<TrackData>) {
 		// Create channels that we will
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
@@ -235,7 +237,7 @@ impl Decode {
 	// These are the functions that map message
 	// enums to the their proper signal handler.
 	#[inline]
-	fn msg_from_kernel(&mut self, channels: &Channels) {
+	fn msg_from_kernel(&mut self, channels: &Channels<TrackData>) {
 		let msg = recv!(channels.from_kernel);
 
 		use KernelToDecode as K;
@@ -275,7 +277,7 @@ impl Decode {
 	}
 
 	#[inline]
-	fn new_source(&mut self, source: Source, to_gc: &Sender<SourceInner>) {
+	fn new_source(&mut self, source: Source<TrackData>, to_gc: &Sender<SourceInner>) {
 		match source.try_into() {
 			Ok(mut s) => {
 				self.swap_audio_buffer();

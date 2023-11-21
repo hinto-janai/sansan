@@ -18,6 +18,7 @@ use symphonia::core::{
 use symphonia::default::{
 	get_probe,get_codecs,
 };
+use crate::state::ValidTrackData;
 
 #[allow(unused_imports)] // docs
 use crate::state::AudioState;
@@ -146,36 +147,51 @@ use crate::state::AudioStateReader;
 /// let arc: Arc<[u8]> = Arc::from(AUDIO_BYTES);
 /// let arc_bytes: Source = Source::from(arc);
 /// ```
-pub enum Source {
+pub enum Source<TrackData>
+where
+	TrackData: ValidTrackData
+{
 	/// TODO
-	Path((SourcePath, Option<SourceMetadata>)),
+	Path((SourcePath, TrackData, Option<SourceMetadata>)),
 
 	/// TODO
-	Bytes((SourceBytes, Option<SourceMetadata>)),
+	Bytes((SourceBytes, TrackData, Option<SourceMetadata>)),
 }
 
-impl From<&'static str> for Source {
+impl<TrackData> From<(&'static str, TrackData)> for Source<TrackData>
+where
+	TrackData: ValidTrackData
+{
 	#[inline]
-	fn from(value: &'static str) -> Self {
-		Source::Path((value.into(), None))
+	fn from(source: (&'static str, TrackData)) -> Self {
+		Source::Path((source.0.into(), source.1, None))
 	}
 }
-impl From<String> for Source {
+impl<TrackData> From<(&'static str, TrackData, SourceMetadata)> for Source<TrackData>
+where
+	TrackData: ValidTrackData
+{
 	#[inline]
-	fn from(value: String) -> Self {
-		Source::Path((value.into(), None))
+	fn from(source: (&'static str, TrackData, SourceMetadata)) -> Self {
+		Source::Path((source.0.into(), source.1, Some(source.2)))
 	}
 }
-impl From<(&'static str, Option<SourceMetadata>)> for Source {
+impl<TrackData> From<(String, TrackData)> for Source<TrackData>
+where
+	TrackData: ValidTrackData
+{
 	#[inline]
-	fn from(value: (&'static str, Option<SourceMetadata>)) -> Self {
-		Source::Path((value.0.into(), value.1))
+	fn from(source: (String, TrackData)) -> Self {
+		Source::Path((source.0.into(), source.1, None))
 	}
 }
-impl From<(String, Option<SourceMetadata>)> for Source {
+impl<TrackData> From<(String, TrackData, SourceMetadata)> for Source<TrackData>
+where
+	TrackData: ValidTrackData
+{
 	#[inline]
-	fn from(value: (String, Option<SourceMetadata>)) -> Self {
-		Source::Path((value.0.into(), value.1))
+	fn from(source: (String, TrackData, SourceMetadata)) -> Self {
+		Source::Path((source.0.into(), source.1, Some(source.2)))
 	}
 }
 
@@ -434,7 +450,10 @@ impl TryFrom<MediaSourceStream> for SourceInner {
 }
 
 //---------------------------------------------------------------------------------------------------- Source -> SourceInner
-impl TryInto<SourceInner> for Source {
+impl<TrackData> TryInto<SourceInner> for Source<TrackData>
+where
+	TrackData: ValidTrackData
+{
 	type Error = SourceError;
 
 	fn try_into(self) -> Result<SourceInner, Self::Error> {
@@ -507,16 +526,31 @@ macro_rules! impl_source_path_path {
 					SourcePath::$enum(path)
 				}
 			}
-			impl From<$path> for Source {
+			impl<TrackData> From<($path, TrackData)> for Source<TrackData>
+			where
+				TrackData: ValidTrackData
+			{
 				#[inline]
-				fn from(source: $path) -> Self {
-					Source::Path((SourcePath::$enum(source), None))
+				fn from(source: ($path, TrackData)) -> Self {
+					Source::Path((SourcePath::$enum(source.0), source.1, None))
 				}
 			}
-			impl From<($path, Option<SourceMetadata>)> for Source {
+			impl<TrackData> From<($path, TrackData, SourceMetadata)> for Source<TrackData>
+			where
+				TrackData: ValidTrackData
+			{
 				#[inline]
-				fn from(source: ($path, Option<SourceMetadata>)) -> Self {
-					Source::Path((SourcePath::$enum(source.0), source.1))
+				fn from(source: ($path, TrackData, SourceMetadata)) -> Self {
+					Source::Path((SourcePath::$enum(source.0), source.1, Some(source.2)))
+				}
+			}
+			impl<TrackData> From<($path, TrackData, Option<SourceMetadata>)> for Source<TrackData>
+			where
+				TrackData: ValidTrackData
+			{
+				#[inline]
+				fn from(source: ($path, TrackData, Option<SourceMetadata>)) -> Self {
+					Source::Path((SourcePath::$enum(source.0), source.1, source.2))
 				}
 			}
 		)*
@@ -589,16 +623,31 @@ macro_rules! impl_source_bytes {
 					SourceBytes::$enum(bytes)
 				}
 			}
-			impl From<$bytes> for Source {
+			impl<TrackData> From<($bytes, TrackData)> for Source<TrackData>
+			where
+				TrackData: ValidTrackData
+			{
 				#[inline]
-				fn from(source: $bytes) -> Self {
-					Source::Bytes((SourceBytes::$enum(source), None))
+				fn from(source: ($bytes, TrackData)) -> Self {
+					Source::Bytes((SourceBytes::$enum(source.0), source.1, None))
 				}
 			}
-			impl From<($bytes, Option<SourceMetadata>)> for Source {
+			impl<TrackData> From<($bytes, TrackData, SourceMetadata)> for Source<TrackData>
+			where
+				TrackData: ValidTrackData
+			{
 				#[inline]
-				fn from(source: ($bytes, Option<SourceMetadata>)) -> Self {
-					Source::Bytes((SourceBytes::$enum(source.0), source.1))
+				fn from(source: ($bytes, TrackData, SourceMetadata)) -> Self {
+					Source::Bytes((SourceBytes::$enum(source.0), source.1, Some(source.2)))
+				}
+			}
+			impl<TrackData> From<($bytes, TrackData, Option<SourceMetadata>)> for Source<TrackData>
+			where
+				TrackData: ValidTrackData
+			{
+				#[inline]
+				fn from(source: ($bytes, TrackData, Option<SourceMetadata>)) -> Self {
+					Source::Bytes((SourceBytes::$enum(source.0), source.1, source.2))
 				}
 			}
 		)*

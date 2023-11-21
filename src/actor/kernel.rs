@@ -69,7 +69,7 @@ pub(crate) const QUEUE_LEN: usize = 256;
 #[derive(Debug)]
 pub(crate) struct Kernel<TrackData: ValidTrackData> {
 	atomic_state:        Arc<AtomicAudioState>,
-	audio_state:         someday::Writer<AudioState<TrackData>, Signal>,
+	audio_state:         someday::Writer<AudioState<TrackData>, Signal<TrackData>>,
 	playing:             Arc<AtomicBool>,
 	audio_ready_to_recv: Arc<AtomicBool>,
 	shutdown_wait:       Arc<Barrier>,
@@ -109,7 +109,7 @@ pub(crate) struct Channels<TrackData: ValidTrackData> {
 	pub(crate) from_audio: Receiver<AudioToKernel>,
 
 	// [Decode]
-	pub(crate) to_decode:          Sender<KernelToDecode>,
+	pub(crate) to_decode:          Sender<KernelToDecode<TrackData>>,
 	pub(crate) from_decode_seek:   Receiver<Result<(), SeekError>>,
 	pub(crate) from_decode_source: Receiver<Result<(), SourceError>>,
 
@@ -130,9 +130,9 @@ pub(crate) struct Channels<TrackData: ValidTrackData> {
 
 	// Signals that return `Result<T, E>`
 	pub(crate) send_add:          Sender<Result<AudioStateSnapshot<TrackData>, AddError>>,
-	pub(crate) recv_add:          Receiver<Add>,
+	pub(crate) recv_add:          Receiver<Add<TrackData>>,
 	pub(crate) send_add_many:     Sender<Result<AudioStateSnapshot<TrackData>, AddManyError>>,
-	pub(crate) recv_add_many:     Receiver<AddMany>,
+	pub(crate) recv_add_many:     Receiver<AddMany<TrackData>>,
 	pub(crate) send_seek:         Sender<Result<AudioStateSnapshot<TrackData>, SeekError>>,
 	pub(crate) recv_seek:         Receiver<Seek>,
 	pub(crate) send_skip:         Sender<Result<AudioStateSnapshot<TrackData>, SkipError>>,
@@ -153,7 +153,7 @@ pub(crate) struct InitArgs<TrackData: ValidTrackData> {
 	pub(crate) playing:             Arc<AtomicBool>,
 	pub(crate) audio_ready_to_recv: Arc<AtomicBool>,
 	pub(crate) shutdown_wait:       Arc<Barrier>,
-	pub(crate) audio_state:         someday::Writer<AudioState<TrackData>, Signal>,
+	pub(crate) audio_state:         someday::Writer<AudioState<TrackData>, Signal<TrackData>>,
 	pub(crate) channels:            Channels<TrackData>,
 	pub(crate) to_gc:               Sender<AudioState<TrackData>>,
 }
@@ -373,13 +373,15 @@ where
 	}
 
 	#[inline]
-	fn add(&mut self, add: Add, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, AddError>>) {
-		todo!();
-		try_send!(to_engine, Ok(self.commit_push_get()));
+	fn add(&mut self, add: Add<TrackData>, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, AddError>>) {
+		match self.add_commit_push(add) {
+			Ok(_)  => try_send!(to_engine, Ok(self.commit_push_get())),
+			Err(e) => try_send!(to_engine, Err(e)),
+		}
 	}
 
 	#[inline]
-	fn add_many(&mut self, add_many: AddMany, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, AddManyError>>) {
+	fn add_many(&mut self, add_many: AddMany<TrackData>, to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, AddManyError>>) {
 		todo!();
 		try_send!(to_engine, Ok(self.commit_push_get()));
 	}
@@ -388,7 +390,7 @@ where
 	fn seek(
 		&mut self,
 		seek: Seek,
-		to_decode: &Sender<KernelToDecode>,
+		to_decode: &Sender<KernelToDecode<TrackData>>,
 		from_decode_seek: &Receiver<Result<(), SeekError>>,
 		to_engine: &Sender<Result<AudioStateSnapshot<TrackData>, SeekError>>,
 	) {
@@ -448,7 +450,7 @@ where
 		try_send!(to_audio, DiscardCurrentAudio);
 	}
 
-	fn tell_decode_to_discard(&mut self, to_decode: &Sender<KernelToDecode>) {
+	fn tell_decode_to_discard(&mut self, to_decode: &Sender<KernelToDecode<TrackData>>) {
 		try_send!(to_decode, KernelToDecode::DiscardAudioAndStop);
 	}
 
@@ -466,16 +468,16 @@ where
 
 	fn add_commit_push<Input, Output>(&mut self, input: Input) -> Output
 	where
-		Input: Copy,
-		Signal: From<Input>,
-		AudioState<TrackData>: ApplyReturn<Signal, Input, Output>,
+		Input: Clone,
+		Signal<TrackData>: From<Input>,
+		AudioState<TrackData>: ApplyReturn<Signal<TrackData>, Input, Output>,
 	{
 		// SAFETY: Special signals, they must always
 		// be cloned, so they should never be passed
 		// to this function.
 		#[cfg(debug_assertions)]
 		{
-			match input.into() {
+			match input.clone().into() {
 				Signal::Shuffle(_) => panic!("shuffle was passed to add_commit_push()"),
 				Signal::Stop(_)    => panic!("stop was passed to add_commit_push()"),
 				_ => (),

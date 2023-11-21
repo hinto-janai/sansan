@@ -10,7 +10,7 @@ use crate::state::{AudioState,ValidTrackData};
 pub struct Play;
 
 //---------------------------------------------------------------------------------------------------- someday::Apply
-impl<TrackData: ValidTrackData> someday::ApplyReturn<Signal, Play, ()> for AudioState<TrackData> {
+impl<TrackData: ValidTrackData> someday::ApplyReturn<Signal<TrackData>, Play, ()> for AudioState<TrackData> {
 	fn apply_return(s: &mut Play, w: &mut Self, r: &Self) {
 		// INVARIANT: [Kernel] must check these.
 		debug_assert!(w.current.is_some());

@@ -235,7 +235,7 @@ impl From<f32> for Volume {
 }
 
 //---------------------------------------------------------------------------------------------------- someday::ApplyReturn
-impl<TrackData: ValidTrackData> someday::ApplyReturn<Signal, Volume, ()> for AudioState<TrackData> {
+impl<TrackData: ValidTrackData> someday::ApplyReturn<Signal<TrackData>, Volume, ()> for AudioState<TrackData> {
 	fn apply_return(s: &mut Volume, w: &mut Self, _: &Self) {
 		w.volume = *s;
 	}

@@ -10,7 +10,7 @@ use crate::signal::Signal;
 pub(crate) struct Stop;
 
 //---------------------------------------------------------------------------------------------------- someday::ApplyReturn
-impl<TrackData: ValidTrackData> someday::ApplyReturn<Signal, Stop, ()> for AudioState<TrackData> {
+impl<TrackData: ValidTrackData> someday::ApplyReturn<Signal<TrackData>, Stop, ()> for AudioState<TrackData> {
 	fn apply_return(_: &mut Stop, w: &mut Self, _: &Self) {
 		// INVARIANT: [Kernel] checks these.
 		debug_assert!(w.current.is_some() || !w.queue.is_empty());

@@ -21,9 +21,9 @@ use someday::{Apply,ApplyReturn};
 // #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 // #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
-pub(crate) enum Signal {
-	Add(Add),
-	AddMany(AddMany),
+pub(crate) enum Signal<TrackData: ValidTrackData> {
+	Add(Add<TrackData>),
+	AddMany(AddMany<TrackData>),
 	Back(Back),
 	Clear(Clear),
 	Next(Next),
@@ -47,7 +47,7 @@ pub(crate) enum Signal {
 macro_rules! todo_impl_signal {
 	($($signal:ident),* $(,)?) => {
 		$(
-			impl<TrackData: ValidTrackData> ApplyReturn<Signal, $signal, ()> for AudioState<TrackData> {
+			impl<TrackData: ValidTrackData> ApplyReturn<Signal<TrackData>, $signal, ()> for AudioState<TrackData> {
 				fn apply_return(_: &mut $signal, _: &mut Self, _: &Self) {
 					todo!();
 				}
@@ -55,30 +55,30 @@ macro_rules! todo_impl_signal {
 		)*
 	}
 }
-todo_impl_signal!(Add,AddMany,Back,Previous,RemoveRange,Remove,Repeat,Seek,SetIndex,Skip,Next);
+todo_impl_signal!(Back,Previous,RemoveRange,Remove,Repeat,Seek,SetIndex,Skip,Next);
 
 // [Apply] will just call the [ApplyReturn::apply_return]
 // implementation found in each respective signal's file.
-impl<TrackData: ValidTrackData> Apply<Signal> for AudioState<TrackData> {
-	fn apply(patch: &mut Signal, writer: &mut Self, reader: &Self) {
+impl<TrackData: ValidTrackData> Apply<Signal<TrackData>> for AudioState<TrackData> {
+	fn apply(patch: &mut Signal<TrackData>, writer: &mut Self, reader: &Self) {
 		match patch {
-			Signal::Add(signal)         => ApplyReturn::apply_return(signal, writer, reader),
-			Signal::AddMany(signal)     => ApplyReturn::apply_return(signal, writer, reader),
-			Signal::Back(signal)        => ApplyReturn::apply_return(signal, writer, reader),
-			Signal::Clear(signal)       => ApplyReturn::apply_return(signal, writer, reader),
-			Signal::Play(signal)        => ApplyReturn::apply_return(signal, writer, reader),
-			Signal::Pause(signal)       => ApplyReturn::apply_return(signal, writer, reader),
-			Signal::Previous(signal)    => ApplyReturn::apply_return(signal, writer, reader),
-			Signal::RemoveRange(signal) => ApplyReturn::apply_return(signal, writer, reader),
-			Signal::Remove(signal)      => ApplyReturn::apply_return(signal, writer, reader),
-			Signal::Repeat(signal)      => ApplyReturn::apply_return(signal, writer, reader),
-			Signal::Seek(signal)        => ApplyReturn::apply_return(signal, writer, reader),
-			Signal::SetIndex(signal)    => ApplyReturn::apply_return(signal, writer, reader),
-			Signal::Skip(signal)        => ApplyReturn::apply_return(signal, writer, reader),
-			Signal::Stop(signal)        => ApplyReturn::apply_return(signal, writer, reader),
-			Signal::Toggle(signal)      => ApplyReturn::apply_return(signal, writer, reader),
-			Signal::Volume(signal)      => ApplyReturn::apply_return(signal, writer, reader),
-			Signal::Next(signal)        => ApplyReturn::apply_return(signal, writer, reader),
+			Signal::Add(signal)         => drop(ApplyReturn::apply_return(signal, writer, reader)),
+			Signal::AddMany(signal)     => drop(ApplyReturn::apply_return(signal, writer, reader)),
+			Signal::Back(signal)        => drop(ApplyReturn::apply_return(signal, writer, reader)),
+			Signal::Clear(signal)       => drop(ApplyReturn::apply_return(signal, writer, reader)),
+			Signal::Play(signal)        => drop(ApplyReturn::apply_return(signal, writer, reader)),
+			Signal::Pause(signal)       => drop(ApplyReturn::apply_return(signal, writer, reader)),
+			Signal::Previous(signal)    => drop(ApplyReturn::apply_return(signal, writer, reader)),
+			Signal::RemoveRange(signal) => drop(ApplyReturn::apply_return(signal, writer, reader)),
+			Signal::Remove(signal)      => drop(ApplyReturn::apply_return(signal, writer, reader)),
+			Signal::Repeat(signal)      => drop(ApplyReturn::apply_return(signal, writer, reader)),
+			Signal::Seek(signal)        => drop(ApplyReturn::apply_return(signal, writer, reader)),
+			Signal::SetIndex(signal)    => drop(ApplyReturn::apply_return(signal, writer, reader)),
+			Signal::Skip(signal)        => drop(ApplyReturn::apply_return(signal, writer, reader)),
+			Signal::Stop(signal)        => drop(ApplyReturn::apply_return(signal, writer, reader)),
+			Signal::Toggle(signal)      => drop(ApplyReturn::apply_return(signal, writer, reader)),
+			Signal::Volume(signal)      => drop(ApplyReturn::apply_return(signal, writer, reader)),
+			Signal::Next(signal)        => drop(ApplyReturn::apply_return(signal, writer, reader)),
 
 			// SAFETY:
 			// Patches must be deterministic across writer/reader [Apply]'s,
@@ -98,7 +98,7 @@ impl<TrackData: ValidTrackData> Apply<Signal> for AudioState<TrackData> {
 macro_rules! impl_from {
 	($($signal:ident),* $(,)?) => {
 		$(
-			impl From<$signal> for Signal {
+			impl<TrackData: ValidTrackData> From<$signal> for Signal<TrackData> {
 				fn from(value: $signal) -> Self {
 					Signal::$signal(value)
 				}
@@ -106,24 +106,17 @@ macro_rules! impl_from {
 		)*
 	}
 }
+impl_from!(Back,Clear,Next,Play,Pause,Previous,RemoveRange,Remove,Repeat,Seek,SetIndex,Shuffle,Skip,Stop,Toggle,Volume);
 
-impl_from! {
-	Add,
-	AddMany,
-	Back,
-	Clear,
-	Next,
-	Play,
-	Pause,
-	Previous,
-	RemoveRange,
-	Remove,
-	Repeat,
-	Seek,
-	SetIndex,
-	Shuffle,
-	Skip,
-	Stop,
-	Toggle,
-	Volume,
+macro_rules! impl_from_generic {
+	($($signal:ident),* $(,)?) => {
+		$(
+			impl<TrackData: ValidTrackData> From<$signal<TrackData>> for Signal<TrackData> {
+				fn from(value: $signal<TrackData>) -> Self {
+					Signal::$signal(value)
+				}
+			}
+		)*
+	}
 }
+impl_from_generic!(Add,AddMany);
