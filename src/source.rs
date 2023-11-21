@@ -315,13 +315,13 @@ impl Default for Metadata {
 	}
 }
 
-//---------------------------------------------------------------------------------------------------- SourceInner
+//---------------------------------------------------------------------------------------------------- SourceDecode
 // The type the `Decoder` thread wants.
 //
 // This is the type `Decoder` holds onto when decoding a track.
 // It contains the necessary data to decode a particular track,
 // and is created from the public API `Source` type.
-pub(crate) struct SourceInner {
+pub(crate) struct SourceDecode {
 	// The current audio file/sound/source.
 	pub(crate) reader: Box<dyn FormatReader>,
 	// The current audio's decoder
@@ -340,14 +340,14 @@ pub(crate) struct SourceInner {
 	pub(crate) timebase: TimeBase,
 }
 
-impl SourceInner {
+impl SourceDecode {
 	#[cold]
 	#[inline(never)]
-	// Returns a dummy [SourceInner]
+	// Returns a dummy [SourceDecode]
 	// that cannot actually be used.
 	//
 	// This exists so [Decode] does not
-	// have to keep an [Option<SourceInner>].
+	// have to keep an [Option<SourceDecode>].
 	//
 	// INVARIANT:
 	// This must not actually be _used_, as in the
@@ -410,11 +410,11 @@ impl SourceInner {
 	}
 }
 
-//---------------------------------------------------------------------------------------------------- MediaSourceStream -> SourceInner
-impl TryFrom<MediaSourceStream> for SourceInner {
+//---------------------------------------------------------------------------------------------------- MediaSourceStream -> SourceDecode
+impl TryFrom<MediaSourceStream> for SourceDecode {
 	type Error = SourceError;
 
-	fn try_from(mss: MediaSourceStream) -> Result<SourceInner, Self::Error> {
+	fn try_from(mss: MediaSourceStream) -> Result<SourceDecode, Self::Error> {
 		let result = get_probe().format(
 			&Hint::new(),
 			mss,
@@ -477,14 +477,14 @@ impl TryFrom<MediaSourceStream> for SourceInner {
 	}
 }
 
-//---------------------------------------------------------------------------------------------------- Source -> SourceInner
-impl<Data> TryInto<SourceInner> for Source<Data>
+//---------------------------------------------------------------------------------------------------- Source -> SourceDecode
+impl<Data> TryInto<SourceDecode> for Source<Data>
 where
 	Data: ValidData
 {
 	type Error = SourceError;
 
-	fn try_into(self) -> Result<SourceInner, Self::Error> {
+	fn try_into(self) -> Result<SourceDecode, Self::Error> {
 		match self {
 			Self::Path(path) => {
 				let file = File::open(path.0)?;
