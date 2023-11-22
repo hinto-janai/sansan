@@ -3,7 +3,7 @@ use std::{thread::JoinHandle, marker::PhantomData};
 use crossbeam::channel::{Receiver, Select, Sender};
 use crate::{
 	channel,
-	signal::{self,SeekError,Signal},
+	signal::{self,SeekError,Signal,SetTime},
 	source::{Source, SourceDecode},
 	state::{AudioState, ValidData},
 	actor::audio::TookAudioBuffer,
@@ -62,7 +62,7 @@ struct Channels<Data: ValidData> {
 	to_gc:            Sender<SourceDecode>,
 	to_audio:         Sender<ToAudio>,
 	from_audio:       Receiver<TookAudioBuffer>,
-	to_kernel_seek:   Sender<Result<(), SeekError>>,
+	to_kernel_seek:   Sender<Result<SetTime, SeekError>>,
 	to_kernel_source: Sender<Result<(), SourceError>>,
 	from_kernel:      Receiver<KernelToDecode<Data>>,
 }
@@ -93,7 +93,7 @@ pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) from_pool:           Receiver<VecDeque<ToAudio>>,
 	pub(crate) to_audio:            Sender<ToAudio>,
 	pub(crate) from_audio:          Receiver<TookAudioBuffer>,
-	pub(crate) to_kernel_seek:      Sender<Result<(), SeekError>>,
+	pub(crate) to_kernel_seek:      Sender<Result<SetTime, SeekError>>,
 	pub(crate) to_kernel_source:    Sender<Result<(), SourceError>>,
 	pub(crate) from_kernel:         Receiver<KernelToDecode<Data>>,
 	pub(crate) eb_seek:             ErrorBehavior,
@@ -243,7 +243,7 @@ impl<Data: ValidData> Decode<Data> {
 		use KernelToDecode as K;
 		match msg {
 			K::NewSource(source)   => self.new_source(source, &channels.to_gc),
-			K::Seek(seek)          => self.seek(seek),
+			K::Seek(seek)          => self.seek(seek, &channels.to_kernel_seek),
 			K::DiscardAudioAndStop => self.discard_audio_and_stop(),
 		}
 	}
@@ -290,7 +290,7 @@ impl<Data: ValidData> Decode<Data> {
 	}
 
 	#[inline]
-	fn seek(&mut self, seek: signal::Seek) {
+	fn seek(&mut self, seek: signal::Seek, to_kernel_seek: &Sender<Result<SetTime, SeekError>>) {
 		use signal::Seek as S;
 
 		// Get the absolute timestamp of where we'll be seeking.
@@ -337,11 +337,12 @@ impl<Data: ValidData> Decode<Data> {
 		};
 
 		// Attempt seek.
-		if let Err(e) = self.source.reader.seek(
+		match self.source.reader.seek(
 			SeekMode::Coarse,
 			SeekTo::Time { time, track_id: None },
 		) {
-			self.handle_error(e, self.eb_seek, "seek");
+			Ok(_)  => try_send!(to_kernel_seek, Ok(SetTime(time.seconds as f64 + time.frac))),
+			Err(e) => self.handle_error(e, self.eb_seek, "seek"),
 		}
 	}
 

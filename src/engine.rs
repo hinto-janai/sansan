@@ -372,6 +372,7 @@ where
 			audio_state: audio_state_writer,
 			channels,
 			to_gc: k_to_gc,
+			previous_threshold: config.previous_threshold,
 		}).expect("sansan [Engine] - could not spawn [Kernel] thread");
 
 		//-------------------------------------------------------------- Return

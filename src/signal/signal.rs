@@ -3,7 +3,7 @@ use crate::state::{AudioState,ValidData};
 use crate::signal::{
 	Add,AddMany,Back,Clear,Previous,RemoveRange,Remove,
 	Repeat,Seek,SetIndex,Shuffle,Skip,Volume,Play,Pause,
-	Toggle,Stop,InsertMethod,
+	Toggle,Stop,InsertMethod,SetTime,
 	AddError,SeekError,Next,NextError,PreviousError,SkipError,
 	BackError,SetIndexError,RemoveError,RemoveRangeError,
 	AddManyError,
@@ -33,7 +33,13 @@ pub(crate) enum Signal<Data: ValidData> {
 	RemoveRange(RemoveRange),
 	Remove(Remove),
 	Repeat(Repeat),
-	Seek(Seek),
+	// This is just a marker just to update timestamp.
+	// If this goes through to the reader, it means
+	// we suceeded and should update our current timestamp
+	// to this [f64].
+	//
+	// This is used when [Seek]'ing.
+	SetTime(SetTime),
 	SetIndex(SetIndex),
 	Shuffle(Shuffle),
 	Skip(Skip),
@@ -55,7 +61,7 @@ macro_rules! todo_impl_signal {
 		)*
 	}
 }
-todo_impl_signal!(Back,Previous,RemoveRange,Remove,Repeat,Seek,SetIndex,Skip,Next);
+todo_impl_signal!(Previous,RemoveRange,Remove,Repeat,SetTime,SetIndex,Skip,Next);
 
 // [Apply] will just call the [ApplyReturn::apply_return]
 // implementation found in each respective signal's file.
@@ -72,7 +78,7 @@ impl<Data: ValidData> Apply<Signal<Data>> for AudioState<Data> {
 			Signal::RemoveRange(signal) => drop(ApplyReturn::apply_return(signal, writer, reader)),
 			Signal::Remove(signal)      => drop(ApplyReturn::apply_return(signal, writer, reader)),
 			Signal::Repeat(signal)      => drop(ApplyReturn::apply_return(signal, writer, reader)),
-			Signal::Seek(signal)        => drop(ApplyReturn::apply_return(signal, writer, reader)),
+			Signal::SetTime(signal)     => drop(ApplyReturn::apply_return(signal, writer, reader)),
 			Signal::SetIndex(signal)    => drop(ApplyReturn::apply_return(signal, writer, reader)),
 			Signal::Skip(signal)        => drop(ApplyReturn::apply_return(signal, writer, reader)),
 			Signal::Stop(signal)        => drop(ApplyReturn::apply_return(signal, writer, reader)),
@@ -106,7 +112,7 @@ macro_rules! impl_from {
 		)*
 	}
 }
-impl_from!(Back,Clear,Next,Play,Pause,Previous,RemoveRange,Remove,Repeat,Seek,SetIndex,Shuffle,Skip,Stop,Toggle,Volume);
+impl_from!(Back,Clear,Next,Play,Pause,Previous,RemoveRange,Remove,Repeat,SetIndex,SetTime,Shuffle,Skip,Stop,Toggle,Volume);
 
 macro_rules! impl_from_generic {
 	($($signal:ident),* $(,)?) => {

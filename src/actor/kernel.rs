@@ -32,6 +32,7 @@ use crate::{
 		AddError,
 		InsertMethod,
 		Seek,
+		SetTime,
 		SeekError,
 		Next,
 		NextError,
@@ -74,6 +75,7 @@ pub(crate) struct Kernel<Data: ValidData> {
 	audio_ready_to_recv: Arc<AtomicBool>,
 	shutdown_wait:       Arc<Barrier>,
 	to_gc:               Sender<AudioState<Data>>,
+	previous_threshold:  f64,
 }
 
 //---------------------------------------------------------------------------------------------------- Msg
@@ -110,7 +112,7 @@ pub(crate) struct Channels<Data: ValidData> {
 
 	// [Decode]
 	pub(crate) to_decode:          Sender<KernelToDecode<Data>>,
-	pub(crate) from_decode_seek:   Receiver<Result<(), SeekError>>,
+	pub(crate) from_decode_seek:   Receiver<Result<SetTime, SeekError>>,
 	pub(crate) from_decode_source: Receiver<Result<(), SourceError>>,
 
 	// Signals that input/output `()`
@@ -156,6 +158,7 @@ pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) audio_state:         someday::Writer<AudioState<Data>, Signal<Data>>,
 	pub(crate) channels:            Channels<Data>,
 	pub(crate) to_gc:               Sender<AudioState<Data>>,
+	pub(crate) previous_threshold:  f64,
 }
 
 //---------------------------------------------------------------------------------------------------- Kernel Impl
@@ -178,6 +181,7 @@ where
 					audio_state,
 					channels,
 					to_gc,
+					previous_threshold,
 				} = args;
 
 				let this = Kernel {
@@ -187,6 +191,7 @@ where
 					audio_ready_to_recv,
 					shutdown_wait,
 					to_gc,
+					previous_threshold,
 				};
 
 				Kernel::main(this, channels);
@@ -245,7 +250,7 @@ where
 				12 => self.add_many    (try_recv!(c.recv_add_many),     &c.send_add_many),
 				13 => self.seek(try_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),
 				14 => self.skip        (try_recv!(c.recv_skip),         &c.send_skip),
-				15 => self.back        (try_recv!(c.recv_back),         &c.send_back),
+				15 => self.back        (try_recv!(c.recv_back), &c.send_back, &c.to_decode, &c.from_decode_seek),
 				16 => self.set_index   (try_recv!(c.recv_set_index),    &c.send_set_index),
 				17 => self.remove      (try_recv!(c.recv_remove),       &c.send_remove),
 				18 => self.remove_range(try_recv!(c.recv_remove_range), &c.send_remove_range),
@@ -391,7 +396,7 @@ where
 		&mut self,
 		seek: Seek,
 		to_decode: &Sender<KernelToDecode<Data>>,
-		from_decode_seek: &Receiver<Result<(), SeekError>>,
+		from_decode_seek: &Receiver<Result<SetTime, SeekError>>,
 		to_engine: &Sender<Result<AudioStateSnapshot<Data>, SeekError>>,
 	) {
 		// Return error to [Engine] if we don't have a [Source] loaded.
@@ -403,7 +408,10 @@ where
 		// Tell [Decode] to seek, return error if it errors.
 		try_send!(to_decode, KernelToDecode::Seek(seek));
 		match recv!(from_decode_seek) {
-			Ok(_)  => try_send!(to_engine, Ok(self.commit_push_get())),
+			Ok(set_time) => {
+				self.add_commit_push(set_time);
+				try_send!(to_engine, Ok(self.commit_push_get()));
+			},
 			Err(e) => try_send!(to_engine, Err(e)),
 		}
 	}
@@ -415,9 +423,45 @@ where
 	}
 
 	#[inline]
-	fn back(&mut self, back: Back, to_engine: &Sender<Result<AudioStateSnapshot<Data>, BackError>>) {
-		todo!();
-		try_send!(to_engine, Ok(self.commit_push_get()));
+	fn back(
+		&mut self,
+		back: Back,
+		to_engine: &Sender<Result<AudioStateSnapshot<Data>, BackError>>,
+		to_decode: &Sender<KernelToDecode<Data>>,
+		from_decode_seek: &Receiver<Result<SetTime, SeekError>>,
+	) {
+		if self.queue_empty() {
+			return;
+		}
+
+		let back = if let Some(t) = back.threshold {
+			// If the [current] has not passed the
+			// threshold, just seek to the begining.
+			if self.less_than_threshold(t) {
+				// Tell [Decode] to seek, return error if it errors.
+				try_send!(to_decode, KernelToDecode::Seek(Seek::Absolute(0.0)));
+				match recv!(from_decode_seek) {
+					Ok(set_time) => {
+						self.add_commit_push(set_time);
+						try_send!(to_engine, Ok(self.commit_push_get()));
+					},
+					Err(e) => try_send!(to_engine, Err(BackError::Seek(e))),
+				}
+				return;
+			}
+
+			back
+		} else {
+			Back {
+				back: back.back,
+				threshold: Some(self.previous_threshold),
+			}
+		};
+
+		match self.add_commit_push(back) {
+			Ok(_)  => try_send!(to_engine, Ok(self.commit_push_get())),
+			Err(e) => try_send!(to_engine, Err(e)),
+		}
 	}
 
 	#[inline]
@@ -495,5 +539,13 @@ where
 
 	fn get(&self) -> AudioStateSnapshot<Data> {
 		AudioStateSnapshot(self.audio_state.head_remote_ref())
+	}
+
+	fn less_than_threshold(&self, threshold: f64) -> bool {
+		if let Some(current) = &self.audio_state.current {
+			current.elapsed < threshold
+		} else {
+			false
+		}
 	}
 }

@@ -106,7 +106,7 @@ where
 	/// TODO
 	pub index: usize,
 	/// TODO
-	pub elapsed: f32,
+	pub elapsed: f64,
 }
 
 impl<Data> Track<Data>

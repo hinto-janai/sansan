@@ -34,6 +34,9 @@ pub enum Seek {
 	Backward(f64),
 }
 
+#[derive(Copy,Clone,Debug,PartialEq,PartialOrd)]
+pub(crate) struct SetTime(pub(crate) f64);
+
 //---------------------------------------------------------------------------------------------------- SeekError
 /// TODO
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
