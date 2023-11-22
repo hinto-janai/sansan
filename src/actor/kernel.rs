@@ -70,7 +70,11 @@ pub(crate) const QUEUE_LEN: usize = 256;
 #[derive(Debug)]
 pub(crate) struct Kernel<Data: ValidData> {
 	atomic_state:        Arc<AtomicAudioState>,
-	audio_state:         someday::Writer<AudioState<Data>, Signal<Data>>,
+	// The [W]riter half of the [Engine]'s [AudioState].
+	//
+	// This originally was [audio_state] but this field is
+	// accessed a lot, so it is just [w], for [w]riter.
+	w:                   someday::Writer<AudioState<Data>, Signal<Data>>,
 	playing:             Arc<AtomicBool>,
 	audio_ready_to_recv: Arc<AtomicBool>,
 	shutdown_wait:       Arc<Barrier>,
@@ -155,7 +159,7 @@ pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) playing:             Arc<AtomicBool>,
 	pub(crate) audio_ready_to_recv: Arc<AtomicBool>,
 	pub(crate) shutdown_wait:       Arc<Barrier>,
-	pub(crate) audio_state:         someday::Writer<AudioState<Data>, Signal<Data>>,
+	pub(crate) w:         someday::Writer<AudioState<Data>, Signal<Data>>,
 	pub(crate) channels:            Channels<Data>,
 	pub(crate) to_gc:               Sender<AudioState<Data>>,
 	pub(crate) previous_threshold:  f64,
@@ -178,7 +182,7 @@ where
 					playing,
 					audio_ready_to_recv,
 					shutdown_wait,
-					audio_state,
+					w,
 					channels,
 					to_gc,
 					previous_threshold,
@@ -187,7 +191,7 @@ where
 				let this = Kernel {
 					atomic_state,
 					playing,
-					audio_state,
+					w,
 					audio_ready_to_recv,
 					shutdown_wait,
 					to_gc,
@@ -322,8 +326,8 @@ where
 			// INVARIANT: must be [push_clone()], see
 			// [crate::signal::signal.rs]'s [Apply]
 			// implementation for more info.
-			self.audio_state.commit_return(Stop);
-			self.audio_state.push_clone();
+			self.w.commit_return(Stop);
+			self.w.push_clone();
 		}
 	}
 
@@ -342,18 +346,18 @@ where
 
 	#[inline]
 	fn shuffle(&mut self, shuffle: Shuffle) {
-		if self.audio_state.queue.len() > 1 {
+		if self.w.queue.len() > 1 {
 			// INVARIANT: must be [push_clone()], see
 			// [crate::signal::signal.rs]'s [Apply]
 			// implementation for more info.
-			self.audio_state.commit_return(shuffle);
-			self.audio_state.push_clone();
+			self.w.commit_return(shuffle);
+			self.w.push_clone();
 		}
 	}
 
 	#[inline]
 	fn repeat(&mut self, repeat: Repeat) {
-		if self.audio_state.repeat != repeat {
+		if self.w.repeat != repeat {
 			self.atomic_state.repeat.set(repeat);
 			self.add_commit_push(repeat);
 		}
@@ -361,7 +365,7 @@ where
 
 	#[inline]
 	fn volume(&mut self, volume: Volume) {
-		if self.audio_state.volume != volume {
+		if self.w.volume != volume {
 			self.atomic_state.volume.set(volume);
 			self.add_commit_push(volume);
 		}
@@ -425,7 +429,7 @@ where
 	#[inline]
 	fn back(
 		&mut self,
-		back: Back,
+		mut back: Back,
 		to_engine: &Sender<Result<AudioStateSnapshot<Data>, BackError>>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 		from_decode_seek: &Receiver<Result<SetTime, SeekError>>,
@@ -434,9 +438,13 @@ where
 			return;
 		}
 
-		let back = if let Some(t) = back.threshold {
-			// If the [current] has not passed the
-			// threshold, just seek to the begining.
+		// Saturate the [Back] if we would
+		// have gone into negative indices.
+		back.back = std::cmp::min(self.w.queue.len(), back.back);
+
+		// If the [current] has not passed the
+		// threshold, just seek to the beginning.
+		if let Some(t) = back.threshold {
 			if self.less_than_threshold(t) {
 				// Tell [Decode] to seek, return error if it errors.
 				try_send!(to_decode, KernelToDecode::Seek(Seek::Absolute(0.0)));
@@ -449,14 +457,7 @@ where
 				}
 				return;
 			}
-
-			back
-		} else {
-			Back {
-				back: back.back,
-				threshold: Some(self.previous_threshold),
-			}
-		};
+		}
 
 		match self.add_commit_push(back) {
 			Ok(_)  => try_send!(to_engine, Ok(self.commit_push_get())),
@@ -499,15 +500,15 @@ where
 	}
 
 	fn queue_empty(&self) -> bool {
-		self.audio_state.queue.is_empty()
+		self.w.queue.is_empty()
 	}
 
 	fn playing(&self) -> bool {
-		self.audio_state.playing
+		self.w.playing
 	}
 
 	fn source_is_some(&self) -> bool {
-		self.audio_state.current.is_some()
+		self.w.current.is_some()
 	}
 
 	fn add_commit_push<Input, Output>(&mut self, input: Input) -> Output
@@ -528,21 +529,21 @@ where
 			}
 		}
 
-		let output = self.audio_state.commit_return(input);
-		self.audio_state.push();
+		let output = self.w.commit_return(input);
+		self.w.push();
 		output
 	}
 
 	fn commit_push_get(&mut self) -> AudioStateSnapshot<Data> {
-		AudioStateSnapshot(self.audio_state.commit_and().push_and().head_remote_ref())
+		AudioStateSnapshot(self.w.commit_and().push_and().head_remote_ref())
 	}
 
 	fn get(&self) -> AudioStateSnapshot<Data> {
-		AudioStateSnapshot(self.audio_state.head_remote_ref())
+		AudioStateSnapshot(self.w.head_remote_ref())
 	}
 
 	fn less_than_threshold(&self, threshold: f64) -> bool {
-		if let Some(current) = &self.audio_state.current {
+		if let Some(current) = &self.w.current {
 			current.elapsed < threshold
 		} else {
 			false

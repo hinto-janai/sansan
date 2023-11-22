@@ -369,7 +369,7 @@ where
 			playing,
 			audio_ready_to_recv,
 			shutdown_wait: Arc::clone(&shutdown_wait),
-			audio_state: audio_state_writer,
+			w: audio_state_writer,
 			channels,
 			to_gc: k_to_gc,
 			previous_threshold: config.previous_threshold,

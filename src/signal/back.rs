@@ -1,5 +1,5 @@
 //---------------------------------------------------------------------------------------------------- use
-use crate::state::{AudioState,ValidData};
+use crate::state::{AudioState,ValidData,Track};
 use someday::ApplyReturn;
 use crate::signal::{Signal,SeekError};
 use crate::source::Source;
@@ -29,6 +29,11 @@ impl<Data: ValidData> ApplyReturn<Signal<Data>, Back, Result<(), BackError>> for
 		// [Back] if the over(under?)flowed.
 		//
 		// The queue has at least 1 length.
+		w.current = Some(Track {
+			source: w.queue[s.back].clone(),
+			index: 0,
+			elapsed: 0.0,
+		});
 
 		Ok(())
 	}
@@ -44,6 +49,8 @@ impl<Data: ValidData> ApplyReturn<Signal<Data>, Back, Result<(), BackError>> for
 #[serde(rename_all = "snake_case")]
 #[derive(thiserror::Error)]
 pub enum BackError {
+	/// TODO
+	OutOfBounds,
 	/// TODO
 	Seek(SeekError),
 }

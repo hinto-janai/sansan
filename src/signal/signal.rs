@@ -35,7 +35,7 @@ pub(crate) enum Signal<Data: ValidData> {
 	Repeat(Repeat),
 	// This is just a marker just to update timestamp.
 	// If this goes through to the reader, it means
-	// we suceeded and should update our current timestamp
+	// we succeeded and should update our current timestamp
 	// to this [f64].
 	//
 	// This is used when [Seek]'ing.

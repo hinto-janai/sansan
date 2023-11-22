@@ -58,7 +58,7 @@ where
 	// media_controls: bool,
 }
 
-//---------------------------------------------------------------------------------------------------- AudioOutputErrorBehavior
+//---------------------------------------------------------------------------------------------------- ErrorBehavior
 /// The action `sansan` will take on various errors
 ///
 /// `sansan` can error in various situations:
