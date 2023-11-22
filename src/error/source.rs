@@ -28,7 +28,7 @@ pub enum SourceError {
 
 	#[error("failed to find track within the codec")]
 	/// The audio codec did not specify a track
-	Track,
+	Current,
 
 	#[error("failed to find the codecs sample rate")]
 	/// The audio codec did not specify a sample rate

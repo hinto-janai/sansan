@@ -10,7 +10,7 @@ use crate::{
 		ValidData,
 		AtomicAudioState,
 		AudioStateSnapshot,
-		Track
+		Current
 	},
 	actor::{
 		decode::KernelToDecode,

@@ -4,7 +4,7 @@ use crossbeam::channel::{Receiver, Select, Sender};
 use crate::{
 	signal,
 	source::Source,
-	state::{Track,ValidData},
+	state::{Current,ValidData},
 	actor::audio::TookAudioBuffer,
 	actor::decode::DECODE_BUFFER_LEN,
 	actor::kernel::QUEUE_LEN,
@@ -30,7 +30,7 @@ type ToDecode = (AudioBuffer<f32>, Time);
 pub(crate) struct Pool<Data: ValidData> {
 	shutdown_wait: Arc<Barrier>,
 	buffer_decode: VecDeque<ToDecode>,
-	buffer_kernel: VecDeque<Track<Data>>,
+	buffer_kernel: VecDeque<Current<Data>>,
 }
 
 // See [src/actor/kernel.rs]'s [Channels]
@@ -38,10 +38,10 @@ struct Channels<Data: ValidData> {
 	shutdown:     Receiver<()>,
 	to_decode:    Sender<VecDeque<ToDecode>>,
 	from_decode:  Receiver<VecDeque<ToDecode>>,
-	to_kernel:    Sender<VecDeque<Track<Data>>>,
-	from_kernel:  Receiver<VecDeque<Track<Data>>>,
+	to_kernel:    Sender<VecDeque<Current<Data>>>,
+	from_kernel:  Receiver<VecDeque<Current<Data>>>,
 	to_gc_decode: Sender<AudioBuffer<f32>>,
-	to_gc_kernel: Sender<Track<Data>>,
+	to_gc_kernel: Sender<Current<Data>>,
 }
 
 //---------------------------------------------------------------------------------------------------- InitArgs
@@ -50,10 +50,10 @@ pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) shutdown:      Receiver<()>,
 	pub(crate) to_decode:     Sender<VecDeque<ToDecode>>,
 	pub(crate) from_decode:   Receiver<VecDeque<ToDecode>>,
-	pub(crate) to_kernel:     Sender<VecDeque<Track<Data>>>,
-	pub(crate) from_kernel:   Receiver<VecDeque<Track<Data>>>,
+	pub(crate) to_kernel:     Sender<VecDeque<Current<Data>>>,
+	pub(crate) from_kernel:   Receiver<VecDeque<Current<Data>>>,
 	pub(crate) to_gc_decode:  Sender<AudioBuffer<f32>>,
-	pub(crate) to_gc_kernel:  Sender<Track<Data>>,
+	pub(crate) to_gc_kernel:  Sender<Current<Data>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Pool Impl

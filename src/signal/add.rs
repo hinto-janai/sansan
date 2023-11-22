@@ -5,7 +5,7 @@ use strum::{
 	EnumString,EnumVariantNames,IntoStaticStr,
 };
 use someday::ApplyReturn;
-use crate::state::{AudioState,ValidData,Track};
+use crate::state::{AudioState,ValidData,Current};
 use crate::signal::Signal;
 
 //---------------------------------------------------------------------------------------------------- Add

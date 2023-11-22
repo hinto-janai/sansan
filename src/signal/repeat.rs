@@ -20,7 +20,7 @@ pub enum Repeat {
 	/// TODO
 	Off,
 	/// TODO
-	Track,
+	Current,
 	/// TODO
 	Queue,
 }
@@ -33,7 +33,7 @@ impl Repeat {
 	pub(crate) const fn from_u8(u: u8) -> Self {
 		match u {
 			0 => Self::Off,
-			1 => Self::Track,
+			1 => Self::Current,
 			2 => Self::Queue,
 			_ => crate::macros::unreachable2!(),
 		}
@@ -41,9 +41,9 @@ impl Repeat {
 
 	pub(crate) const fn to_u8(self) -> u8 {
 		match self {
-			Self::Off   => 0,
-			Self::Track => 1,
-			Self::Queue => 2,
+			Self::Off     => 0,
+			Self::Current => 1,
+			Self::Queue   => 2,
 		}
 	}
 }

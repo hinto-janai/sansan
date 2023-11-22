@@ -51,7 +51,7 @@ where
 	pub volume: Volume,
 
 	/// The currently playing index in the queue.
-	pub current: Option<Track<Data>>,
+	pub current: Option<Current<Data>>,
 }
 
 //---------------------------------------------------------------------------------------------------- AudioState Impl
@@ -92,12 +92,12 @@ where
 	T: Clone + Send + Sync + 'static
 {}
 
-//---------------------------------------------------------------------------------------------------- Track
+//---------------------------------------------------------------------------------------------------- Current
 /// TODO
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq)]
-pub struct Track<Data>
+pub struct Current<Data>
 where
 	Data: ValidData
 {
@@ -109,7 +109,7 @@ where
 	pub elapsed: f64,
 }
 
-impl<Data> Track<Data>
+impl<Data> Current<Data>
 where
 	Data: ValidData
 {

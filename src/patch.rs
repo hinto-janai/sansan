@@ -1,7 +1,7 @@
 //---------------------------------------------------------------------------------------------------- use
 use someday::{Apply, ApplyReturn};
 use std::collections::VecDeque;
-use crate::audio_state::{AudioState,Track};
+use crate::audio_state::{AudioState,Current};
 use crate::signal;
 
 //---------------------------------------------------------------------------------------------------- PatchClear

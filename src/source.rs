@@ -450,7 +450,7 @@ impl TryFrom<MediaSourceStream> for SourceDecode {
 				codecs.get_codec(t.codec_params.codec).is_some()
 			})
 		else {
-			return Err(SourceError::Track);
+			return Err(SourceError::Current);
 		};
 
 		// Create a decoder for the track.
