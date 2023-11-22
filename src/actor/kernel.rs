@@ -244,7 +244,7 @@ where
 				2  => { try_recv!(c.recv_pause);    self.pause()    },
 				3  => { try_recv!(c.recv_stop);     self.stop()     },
 				4  => self.clear(try_recv!(c.recv_clear)),
-				5  => self.shuffle(try_recv!(c.recv_shuffle)),
+				5  => self.shuffle(try_recv!(c.recv_shuffle), &c.to_decode),
 				6  => { try_recv!(c.recv_next);     self.next()     },
 				7  => { try_recv!(c.recv_previous); self.previous() },
 				8  => self.repeat      (try_recv!(c.recv_repeat)),
@@ -345,12 +345,18 @@ where
 	}
 
 	#[inline]
-	fn shuffle(&mut self, shuffle: Shuffle) {
+	fn shuffle(&mut self, shuffle: Shuffle, to_decode: &Sender<KernelToDecode<Data>>) {
 		if self.w.queue.len() > 1 {
 			// INVARIANT: must be [push_clone()], see
 			// [crate::signal::signal.rs]'s [Apply]
 			// implementation for more info.
-			self.w.commit_return(shuffle);
+			//
+			// This shuffle might be [Shuffle::Reset] which _may_
+			// set our [current] to queue[0], so we must forward
+			// it to [Decode].
+			if let Some(source) = self.w.commit_return(shuffle) {
+				try_send!(to_decode, KernelToDecode::NewSource(source));
+			}
 			self.w.push_clone();
 		}
 	}
