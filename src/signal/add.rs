@@ -5,7 +5,7 @@ use strum::{
 	EnumString,EnumVariantNames,IntoStaticStr,
 };
 use someday::ApplyReturn;
-use crate::state::{AudioState,ValidData, Track};
+use crate::state::{AudioState,ValidData,Track};
 use crate::signal::Signal;
 
 //---------------------------------------------------------------------------------------------------- Add
@@ -128,9 +128,79 @@ where
 	pub play: bool,
 }
 
-impl<Data: ValidData> ApplyReturn<Signal<Data>, AddMany<Data>, Result<(), AddManyError>> for AudioState<Data> {
-	fn apply_return(s: &mut AddMany<Data>, w: &mut Self, _: &Self) -> Result<(), AddManyError> {
-		Ok(())
+impl<Data: ValidData> ApplyReturn<Signal<Data>, AddMany<Data>, Result<Option<Source<Data>>, AddManyError>> for AudioState<Data> {
+	fn apply_return(s: &mut AddMany<Data>, w: &mut Self, _: &Self) -> Result<Option<Source<Data>>, AddManyError> {
+		// INVARIANT:
+		//
+		// [Engine] does 1 check:
+		// - If the [Vec<Source>] is empty.
+		//
+		// So we can assume the [Vec] length is at least 1.
+		//
+		// Other safety checks are not done, we must check those.
+
+		if s.clear {
+			w.queue.clear();
+		}
+
+		// Re-route certain [Index] flavors into
+		// [Back/Front] and do safety checks.
+		let insert = match s.insert {
+			InsertMethod::Index(i) if i == 0             => { InsertMethod::Front },
+			InsertMethod::Index(i) if i == w.queue.len() => { InsertMethod::Back },
+			InsertMethod::Index(i) if i > w.queue.len()  => { return Err(AddManyError::OutOfBounds); },
+			_ => s.insert,
+		};
+
+		// [option] contains the [Source] we (Kernel) should
+		// send to [Decode], if we set our [current] to it.
+		let option = match insert {
+			InsertMethod::Back => {
+				let option = if s.play && w.queue.is_empty() && w.current.is_none() {
+					Some(s.sources[0].clone())
+				} else {
+					None
+				};
+
+				s.sources
+					.iter()
+					.for_each(|source| w.queue.push_back(source.clone()));
+
+				option
+			},
+
+			InsertMethod::Front => {
+				let option = if s.play && w.current.is_none() {
+					Some(s.sources[0].clone())
+				} else {
+					None
+				};
+
+				s.sources
+					.iter()
+					.for_each(|source| w.queue.push_front(source.clone()));
+
+				option
+			},
+
+			InsertMethod::Index(index) => {
+				debug_assert!(index > 0);
+				debug_assert!(index != w.queue.len());
+
+				s.sources
+					.iter()
+					.enumerate()
+					.for_each(|(i, source)| w.queue.insert(i + index, source.clone()));
+
+				None
+			},
+		};
+
+		if s.play {
+			w.playing = true;
+		}
+
+		Ok(option)
 	}
 }
 
