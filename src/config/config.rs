@@ -23,13 +23,13 @@ use strum::{
 // #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug)]
 /// TODO
-pub struct Config<Data, CallbackSender>
+pub struct Config<Data, Sender>
 where
 	Data: ValidData,
-	CallbackSender: SansanSender<()>,
+	Sender: SansanSender<()>,
 {
 	/// TODO
-	pub callbacks: Callbacks<Data, CallbackSender>,
+	pub callbacks: Callbacks<Data, Sender>,
 	/// TODO
 	pub callback_low_priority: bool,
 
@@ -140,10 +140,10 @@ impl Default for ErrorBehavior {
 }
 
 //---------------------------------------------------------------------------------------------------- Config Impl
-impl<Data, CallbackSender> Config<Data, CallbackSender>
+impl<Data, Sender> Config<Data, Sender>
 where
 	Data: ValidData,
-	CallbackSender: SansanSender<()>,
+	Sender: SansanSender<()>,
 {
 	/// Return a reasonable default [`Config`].
 	///
@@ -176,10 +176,10 @@ where
 	};
 }
 
-impl<Data, CallbackSender> Default for Config<Data, CallbackSender>
+impl<Data, Sender> Default for Config<Data, Sender>
 where
 	Data: ValidData,
-	CallbackSender: SansanSender<()>,
+	Sender: SansanSender<()>,
 {
 	fn default() -> Self {
 		Self::DEFAULT

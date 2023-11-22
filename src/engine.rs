@@ -23,13 +23,17 @@ use crate::signal::{
 	BackError,SetIndexError,RemoveError,RemoveRangeError,
 	AddManyError,
 };
-use crossbeam::channel::{Sender,Receiver,bounded,unbounded};
+use crossbeam::channel::{bounded,unbounded};
 use symphonia::core::audio::AudioBuffer;
 use std::sync::{
 	Arc,
 	Barrier,
 	atomic::AtomicBool,
 };
+
+// Prevent collision with [S] generic.
+use crossbeam::channel::Sender as S;
+use crossbeam::channel::Receiver as R;
 
 //---------------------------------------------------------------------------------------------------- Constants
 // Total count of all the "actors" in our system.
@@ -48,70 +52,70 @@ pub(crate) const ACTOR_COUNT: usize = 3;
 //---------------------------------------------------------------------------------------------------- Engine
 /// TODO
 #[derive(Debug)]
-pub struct Engine<Data, CallbackSender>
+pub struct Engine<Data, Sender>
 where
 	Data: ValidData,
-	CallbackSender: SansanSender<()>,
+	Sender: SansanSender<()>,
 {
 	// Data and objects.
 	audio:  AudioStateReader<Data>,
-	_config: PhantomData<CallbackSender>,
+	_config: PhantomData<Sender>,
 
 	// Signal to [Kernel] to tell all of our internal
 	// actors (threads) to start shutting down.
-	shutdown: Sender<()>,
+	shutdown: S<()>,
 	// Same as above, but for [shutdown_hang()].
-	shutdown_hang: Sender<()>,
+	shutdown_hang: S<()>,
 	// [Kernel] telling us the shutdown
 	// process has been completed.
-	shutdown_done: Receiver<()>,
+	shutdown_done: R<()>,
 	// Should we block when shutting down? (`drop()`)
 	shutdown_blocking: bool,
 
 	// Signals that input/output `()`
-	send_toggle:       Sender<()>,
-	send_play:         Sender<()>,
-	send_pause:        Sender<()>,
-	send_next:         Sender<()>,
-	send_previous:     Sender<()>,
-	send_stop:         Sender<()>,
+	send_toggle:       S<()>,
+	send_play:         S<()>,
+	send_pause:        S<()>,
+	send_next:         S<()>,
+	send_previous:     S<()>,
+	send_stop:         S<()>,
 
 	// Signals that have input and output `()`
-	send_clear:        Sender<Clear>,
-	send_restore:      Sender<AudioState<Data>>,
-	send_repeat:       Sender<Repeat>,
-	send_volume:       Sender<Volume>,
-	send_shuffle:      Sender<Shuffle>,
+	send_clear:        S<Clear>,
+	send_restore:      S<AudioState<Data>>,
+	send_repeat:       S<Repeat>,
+	send_volume:       S<Volume>,
+	send_shuffle:      S<Shuffle>,
 
 	// Signals that return `Result<T, E>`
-	send_add:          Sender<Add<Data>>,
-	recv_add:          Receiver<Result<AudioStateSnapshot<Data>, AddError>>,
-	send_add_many:     Sender<AddMany<Data>>,
-	recv_add_many:     Receiver<Result<AudioStateSnapshot<Data>, AddManyError>>,
-	send_seek:         Sender<Seek>,
-	recv_seek:         Receiver<Result<AudioStateSnapshot<Data>, SeekError>>,
-	send_skip:         Sender<Skip>,
-	recv_skip:         Receiver<Result<AudioStateSnapshot<Data>, SkipError>>,
-	send_back:         Sender<Back>,
-	recv_back:         Receiver<Result<AudioStateSnapshot<Data>, BackError>>,
-	send_set_index:    Sender<SetIndex>,
-	recv_set_index:    Receiver<Result<AudioStateSnapshot<Data>, SetIndexError>>,
-	send_remove:       Sender<Remove>,
-	recv_remove:       Receiver<Result<AudioStateSnapshot<Data>, RemoveError>>,
-	send_remove_range: Sender<RemoveRange>,
-	recv_remove_range: Receiver<Result<AudioStateSnapshot<Data>, RemoveRangeError>>,
+	send_add:          S<Add<Data>>,
+	recv_add:          R<Result<AudioStateSnapshot<Data>, AddError>>,
+	send_add_many:     S<AddMany<Data>>,
+	recv_add_many:     R<Result<AudioStateSnapshot<Data>, AddManyError>>,
+	send_seek:         S<Seek>,
+	recv_seek:         R<Result<AudioStateSnapshot<Data>, SeekError>>,
+	send_skip:         S<Skip>,
+	recv_skip:         R<Result<AudioStateSnapshot<Data>, SkipError>>,
+	send_back:         S<Back>,
+	recv_back:         R<Result<AudioStateSnapshot<Data>, BackError>>,
+	send_set_index:    S<SetIndex>,
+	recv_set_index:    R<Result<AudioStateSnapshot<Data>, SetIndexError>>,
+	send_remove:       S<Remove>,
+	recv_remove:       R<Result<AudioStateSnapshot<Data>, RemoveError>>,
+	send_remove_range: S<RemoveRange>,
+	recv_remove_range: R<Result<AudioStateSnapshot<Data>, RemoveRangeError>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Engine Impl
-impl<Data, CallbackSender> Engine<Data, CallbackSender>
+impl<Data, Sender> Engine<Data, Sender>
 where
 	Data: ValidData,
-	CallbackSender: SansanSender<()>,
+	Sender: SansanSender<()>,
 {
 	/// TODO
 	#[cold]
 	#[inline(never)]
-	pub fn init(config: Config<Data, CallbackSender>) -> Result<Self, EngineInitError> {
+	pub fn init(config: Config<Data, Sender>) -> Result<Self, EngineInitError> {
 		// Initialize the `AudioStateReader`.
 		let (audio_state_reader, audio_state_writer) = someday::new(AudioState::DUMMY);
 		let audio_state_reader = AudioStateReader(audio_state_reader);
@@ -153,7 +157,7 @@ where
 		// In the case where we don't need or a response, or rather
 		// the return value is [()], e.g [toggle()], then there
 		// is no need for a [Kernel] ---response---> [Signal] channel,
-		// meaning Signal only owns a Sender, and Kernel only owns a Receiver.
+		// meaning Signal only owns a S, and Kernel only owns a R.
 		//
 		// These are those "no-response-needed" channels.
 		// They are [unbounded()] to allow for immediate return.
@@ -216,11 +220,11 @@ where
 		// If all callbacks are set to [None], then the other
 		// actors will never send a message, therefore we
 		// can safely _not_ spawn [Caller] and drop the
-		// [Receiver] end of the channels.
+		// [R] end of the channels.
 		if callbacks.all_none() {
 			drop((callbacks, shutdown, next, queue_end, repeat, elapsed));
 		} else {
-			Caller::<Data, CallbackSender>::init(crate::actor::caller::InitArgs {
+			Caller::<Data, Sender>::init(crate::actor::caller::InitArgs {
 				low_priority: config.callback_low_priority,
 				callbacks,
 				audio_state:   AudioStateReader::clone(&audio_state_reader),
@@ -539,10 +543,10 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- Drop
-impl<Data, CallbackSender> Drop for Engine<Data, CallbackSender>
+impl<Data, Sender> Drop for Engine<Data, Sender>
 where
 	Data: ValidData,
-	CallbackSender: SansanSender<()>,
+	Sender: SansanSender<()>,
 {
 	#[cold]
 	#[inline(never)]
