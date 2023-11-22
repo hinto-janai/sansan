@@ -5,7 +5,8 @@ use crate::{
 	config::{Callback,Callbacks},
 	state::{AudioState,AudioStateReader,ValidData},
 	macros::{send,try_recv,debug2,try_send},
-	channel::SansanSender,
+	channel::{ValidSender,SansanSender},
+	error::SansanError,
 };
 use std::sync::{
 	Arc,
@@ -16,12 +17,15 @@ use std::sync::{
 //---------------------------------------------------------------------------------------------------- Constants
 
 //---------------------------------------------------------------------------------------------------- Caller
-pub(crate) struct Caller<Data, CallbackSender>
+pub(crate) struct Caller<Data, Sender>
 where
-	Data: ValidData,
-	CallbackSender: SansanSender<()>,
+	Data:   ValidData,
+	Sender: ValidSender,
 {
-	callbacks:     Callbacks<Data, CallbackSender>,
+	cb_next:       Option<Callback<Data, Sender, ()>>,
+	cb_queue_end:  Option<Callback<Data, Sender, ()>>,
+	cb_repeat:     Option<Callback<Data, Sender, ()>>,
+	cb_elapsed:    Option<Callback<Data, Sender, ()>>,
 	audio_state:   AudioStateReader<Data>,
 	shutdown_wait: Arc<Barrier>,
 }
@@ -37,13 +41,16 @@ struct Channels {
 }
 
 //---------------------------------------------------------------------------------------------------- Caller Impl
-pub(crate) struct InitArgs<Data, CallbackSender>
+pub(crate) struct InitArgs<Data, Sender>
 where
-	Data: ValidData,
-	CallbackSender: SansanSender<()>,
+	Data:   ValidData,
+	Sender: ValidSender,
 {
+	pub(crate) cb_next:       Option<Callback<Data, Sender, ()>>,
+	pub(crate) cb_queue_end:  Option<Callback<Data, Sender, ()>>,
+	pub(crate) cb_repeat:     Option<Callback<Data, Sender, ()>>,
+	pub(crate) cb_elapsed:    Option<Callback<Data, Sender, ()>>,
 	pub(crate) low_priority:  bool,
-	pub(crate) callbacks:     Callbacks<Data, CallbackSender>,
 	pub(crate) audio_state:   AudioStateReader<Data>,
 	pub(crate) shutdown_wait: Arc<Barrier>,
 	pub(crate) shutdown:      Receiver<()>,
@@ -54,21 +61,24 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- Caller Impl
-impl<Data, CallbackSender> Caller<Data, CallbackSender>
+impl<Data, Sender> Caller<Data, Sender>
 where
-	Data: ValidData,
-	CallbackSender: SansanSender<()>,
+	Data:   ValidData,
+	Sender: ValidSender,
 {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]
-	pub(crate) fn init(args: InitArgs<Data, CallbackSender>) -> Result<JoinHandle<()>, std::io::Error> {
+	pub(crate) fn init(args: InitArgs<Data, Sender>) -> Result<JoinHandle<()>, std::io::Error> {
 		std::thread::Builder::new()
 			.name("Caller".into())
 			.spawn(move || {
 				let InitArgs {
+					cb_next,
+					cb_queue_end,
+					cb_repeat,
+					cb_elapsed,
 					low_priority,
-					callbacks,
 					audio_state,
 					shutdown_wait,
 					shutdown,
@@ -87,7 +97,10 @@ where
 				};
 
 				let this = Caller {
-					callbacks,
+					cb_next,
+					cb_queue_end,
+					cb_repeat,
+					cb_elapsed,
 					audio_state,
 					shutdown_wait,
 				};
@@ -141,34 +154,31 @@ where
 
 	#[inline]
 	fn next(&mut self) {
-		Self::call(&self.audio_state.get(), &mut self.callbacks.next);
+		Self::call(&self.audio_state.get(), &mut self.cb_next);
 	}
 
 	#[inline]
 	fn queue_end(&mut self) {
-		Self::call(&self.audio_state.get(), &mut self.callbacks.queue_end);
+		Self::call(&self.audio_state.get(), &mut self.cb_queue_end);
 	}
 
 	#[inline]
 	fn repeat(&mut self) {
-		Self::call(&self.audio_state.get(), &mut self.callbacks.repeat);
+		Self::call(&self.audio_state.get(), &mut self.cb_repeat);
 	}
 
 	#[inline]
 	fn elapsed(&mut self) {
-		let audio_state = self.audio_state.get();
-		self.callbacks.elapsed
-			.iter_mut()
-			.for_each(|(cb, _)| cb.call(&audio_state));
+		Self::call(&self.audio_state.get(), &mut self.cb_elapsed);
 	}
 
 	#[inline]
 	fn call(
 		audio_state: &AudioState<Data>,
-		callback: &mut Option<Callback<Data, CallbackSender>>
+		callback: &mut Option<Callback<Data, Sender, ()>>
 	) {
 		if let Some(cb) = callback.as_mut() {
-			cb.call(audio_state);
+			cb.call(audio_state, ());
 		}
 	}
 }

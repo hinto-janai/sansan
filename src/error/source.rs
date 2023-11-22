@@ -24,7 +24,7 @@ pub enum SourceError {
 
 	#[error("failed to create codec decoder: {0}")]
 	/// Error occurred while creating a decoder for the audio codec
-	Decoder(#[from] crate::error::decoder::DecoderError),
+	Decoder(#[from] crate::error::decoder::DecodeError),
 
 	#[error("failed to find track within the codec")]
 	/// The audio codec did not specify a track

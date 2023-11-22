@@ -6,7 +6,7 @@ use crate::source::Source;
 ///
 /// This `enum` represents all the potential errors that can
 /// occur when attempting to decode an audio [`Source`].
-pub enum DecoderError {
+pub enum DecodeError {
 	#[error("the audio data contained malformed data")]
 	/// The audio data contained malformed data
     Decode(&'static str),
@@ -28,7 +28,7 @@ pub enum DecoderError {
 	Unknown,
 }
 
-impl From<symphonia::core::errors::Error> for DecoderError {
+impl From<symphonia::core::errors::Error> for DecodeError {
 	fn from(value: symphonia::core::errors::Error) -> Self {
 		use symphonia::core::errors::Error as E;
 		match value {

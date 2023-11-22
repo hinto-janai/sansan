@@ -11,7 +11,7 @@
 
 //----------------------------------------------------------------------------------------------- use
 use crate::{
-	error::AudioOutputError,
+	error::OutputError,
 	audio::resampler::Resampler,
 	channel::SansanSender, signal::Volume
 };
@@ -42,7 +42,7 @@ where
 		audio: AudioBuffer<f32>,
 		gc: &Sender<AudioBuffer<f32>>,
 		volume: Volume,
-	) -> Result<(), AudioOutputError>;
+	) -> Result<(), OutputError>;
 
 	/// Flush all the current audio in the internal buffer (if any).
 	///
@@ -80,13 +80,13 @@ where
 		//
 		// `None` will pick a reasonable default for low-latency pause/play.
 		buffer_milliseconds: Option<u8>,
-	) -> Result<Self, AudioOutputError>;
+	) -> Result<Self, OutputError>;
 
 	/// Start playback
 	///
 	/// This should "enable" the stream so that it is
 	/// active and playing whatever audio buffers it has.
-	fn play(&mut self) -> Result<(), AudioOutputError>;
+	fn play(&mut self) -> Result<(), OutputError>;
 
 	/// Pause playback
 	///
@@ -95,10 +95,10 @@ where
 	///
 	/// This should _not_ flush the current buffer if any,
 	/// it should solely pause the stream and return immediately.
-	fn pause(&mut self) -> Result<(), AudioOutputError>;
+	fn pause(&mut self) -> Result<(), OutputError>;
 
 	/// `flush()` + `pause()`.
-	fn stop(&mut self) -> Result<(), AudioOutputError> {
+	fn stop(&mut self) -> Result<(), OutputError> {
 		self.flush();
 		self.pause()
 	}
@@ -114,7 +114,7 @@ where
 	fn duration(&self) -> u64;
 
 	/// Toggle playback.
-	fn toggle(&mut self) -> Result<(), AudioOutputError> {
+	fn toggle(&mut self) -> Result<(), OutputError> {
 		if self.is_playing() {
 			self.pause()
 		} else {
@@ -123,7 +123,7 @@ where
 	}
 
 	/// Create a "fake" dummy connection to the audio hardware/server.
-	fn dummy() -> Result<Self, AudioOutputError> {
+	fn dummy() -> Result<Self, OutputError> {
 		let spec = SignalSpec {
 			// INVARIANT: Must be non-zero.
 			rate: 44_100,

@@ -6,7 +6,7 @@
 /// errors, so instead of being generic per backend,
 /// each one will just conform to this enum.
 #[derive(thiserror::Error, Debug)]
-pub enum AudioOutputError {
+pub enum OutputError {
 	#[error("audio stream was closed")]
 	/// The audio stream was closed
 	StreamClosed,

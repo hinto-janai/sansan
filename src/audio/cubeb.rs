@@ -12,7 +12,7 @@ use crate::{
 	signal::Volume,
 	audio::output::AudioOutput,
 	audio::resampler::Resampler,
-	error::AudioOutputError,
+	error::OutputError,
 };
 use symphonia::core::audio::{AudioBuffer,SignalSpec, SampleBuffer,Signal};
 use cubeb::StereoFrame;
@@ -107,7 +107,7 @@ where
 		mut audio: AudioBuffer<f32>,
 		to_gc:  &Sender<AudioBuffer<f32>>,
 		volume: Volume,
-	) -> Result<(), AudioOutputError> {
+	) -> Result<(), OutputError> {
 		// Return if empty audio.
 		if audio.frames() == 0  {
 			return Ok(());
@@ -188,7 +188,7 @@ where
 			false => Ok(()),
 			true  => {
 				self.error.store(false, Ordering::Release);
-				Err(AudioOutputError::Write)
+				Err(OutputError::Write)
 			},
 		}
 	}
@@ -232,11 +232,11 @@ where
 		duration: symphonia::core::units::Duration,
 		disable_device_switch: bool,
 		buffer_milliseconds: Option<u8>,
-	) -> Result<Self, AudioOutputError> {
+	) -> Result<Self, OutputError> {
 		let channels = std::cmp::max(signal_spec.channels.count(), 2);
 		// For the resampler.
 		let Some(channel_count) = NonZeroUsize::new(channels) else {
-			return Err(AudioOutputError::InvalidChannels);
+			return Err(OutputError::InvalidChannels);
 		};
 
 		// INVARIANT:
@@ -248,18 +248,18 @@ where
 		let sample_rate_cubeb = (sample_rate as usize * channels) as u32;
 		// For the resampler.
 		let Some(sample_rate_input) = NonZeroUsize::new(sample_rate as usize) else {
-			return Err(AudioOutputError::InvalidChannels);
+			return Err(OutputError::InvalidChannels);
 		};
 		// Return if somehow the duration is insanely high.
 		let Ok(duration_non_zero) = TryInto::<usize>::try_into(duration) else {
-			return Err(AudioOutputError::InvalidSpec);
+			return Err(OutputError::InvalidSpec);
 		};
 		let Some(duration_non_zero) = NonZeroUsize::new(duration_non_zero) else {
-			return Err(AudioOutputError::InvalidSpec);
+			return Err(OutputError::InvalidSpec);
 		};
 		// Return if somehow the sample rate is insanely high.
 		let Ok(sample_rate) = TryInto::<u32>::try_into(sample_rate) else {
-			return Err(AudioOutputError::InvalidSampleRate);
+			return Err(OutputError::InvalidSampleRate);
 		};
 
 		// TODO: support more than stereo.
@@ -288,7 +288,7 @@ where
 			Ok(c) => c,
 			Err(e) => {
 				use cubeb::ErrorCode as E;
-				use AudioOutputError as E2;
+				use OutputError as E2;
 
 				return Err(match e.code() {
 					E::DeviceUnavailable => E2::DeviceUnavailable,
@@ -359,7 +359,7 @@ where
 			Ok(s) => s,
 			Err(e) => {
 				use cubeb::ErrorCode as E;
-				use AudioOutputError as E2;
+				use OutputError as E2;
 
 				return Err(match e.code() {
 					E::DeviceUnavailable => E2::DeviceUnavailable,
@@ -411,9 +411,9 @@ where
 		})
 	}
 
-	fn play(&mut self) -> Result<(), AudioOutputError> {
+	fn play(&mut self) -> Result<(), OutputError> {
 		use cubeb::ErrorCode as E;
-		use AudioOutputError as E2;
+		use OutputError as E2;
 
 		match self.stream.start() {
 			Ok(_) => { self.playing = true; Ok(()) },
@@ -425,9 +425,9 @@ where
 		}
 	}
 
-	fn pause(&mut self) -> Result<(), AudioOutputError> {
+	fn pause(&mut self) -> Result<(), OutputError> {
 		use cubeb::ErrorCode as E;
-		use AudioOutputError as E2;
+		use OutputError as E2;
 
 		match self.stream.stop() {
 			Ok(_) => { self.playing = false; Ok(()) },

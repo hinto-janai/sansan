@@ -71,7 +71,7 @@ pub use engine::Engine;
 pub mod source;
 // pub use source::{
 	// Source,SourcePath,SourceBytes,
-	// SourceError,DecoderError,Metadata,
+	// SourceError,DecodeError,Metadata,
 // };
 
 pub mod channel;

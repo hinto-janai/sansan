@@ -1,12 +1,13 @@
 //---------------------------------------------------------------------------------------------------- use
 use std::marker::PhantomData;
 use crate::{
+	error::SansanError,
 	config::{
 		callbacks::Callbacks,
 		state::AudioStateConfig,
 	},
 	engine::Engine,
-	channel::SansanSender,
+	channel::{ValidSender,SansanSender},
 	state::{AudioState,ValidData},
 };
 use strum::{
@@ -26,7 +27,7 @@ use strum::{
 pub struct Config<Data, Sender>
 where
 	Data: ValidData,
-	Sender: SansanSender<()>,
+	Sender: ValidSender,
 {
 	/// TODO
 	pub callbacks: Callbacks<Data, Sender>,
@@ -143,7 +144,7 @@ impl Default for ErrorBehavior {
 impl<Data, Sender> Config<Data, Sender>
 where
 	Data: ValidData,
-	Sender: SansanSender<()>,
+	Sender: ValidSender,
 {
 	/// Return a reasonable default [`Config`].
 	///
@@ -179,7 +180,7 @@ where
 impl<Data, Sender> Default for Config<Data, Sender>
 where
 	Data: ValidData,
-	Sender: SansanSender<()>,
+	Sender: ValidSender,
 {
 	fn default() -> Self {
 		Self::DEFAULT

@@ -12,7 +12,7 @@ use crate::{
 		caller::Caller,
 	},
 	audio::{cubeb::Cubeb,rubato::Rubato},
-	channel::SansanSender,
+	channel::{ValidSender,SansanSender},
 	macros::{send,recv,try_send,try_recv},
 	source::Source,
 };
@@ -110,7 +110,7 @@ where
 impl<Data, Sender> Engine<Data, Sender>
 where
 	Data: ValidData,
-	Sender: SansanSender<()>,
+	Sender: ValidSender,
 {
 	/// TODO
 	#[cold]
@@ -204,29 +204,35 @@ where
 		let callbacks = config.callbacks;
 
 		// Initialize [Caller]'s channels.
-		let (c_shutdown,          shutdown)    = bounded(1);
-		let (to_caller_next,      next)        = unbounded();
-		let (to_caller_queue_end, queue_end)   = unbounded();
-		let (to_caller_repeat,    repeat)      = unbounded();
-		let (to_caller_elapsed,   elapsed)     = unbounded();
+		let (c_shutdown,          shutdown)  = bounded(1);
+		let (to_caller_next,      next)      = unbounded();
+		let (to_caller_queue_end, queue_end) = unbounded();
+		let (to_caller_repeat,    repeat)    = unbounded();
+		let (to_caller_elapsed,   elapsed)   = unbounded();
 
+		// The channels _other_ actors use to tell
+		// [Caller] that some event has gone off
+		// and that it should [call()] the callback.
 		let to_caller_next      = if callbacks.next.is_some()      { Some(to_caller_next)      } else { None };
 		let to_caller_queue_end = if callbacks.queue_end.is_some() { Some(to_caller_queue_end) } else { None };
 		let to_caller_repeat    = if callbacks.repeat.is_some()    { Some(to_caller_repeat)    } else { None };
-		let to_caller_elapsed   = callbacks.elapsed.as_ref().and_then(|(_, d)| Some((to_caller_elapsed, d.as_secs_f64())));
+		let to_caller_elapsed   = callbacks.elapsed.as_ref().and_then(|(_, secs)| Some((to_caller_elapsed, *secs)));
 
 		// INVARIANT:
 		//
 		// If all callbacks are set to [None], then the other
 		// actors will never send a message, therefore we
 		// can safely _not_ spawn [Caller] and drop the
-		// [R] end of the channels.
+		// [Receiver] end of the channels.
 		if callbacks.all_none() {
 			drop((callbacks, shutdown, next, queue_end, repeat, elapsed));
 		} else {
 			Caller::<Data, Sender>::init(crate::actor::caller::InitArgs {
-				low_priority: config.callback_low_priority,
-				callbacks,
+				cb_next:       callbacks.next,
+				cb_queue_end:  callbacks.queue_end,
+				cb_repeat:     callbacks.repeat,
+				cb_elapsed:    callbacks.elapsed.and_then(|(cb, _)| Some(cb)),
+				low_priority:  config.callback_low_priority,
 				audio_state:   AudioStateReader::clone(&audio_state_reader),
 				shutdown_wait: Arc::clone(&shutdown_wait),
 				shutdown,

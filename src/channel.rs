@@ -41,6 +41,28 @@
 
 //---------------------------------------------------------------------------------------------------- use
 use std::convert::Infallible;
+use crate::error::{OutputError,DecodeError,SourceError};
+use crate::signal::SeekError;
+
+//---------------------------------------------------------------------------------------------------- Valid
+/// TODO
+pub trait ValidSender
+where
+	Self:
+		SansanSender<()> +
+		SansanSender<OutputError> +
+		SansanSender<DecodeError> +
+		SansanSender<SourceError> +
+{}
+
+impl<T> ValidSender for T
+where
+	T:
+		SansanSender<()> +
+		SansanSender<OutputError> +
+		SansanSender<DecodeError> +
+		SansanSender<SourceError>
+{}
 
 //---------------------------------------------------------------------------------------------------- Sender
 /// A sender side of a channel, that can send the message `T`.
