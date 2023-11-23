@@ -2,58 +2,32 @@
 use std::marker::PhantomData;
 use crate::{
 	error::SansanError,
-	config::callbacks::Callbacks,
+	config::{
+		callbacks::Callbacks,
+		state::AudioStateConfig,
+	},
 	engine::Engine,
 	channel::SansanSender,
 	state::{AudioState,ValidData},
 };
-use strum::{
-	AsRefStr,
-	Display,
-	EnumCount,
-	EnumString,
-	EnumVariantNames,
-	IntoStaticStr,
-};
 
 //---------------------------------------------------------------------------------------------------- Config
-// #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-// #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug)]
 /// TODO
-pub struct Config<Data, Call, Error>
+pub struct EngineConfig<Data, Call, Error>
 where
 	Data: ValidData,
 	Call: SansanSender<()>,
 	Error: SansanSender<SansanError>,
 {
-	//------------------------------------------ Engine
 	/// TODO
 	pub callbacks: Callbacks<Data, Call, Error>,
 	/// TODO
 	pub callback_low_priority: bool,
 	/// TODO
 	pub shutdown_blocking: bool,
-
-	//------------------------------------------ Audio
-	/// TODO
-	pub restore: Option<AudioState<Data>>,
 	/// TODO
 	pub previous_threshold: f64,
-
-	//------------------------------------------ Media Controls
-	/// TODO
-	pub media_controls: bool,
-
-	//------------------------------------------ Error
-	/// TODO
-	pub error_behavior_output: ErrorBehavior,
-	/// TODO
-	pub error_behavior_seek: ErrorBehavior,
-	/// TODO
-	pub error_behavior_decode: ErrorBehavior,
-	/// TODO
-	pub error_behavior_source: ErrorBehavior,
 }
 
 //---------------------------------------------------------------------------------------------------- ErrorBehavior
@@ -168,7 +142,6 @@ where
 	///     restore:               None,
 	///     audio_state:           AudioStateConfig::DEFAULT,
 	///     previous_threshold:    3.0,
-	///     media_controls:        false,
 	///     error_behavior_output: ErrorBehavior::DEFAULT,
 	///     error_behavior_seek:   ErrorBehavior::DEFAULT,
 	///     error_behavior_decode: ErrorBehavior::DEFAULT,
@@ -180,8 +153,8 @@ where
 		callback_low_priority: true,
 		shutdown_blocking:     true,
 		restore:               None,
+		audio_state:           AudioStateConfig::DEFAULT,
 		previous_threshold:    3.0,
-		media_controls:        false,
 		error_behavior_output: ErrorBehavior::DEFAULT,
 		error_behavior_seek:   ErrorBehavior::DEFAULT,
 		error_behavior_decode: ErrorBehavior::DEFAULT,

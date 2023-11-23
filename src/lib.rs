@@ -3,8 +3,6 @@
 //! This is the API reference for [`sansan`](https://github.com/hinto-janai/sansan),
 //! meant to solely document inputs/outputs and other note-worthy things.
 //!
-//! This documentation does not contain detailed commentary on usage.
-//!
 //! See [`sansan.cat`](https://sansan.cat) for a user-guide and
 //! [`examples/`](https://github.com/hinto-janai/sansan/tree/main/examples)
 //! for small example programs.
