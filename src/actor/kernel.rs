@@ -35,7 +35,6 @@ use crate::{
 		SetTime,
 		SeekError,
 		Next,
-		NextError,
 		Previous,
 		PreviousError,
 		Skip,
@@ -379,6 +378,14 @@ where
 
 	#[inline]
 	fn next(&mut self) {
+		// INVARIANT:
+		// Applying [Next] returns an `Option<Source>`.
+		//
+		// `None` means our queue is done, and [Kernel]
+		// must clean the audio state up, and tell everyone else.
+		//
+		// `Some(Source)` means there is a new source to play.
+
 		todo!();
 	}
 

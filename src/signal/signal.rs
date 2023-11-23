@@ -4,7 +4,7 @@ use crate::signal::{
 	Add,AddMany,Back,Clear,Previous,RemoveRange,Remove,
 	Repeat,Seek,SetIndex,Shuffle,Skip,Volume,Play,Pause,
 	Toggle,Stop,InsertMethod,SetTime,
-	AddError,SeekError,Next,NextError,PreviousError,SkipError,
+	AddError,SeekError,Next,PreviousError,SkipError,
 	BackError,SetIndexError,RemoveError,RemoveRangeError,
 	AddManyError,
 };
@@ -61,7 +61,7 @@ macro_rules! todo_impl_signal {
 		)*
 	}
 }
-todo_impl_signal!(Previous,RemoveRange,Remove,Repeat,SetTime,SetIndex,Skip,Next);
+todo_impl_signal!(Previous,RemoveRange,Remove,Repeat,SetTime,SetIndex,Skip);
 
 // [Apply] will just call the [ApplyReturn::apply_return]
 // implementation found in each respective signal's file.

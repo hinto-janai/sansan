@@ -19,7 +19,7 @@ use crate::{
 	signal::{
 		Add,AddMany,Back,Clear,Previous,RemoveRange,Remove,
 		Repeat,Seek,SetIndex,Shuffle,Skip,Volume,InsertMethod,
-		AddError,SeekError,Next,NextError,PreviousError,SkipError,
+		AddError,SeekError,Next,PreviousError,SkipError,
 		BackError,SetIndexError,RemoveError,RemoveRangeError,
 		AddManyError,
 	}

@@ -12,7 +12,7 @@ mod clear;
 pub use clear::Clear;
 
 mod next;
-pub use next::{Next,NextError};
+pub(crate) use next::Next;
 
 mod pause;
 pub(crate) use pause::Pause;
