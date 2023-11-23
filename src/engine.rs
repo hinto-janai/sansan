@@ -2,7 +2,7 @@
 use std::{thread::JoinHandle, marker::PhantomData};
 use crate::{
 	state::{AudioStateSnapshot,AudioStateReader,AudioState,ValidData, AtomicAudioState},
-	config::{Config,Callbacks},
+	config::{Config,Callback,Callbacks},
 	actor::{
 		audio::{Audio,AUDIO_BUFFER_LEN},
 		decode::Decode,
@@ -112,10 +112,51 @@ where
 	Data: ValidData,
 	Sender: ValidSender,
 {
+	//---------------------------------------------------------------------------------------------------- Init
 	/// TODO
 	#[cold]
 	#[inline(never)]
 	pub fn init(config: Config<Data, Sender>) -> Result<Self, EngineInitError> {
+		// Some initial assertions that must be upheld.
+		// These may or may not have been already checked
+		// by other constructors, but we will check again here.
+		{
+			// Callback elapsed seconds must be a normal float.
+			if let Some((_, seconds)) = config.callbacks.elapsed {
+				assert!(seconds.is_normal(), "input seconds was not a normal float: {seconds}");
+			}
+
+			// Previous threshold must be a normal float.
+			assert!(
+				config.previous_threshold.is_normal(),
+				"[config.previous_threshold] was not a normal float: {}",
+				config.previous_threshold,
+			);
+
+			// Check all callbacks aren't the illegal [__Phantom] variant.
+			static CALLBACK_ERROR_MSG: &str =
+				"__Phantom is used for the generic <Msg> bounds. It is not a real variant, do not use it.";
+			macro_rules! callback_check {
+				($callback:ident) => {
+					if let Some(callback) = &config.callbacks.$callback {
+						let s = stringify!($callback);
+						assert!(!matches!(callback, Callback::__Phantom(_)), "{s}: {CALLBACK_ERROR_MSG}");
+					}
+				};
+			}
+			callback_check!(next);
+			callback_check!(queue_end);
+			callback_check!(repeat);
+			callback_check!(error_output);
+			callback_check!(error_decode);
+			callback_check!(error_source);
+
+			// Special callback with tuple, same check.
+			if let Some((callback, _)) = &config.callbacks.elapsed {
+				assert!(!matches!(callback, Callback::__Phantom(_)), "elapsed: {CALLBACK_ERROR_MSG}");
+			}
+		}
+
 		// Initialize the `AudioStateReader`.
 		let (audio_state_reader, audio_state_writer) = someday::new(AudioState::DUMMY);
 		let audio_state_reader = AudioStateReader(audio_state_reader);
@@ -423,6 +464,7 @@ where
 		})
 	}
 
+	//---------------------------------------------------------------------------------------------------- Regular Fn
 	/// TODO
 	pub fn reader(&self) -> AudioStateReader<Data> {
 		AudioStateReader::clone(&self.audio)
