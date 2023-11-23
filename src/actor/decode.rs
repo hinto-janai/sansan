@@ -85,6 +85,7 @@ pub(crate) enum KernelToDecode<Data: ValidData> {
 
 //---------------------------------------------------------------------------------------------------- Decode Impl
 pub(crate) struct InitArgs<Data: ValidData> {
+	pub(crate) init_barrier:        Option<Arc<Barrier>>,
 	pub(crate) audio_ready_to_recv: Arc<AtomicBool>,
 	pub(crate) shutdown_wait:       Arc<Barrier>,
 	pub(crate) shutdown:            Receiver<()>,
@@ -111,6 +112,7 @@ impl<Data: ValidData> Decode<Data> {
 			.name("Decode".into())
 			.spawn(move || {
 				let InitArgs {
+					init_barrier,
 					audio_ready_to_recv,
 					shutdown_wait,
 					shutdown,
@@ -151,7 +153,11 @@ impl<Data: ValidData> Decode<Data> {
 					_p: PhantomData,
 				};
 
-				Decode::main(this, channels)
+				if let Some(init_barrier) = init_barrier {
+					init_barrier.wait();
+				}
+
+				Decode::main(this, channels);
 			})
 	}
 
@@ -357,9 +363,9 @@ impl<Data: ValidData> Decode<Data> {
 		use ErrorBehavior as E;
 
 		match behavior {
-			E::Pause    => (), // TODO: tell [Kernel] to pause
-			E::Continue => (),
-			E::Skip     => (), // TODO: tell [Kernel] to skip
+			E::Pause    => todo!(), // TODO: tell [Kernel] to pause
+			E::Continue => todo!(),
+			E::Skip     => todo!(), // TODO: tell [Kernel] to skip
 			E::Panic    => panic!("{error_type} error: {error}"),
 		}
 	}

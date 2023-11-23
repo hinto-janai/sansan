@@ -84,6 +84,7 @@ pub(crate) enum AudioToKernel {
 
 //---------------------------------------------------------------------------------------------------- Audio Impl
 pub(crate) struct InitArgs {
+	pub(crate) init_barrier:      Option<Arc<Barrier>>,
 	pub(crate) atomic_state:      Arc<AtomicAudioState>,
 	pub(crate) playing:           Arc<AtomicBool>,
 	pub(crate) ready_to_recv:     Arc<AtomicBool>,
@@ -111,6 +112,7 @@ where
 			.name("Audio".into())
 			.spawn(move || {
 				let InitArgs {
+					init_barrier,
 					atomic_state,
 					playing,
 					ready_to_recv,
@@ -151,6 +153,10 @@ where
 					eb_output,
 				};
 
+				if let Some(init_barrier) = init_barrier {
+					init_barrier.wait();
+				}
+
 				Audio::main(this, channels);
 			})
 	}
@@ -158,7 +164,7 @@ where
 	//---------------------------------------------------------------------------------------------------- Main Loop
 	#[cold]
 	#[inline(never)]
-	fn main(mut self, mut channels: Channels) {
+	fn main(mut self, channels: Channels) {
 		// Create channels that we will
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
@@ -171,7 +177,7 @@ where
 			// If we're playing, check if we have samples to play.
 			if self.playing_local {
 				if let Ok(msg) = channels.from_decode.try_recv() {
-					self.play_audio_buffer(msg, &channels.to_gc, &mut channels.to_caller_elapsed);
+					self.play_audio_buffer(msg, &channels.to_gc, &channels.to_caller_elapsed);
 				}
 			}
 
@@ -197,7 +203,7 @@ where
 				// From `Decode`.
 				0 => {
 					let msg = try_recv!(channels.from_decode);
-					self.play_audio_buffer(msg, &channels.to_gc, &mut channels.to_caller_elapsed);
+					self.play_audio_buffer(msg, &channels.to_gc, &channels.to_caller_elapsed);
 				},
 
 				// From `Kernel`.
@@ -235,7 +241,7 @@ where
 		&mut self,
 		msg: (AudioBuffer<f32>, symphonia::core::units::Time),
 		to_gc: &Sender<AudioBuffer<f32>>,
-		to_caller_elapsed: &mut Option<(Sender<()>, f64)>,
+		to_caller_elapsed: &Option<(Sender<()>, f64)>,
 	) {
 		let (audio, time) = msg;
 

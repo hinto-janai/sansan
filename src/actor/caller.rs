@@ -46,6 +46,7 @@ where
 	Data: ValidData,
 	Call: SansanSender<()>,
 {
+	pub(crate) init_barrier:  Option<Arc<Barrier>>,
 	pub(crate) cb_next:       Option<Callback<Data, Call, ()>>,
 	pub(crate) cb_queue_end:  Option<Callback<Data, Call, ()>>,
 	pub(crate) cb_repeat:     Option<Callback<Data, Call, ()>>,
@@ -74,6 +75,7 @@ where
 			.name("Caller".into())
 			.spawn(move || {
 				let InitArgs {
+					init_barrier,
 					cb_next,
 					cb_queue_end,
 					cb_repeat,
@@ -105,14 +107,22 @@ where
 					shutdown_wait,
 				};
 
-				Caller::main(this, channels, low_priority);
+				if let Some(init_barrier) = init_barrier {
+					init_barrier.wait();
+				}
+
+				if low_priority {
+					lpt::lpt();
+				}
+
+				Caller::main(this, channels);
 			})
 	}
 
 	//---------------------------------------------------------------------------------------------------- Main Loop
 	#[cold]
 	#[inline(never)]
-	fn main(mut self, channels: Channels, low_priority: bool) {
+	fn main(mut self, channels: Channels) {
 		// Create channels that we will
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
@@ -122,8 +132,6 @@ where
 		assert_eq!(2, select.recv(&channels.repeat));
 		assert_eq!(3, select.recv(&channels.elapsed));
 		assert_eq!(4, select.recv(&channels.shutdown));
-
-		if low_priority { lpt::lpt(); }
 
 		loop {
 			// Route signal to its appropriate handler function [fn_*()].

@@ -46,6 +46,7 @@ struct Channels<Data: ValidData> {
 
 //---------------------------------------------------------------------------------------------------- InitArgs
 pub(crate) struct InitArgs<Data: ValidData> {
+	pub(crate) init_barrier:  Option<Arc<Barrier>>,
 	pub(crate) shutdown_wait: Arc<Barrier>,
 	pub(crate) shutdown:      Receiver<()>,
 	pub(crate) to_decode:     Sender<VecDeque<ToDecode>>,
@@ -66,6 +67,7 @@ impl<Data: ValidData> Pool<Data> {
 			.name("Pool".into())
 			.spawn(move || {
 				let InitArgs {
+					init_barrier,
 					shutdown_wait,
 					shutdown,
 					to_decode,
@@ -109,7 +111,11 @@ impl<Data: ValidData> Pool<Data> {
 					buffer_kernel,
 				};
 
-				Pool::main(this, channels)
+				if let Some(init_barrier) = init_barrier {
+					init_barrier.wait();
+				}
+
+				Pool::main(this, channels);
 			})
 	}
 

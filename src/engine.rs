@@ -73,7 +73,6 @@ where
 	// [Kernel] telling us the shutdown
 	// process has been completed.
 	shutdown_done: R<()>,
-	// Should we block when shutting down? (`drop()`)
 	shutdown_blocking: bool,
 
 	// Signals that input/output `()`
@@ -118,9 +117,9 @@ where
 	Error: SansanSender<SansanError>,
 {
 	//---------------------------------------------------------------------------------------------------- Init
-	/// TODO
 	#[cold]
 	#[inline(never)]
+	/// TODO
 	pub fn init(config: Config<Data, Call, Error>) -> Result<Self, EngineInitError> {
 		// Some initial assertions that must be upheld.
 		// These may or may not have been already checked
@@ -159,6 +158,26 @@ where
 				assert!(!matches!(callback, Callback::__Phantom(_)), "elapsed: {CALLBACK_ERROR_MSG}");
 			}
 		}
+
+		// If [config.init_blocking] is true, make a [Some(barrier)]
+		// so all actors can wait on it after successful init, else [None].
+		let init_barrier = if config.init_blocking {
+			let mut actor_count = ACTOR_COUNT;
+
+			// If [Media Control] is not spawned
+			if !config.media_controls {
+				actor_count -= 1;
+			}
+
+			// If [Caller] is not spawned
+			if config.callbacks.all_none() {
+				actor_count -= 1;
+			}
+
+			Some(Arc::new(Barrier::new(actor_count)))
+		} else {
+			None
+		};
 
 		// Initialize the `AudioStateReader`.
 		let (audio_state_reader, audio_state_writer) = someday::new(AudioState::DUMMY);
@@ -272,6 +291,7 @@ where
 			drop((callbacks, shutdown, next, queue_end, repeat, elapsed));
 		} else {
 			Caller::<Data, Call>::init(crate::actor::caller::InitArgs {
+				init_barrier:  init_barrier.clone(), // Option<Arc<_>>,
 				cb_next:       callbacks.next,
 				cb_queue_end:  callbacks.queue_end,
 				cb_repeat:     callbacks.repeat,
@@ -305,6 +325,7 @@ where
 		let (a_shutdown, shutdown) = bounded(1);
 		let (a_to_gc, gc_from_a)   = unbounded();
 		Audio::<Cubeb<Rubato>>::init(crate::actor::audio::InitArgs {
+			init_barrier:      init_barrier.clone(), // Option<Arc<_>>,
 			shutdown,
 			atomic_state:      Arc::clone(&atomic_state),
 			playing:           Arc::clone(&playing),
@@ -328,6 +349,7 @@ where
 		let (d_to_p,        p_from_d)        = bounded(1);
 		let (p_to_d,        d_from_p)        = bounded(1);
 		Decode::init(crate::actor::decode::InitArgs {
+			init_barrier:        init_barrier.clone(), // Option<Arc<_>>,
 			audio_ready_to_recv: Arc::clone(&audio_ready_to_recv),
 			shutdown_wait:       Arc::clone(&shutdown_wait),
 			shutdown,
@@ -351,6 +373,7 @@ where
 		let (p_to_gc_d, gc_from_d) = unbounded();
 		let (p_to_gc_k, gc_from_k) = unbounded();
 		Pool::<Data>::init(crate::actor::pool::InitArgs {
+			init_barrier:  init_barrier.clone(), // Option<Arc<_>>,
 			shutdown_wait: Arc::clone(&shutdown_wait),
 			shutdown,
 			to_decode:     p_to_d,
@@ -364,7 +387,8 @@ where
 		//-------------------------------------------------------------- Spawn [Gc]
 		let (gc_shutdown, shutdown)  = bounded(1);
 		let (k_to_gc,     gc_from_k) = unbounded();
-		Gc::<Data>::init(Gc {
+		Gc::<Data>::init(crate::actor::gc::Gc {
+			init_barrier:  init_barrier.clone(), // Option<Arc<_>>,
 			shutdown_wait: Arc::clone(&shutdown_wait),
 			shutdown,
 			from_audio: gc_from_a,
@@ -419,6 +443,7 @@ where
 			recv_remove_range: k_recv_remove_range,
 		};
 		Kernel::<Data>::init(crate::actor::kernel::InitArgs {
+			init_barrier,
 			atomic_state,
 			playing,
 			audio_ready_to_recv,

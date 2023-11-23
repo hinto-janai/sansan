@@ -33,6 +33,8 @@ where
 	/// TODO
 	pub callback_low_priority: bool,
 	/// TODO
+	pub init_blocking: bool,
+	/// TODO
 	pub shutdown_blocking: bool,
 
 	//------------------------------------------ Audio
@@ -178,7 +180,8 @@ where
 	pub const DEFAULT: Self = Self {
 		callbacks:             Callbacks::DEFAULT,
 		callback_low_priority: true,
-		shutdown_blocking:     true,
+		init_blocking:         false,
+		shutdown_blocking:     false,
 		restore:               None,
 		previous_threshold:    3.0,
 		media_controls:        false,

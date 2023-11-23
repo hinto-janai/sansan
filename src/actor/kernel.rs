@@ -154,11 +154,12 @@ pub(crate) struct Channels<Data: ValidData> {
 
 //---------------------------------------------------------------------------------------------------- Kernel Impl
 pub(crate) struct InitArgs<Data: ValidData> {
+	pub(crate) init_barrier:        Option<Arc<Barrier>>,
 	pub(crate) atomic_state:        Arc<AtomicAudioState>,
 	pub(crate) playing:             Arc<AtomicBool>,
 	pub(crate) audio_ready_to_recv: Arc<AtomicBool>,
 	pub(crate) shutdown_wait:       Arc<Barrier>,
-	pub(crate) w:         someday::Writer<AudioState<Data>, Signal<Data>>,
+	pub(crate) w:                   someday::Writer<AudioState<Data>, Signal<Data>>,
 	pub(crate) channels:            Channels<Data>,
 	pub(crate) to_gc:               Sender<AudioState<Data>>,
 	pub(crate) previous_threshold:  f64,
@@ -177,6 +178,7 @@ where
 			.name("Kernel".into())
 			.spawn(move || {
 				let InitArgs {
+					init_barrier,
 					atomic_state,
 					playing,
 					audio_ready_to_recv,
@@ -196,6 +198,10 @@ where
 					to_gc,
 					previous_threshold,
 				};
+
+				if let Some(init_barrier) = init_barrier {
+					init_barrier.wait();
+				}
 
 				Kernel::main(this, channels);
 			})
@@ -222,7 +228,7 @@ where
 		assert_eq!(7,  select.recv(&c.recv_previous));
 		assert_eq!(8,  select.recv(&c.recv_repeat));
 		assert_eq!(9,  select.recv(&c.recv_volume));
-		assert_eq!(10,  select.recv(&c.recv_restore));
+		assert_eq!(10, select.recv(&c.recv_restore));
 		assert_eq!(11, select.recv(&c.recv_add));
 		assert_eq!(12, select.recv(&c.recv_add_many));
 		assert_eq!(13, select.recv(&c.recv_seek));
@@ -248,7 +254,7 @@ where
 				7  => { try_recv!(c.recv_previous); self.previous() },
 				8  => self.repeat      (try_recv!(c.recv_repeat)),
 				9  => self.volume      (try_recv!(c.recv_volume)),
-				10  => self.restore     (try_recv!(c.recv_restore)),
+				10 => self.restore     (try_recv!(c.recv_restore)),
 				11 => self.add         (try_recv!(c.recv_add),          &c.send_add),
 				12 => self.add_many    (try_recv!(c.recv_add_many),     &c.send_add_many),
 				13 => self.seek(try_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),
