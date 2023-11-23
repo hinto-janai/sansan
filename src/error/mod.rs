@@ -7,5 +7,5 @@ pub use source::SourceError;
 mod output;
 pub use output::OutputError;
 
-mod sansan;
-pub use sansan::SansanError;
+mod error;
+pub use error::SansanError;
