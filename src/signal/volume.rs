@@ -1,6 +1,8 @@
 //---------------------------------------------------------------------------------------------------- use
 use crate::state::{AudioState,ValidData};
 use crate::signal::Signal;
+use crate::atomic::AtomicF32;
+use std::sync::atomic::Ordering;
 #[allow(unused_imports)] // docs
 use crate::engine::Engine;
 
@@ -242,35 +244,25 @@ impl<Data: ValidData> someday::ApplyReturn<Signal<Data>, Volume, ()> for AudioSt
 }
 
 //---------------------------------------------------------------------------------------------------- AtomicVolume
-use std::sync::atomic::{AtomicU32,Ordering};
-
-pub(crate) struct AtomicVolume(AtomicU32);
+pub(crate) struct AtomicVolume(AtomicF32);
 
 impl AtomicVolume {
-	/// FIXME: This may not be portable across different platforms.
-	///
-	/// Should equal to `Volume::DEFAULT`'s f32 bits.
-	pub(crate) const DEFAULT_BITS: u32 = 1048576000;
-
-	pub(crate) const DEFAULT: Self = Self(AtomicU32::new(Self::DEFAULT_BITS));
+	pub(crate) const DEFAULT: Self = Self(AtomicF32::SELF_0_25);
 
 	#[cold]
 	#[inline(never)]
 	pub(crate) fn new(volume: Volume) -> Self {
-		let bits = volume.inner().to_bits();
-		Self(AtomicU32::new(bits))
+		Self(AtomicF32::new(volume.inner()))
 	}
 
 	#[inline]
 	pub(crate) fn store(&self, volume: Volume, ordering: Ordering) {
-		let bits = volume.inner().to_bits();
-		self.0.store(bits, ordering);
+		self.0.store(volume.inner(), ordering);
 	}
 
 	#[inline]
 	pub(crate) fn load(&self, ordering: Ordering) -> Volume {
-		let bits = self.0.load(ordering);
-		Volume(f32::from_bits(bits))
+		Volume(self.0.load(ordering))
 	}
 
 	#[inline]
@@ -298,8 +290,8 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn atomic_volume_default_bits() {
-		assert_eq!(Volume::DEFAULT.inner().to_bits(), AtomicVolume::DEFAULT_BITS);
+	fn atomic_volume_default() {
+		assert_eq!(Volume::DEFAULT, AtomicVolume::DEFAULT.get());
 	}
 
 	#[test]
