@@ -5,7 +5,7 @@ use crate::{
 	config::{Callback,Callbacks},
 	state::{AudioState,AudioStateReader,ValidData},
 	macros::{send,try_recv,debug2,try_send},
-	channel::{ValidSender,SansanSender},
+	channel::SansanSender,
 	error::SansanError,
 };
 use std::sync::{
@@ -17,15 +17,15 @@ use std::sync::{
 //---------------------------------------------------------------------------------------------------- Constants
 
 //---------------------------------------------------------------------------------------------------- Caller
-pub(crate) struct Caller<Data, Sender>
+pub(crate) struct Caller<Data, Call>
 where
-	Data:   ValidData,
-	Sender: ValidSender,
+	Data: ValidData,
+	Call: SansanSender<()>,
 {
-	cb_next:       Option<Callback<Data, Sender, ()>>,
-	cb_queue_end:  Option<Callback<Data, Sender, ()>>,
-	cb_repeat:     Option<Callback<Data, Sender, ()>>,
-	cb_elapsed:    Option<Callback<Data, Sender, ()>>,
+	cb_next:       Option<Callback<Data, Call, ()>>,
+	cb_queue_end:  Option<Callback<Data, Call, ()>>,
+	cb_repeat:     Option<Callback<Data, Call, ()>>,
+	cb_elapsed:    Option<Callback<Data, Call, ()>>,
 	audio_state:   AudioStateReader<Data>,
 	shutdown_wait: Arc<Barrier>,
 }
@@ -41,15 +41,15 @@ struct Channels {
 }
 
 //---------------------------------------------------------------------------------------------------- Caller Impl
-pub(crate) struct InitArgs<Data, Sender>
+pub(crate) struct InitArgs<Data, Call>
 where
-	Data:   ValidData,
-	Sender: ValidSender,
+	Data: ValidData,
+	Call: SansanSender<()>,
 {
-	pub(crate) cb_next:       Option<Callback<Data, Sender, ()>>,
-	pub(crate) cb_queue_end:  Option<Callback<Data, Sender, ()>>,
-	pub(crate) cb_repeat:     Option<Callback<Data, Sender, ()>>,
-	pub(crate) cb_elapsed:    Option<Callback<Data, Sender, ()>>,
+	pub(crate) cb_next:       Option<Callback<Data, Call, ()>>,
+	pub(crate) cb_queue_end:  Option<Callback<Data, Call, ()>>,
+	pub(crate) cb_repeat:     Option<Callback<Data, Call, ()>>,
+	pub(crate) cb_elapsed:    Option<Callback<Data, Call, ()>>,
 	pub(crate) low_priority:  bool,
 	pub(crate) audio_state:   AudioStateReader<Data>,
 	pub(crate) shutdown_wait: Arc<Barrier>,
@@ -61,15 +61,15 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- Caller Impl
-impl<Data, Sender> Caller<Data, Sender>
+impl<Data, Call> Caller<Data, Call>
 where
-	Data:   ValidData,
-	Sender: ValidSender,
+	Data: ValidData,
+	Call: SansanSender<()>,
 {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]
-	pub(crate) fn init(args: InitArgs<Data, Sender>) -> Result<JoinHandle<()>, std::io::Error> {
+	pub(crate) fn init(args: InitArgs<Data, Call>) -> Result<JoinHandle<()>, std::io::Error> {
 		std::thread::Builder::new()
 			.name("Caller".into())
 			.spawn(move || {
@@ -175,7 +175,7 @@ where
 	#[inline]
 	fn call(
 		audio_state: &AudioState<Data>,
-		callback: &mut Option<Callback<Data, Sender, ()>>
+		callback: &mut Option<Callback<Data, Call, ()>>
 	) {
 		if let Some(cb) = callback.as_mut() {
 			cb.call(audio_state, ());

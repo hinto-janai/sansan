@@ -7,7 +7,7 @@ use crate::{
 		state::AudioStateConfig,
 	},
 	engine::Engine,
-	channel::{ValidSender,SansanSender},
+	channel::SansanSender,
 	state::{AudioState,ValidData},
 };
 use strum::{
@@ -24,13 +24,14 @@ use strum::{
 // #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug)]
 /// TODO
-pub struct Config<Data, Sender>
+pub struct Config<Data, Call, Error>
 where
 	Data: ValidData,
-	Sender: ValidSender,
+	Call: SansanSender<()>,
+	Error: SansanSender<SansanError>,
 {
 	/// TODO
-	pub callbacks: Callbacks<Data, Sender>,
+	pub callbacks: Callbacks<Data, Call, Error>,
 	/// TODO
 	pub callback_low_priority: bool,
 
@@ -141,16 +142,30 @@ impl Default for ErrorBehavior {
 }
 
 //---------------------------------------------------------------------------------------------------- Config Impl
-impl<Data, Sender> Config<Data, Sender>
+impl<Data, Call, Error> Config<Data, Call, Error>
 where
 	Data: ValidData,
-	Sender: ValidSender,
+	Call: SansanSender<()>,
+	Error: SansanSender<SansanError>,
 {
 	/// Return a reasonable default [`Config`].
 	///
+	/// For the generics:
+	/// - `Data`: 1st `()` means the [`AudioState`] will contain no extra data, or more accurately, `()` will be the extra data
+	/// - `Call`: 2nd `()` means our callback channel (if even provided) will be the `()` channel, or more accurately, it will do nothing
+	/// - `Error`: 3rd `()` means our error callback channel (if even provided) will also do nothing
+	///
+	/// This means, this [`Config`] makes the [`Engine`]
+	/// do nothing on channel-based callbacks, and will
+	/// also not report any errors that occur, since that
+	/// is also `()`.
+	///
+	/// Of course, you can (and probably should) override these generics,
+	/// and provide any custom combination of `Data, Call, Error`.
+	///
 	/// ```rust
 	/// # use sansan::config::*;
-	/// Config::<(), ()> {
+	/// Config::<(), (), ()> {
 	///     callbacks:             Callbacks::DEFAULT,
 	///     callback_low_priority: true,
 	///     shutdown_blocking:     true,
@@ -177,10 +192,11 @@ where
 	};
 }
 
-impl<Data, Sender> Default for Config<Data, Sender>
+impl<Data, Call, Error> Default for Config<Data, Call, Error>
 where
 	Data: ValidData,
-	Sender: ValidSender,
+	Call: SansanSender<()>,
+	Error: SansanSender<SansanError>,
 {
 	fn default() -> Self {
 		Self::DEFAULT

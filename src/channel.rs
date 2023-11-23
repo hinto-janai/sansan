@@ -1,68 +1,48 @@
 //! Channel traits
-//!
-//! [`SansanReceiver`] and [`SansanSender`] are traits that are to
-//! be implemented on channel types, like [`std::sync::mpsc::Sender`].
-//!
-//! Since [`crate::config::Config`]'s [`crate::config::Callback`] enum has a generic
-//! that requires you to specify a channel (even if you aren't using it), these trait's
-//! let you use any channel pairing that can implement `try_send()` and `try_recv()`.
-//!
-//! These two traits are already implemented on:
-//! `std::sync::mpsc::Sender`
-//! `std::sync::mpsc::SyncSender`
-//! `std::sync::mpsc::Receiver`
-//! `crossbeam::channel::Sender`
-//! `crossbeam::channel::Receiver`
-//! `()`
-//!
-//! In cases where you never use the channel variant in [`crate::config::Callback`], you can use
-//! `()` in your generic locations, e.g, `Config<(), ()>` and `Callback<(), ()>` to simplify things.
-//!
-//! `try_send()` and `try_recv()` on `()` will do nothing.
-//!
-//! For example, if you wanted to use the [`std`]'s channels:
-//! ```rust
-//! use sansan::config::{Callback, Callbacks};
-//! use std::sync::mpsc::{channel, Sender};
-//!
-//! // Create an empty `Callbacks`.
-//! let mut callbacks: Callbacks<(), Sender<()>> = Callbacks::new();
-//!
-//! let (send, recv) = channel();
-//!
-//! // Send a channel message every 1 second.
-//! callbacks.elapsed(
-//!     // This takes in anything that implements `SansanSender`,
-//!     // which `std::sync::mpsc::Sender` does.
-//!     Callback::Channel(send),
-//!     std::time::Duration::from_secs(1),
-//! );
-//! ```
+//
+// [`SansanReceiver`] and [`SansanSender`] are traits that are to
+// be implemented on channel types, like [`std::sync::mpsc::Sender`].
+//
+// Since [`crate::config::Config`]'s [`crate::config::Callback`] enum has a generic
+// that requires you to specify a channel (even if you aren't using it), these trait's
+// let you use any channel pairing that can implement `try_send()` and `try_recv()`.
+//
+// These two traits are already implemented on:
+// `std::sync::mpsc::Sender`
+// `std::sync::mpsc::SyncSender`
+// `std::sync::mpsc::Receiver`
+// `crossbeam::channel::Sender`
+// `crossbeam::channel::Receiver`
+// `()`
+//
+// In cases where you never use the channel variant in [`crate::config::Callback`], you can use
+// `()` in your generic locations, e.g, `Config<(), ()>` and `Callback<(), ()>` to simplify things.
+//
+// `try_send()` and `try_recv()` on `()` will do nothing.
+//
+// For example, if you wanted to use the [`std`]'s channels:
+// ```rust
+// use sansan::config::{Callback, Callbacks};
+// use std::sync::mpsc::{channel, Sender};
+//
+// // Create an empty `Callbacks`.
+// let mut callbacks: Callbacks<(), Sender<()>> = Callbacks::new();
+//
+// let (send, recv) = channel();
+//
+// // Send a channel message every 1 second.
+// callbacks.elapsed(
+//     // This takes in anything that implements `SansanSender`,
+//     // which `std::sync::mpsc::Sender` does.
+//     Callback::Channel(send),
+//     std::time::Duration::from_secs(1),
+// );
+// ```
 
 //---------------------------------------------------------------------------------------------------- use
 use std::convert::Infallible;
 use crate::error::{OutputError,DecodeError,SourceError};
 use crate::signal::SeekError;
-
-//---------------------------------------------------------------------------------------------------- Valid
-/// TODO
-pub trait ValidSender
-where
-	Self:
-		SansanSender<()> +
-		SansanSender<OutputError> +
-		SansanSender<DecodeError> +
-		SansanSender<SourceError> +
-{}
-
-impl<T> ValidSender for T
-where
-	T:
-		SansanSender<()> +
-		SansanSender<OutputError> +
-		SansanSender<DecodeError> +
-		SansanSender<SourceError>
-{}
 
 //---------------------------------------------------------------------------------------------------- Sender
 /// A sender side of a channel, that can send the message `T`.
@@ -152,10 +132,10 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- "Fake" Channel
-impl SansanSender<()> for () {
+impl<T: Send + 'static> SansanSender<T> for () {
 	type Error = Infallible;
 	/// This just returns `Ok(())`.
-	fn try_send(&self, _: ()) -> Result<(), Infallible> {
+	fn try_send(&self, _: T) -> Result<(), Infallible> {
 		Ok(())
 	}
 }

@@ -11,17 +11,18 @@ use crate::{
 		gc::Gc,
 		caller::Caller,
 	},
+	error::SansanError,
 	audio::{cubeb::Cubeb,rubato::Rubato},
-	channel::{ValidSender,SansanSender},
+	channel::SansanSender,
 	macros::{send,recv,try_send,try_recv},
 	source::Source,
-};
-use crate::signal::{
-	Add,AddMany,Back,Clear,Previous,RemoveRange,Remove,
-	Repeat,Seek,SetIndex,Shuffle,Skip,Volume,InsertMethod,
-	AddError,SeekError,Next,NextError,PreviousError,SkipError,
-	BackError,SetIndexError,RemoveError,RemoveRangeError,
-	AddManyError,
+	signal::{
+		Add,AddMany,Back,Clear,Previous,RemoveRange,Remove,
+		Repeat,Seek,SetIndex,Shuffle,Skip,Volume,InsertMethod,
+		AddError,SeekError,Next,NextError,PreviousError,SkipError,
+		BackError,SetIndexError,RemoveError,RemoveRangeError,
+		AddManyError,
+	}
 };
 use crossbeam::channel::{bounded,unbounded};
 use symphonia::core::audio::AudioBuffer;
@@ -52,14 +53,17 @@ pub(crate) const ACTOR_COUNT: usize = 3;
 //---------------------------------------------------------------------------------------------------- Engine
 /// TODO
 #[derive(Debug)]
-pub struct Engine<Data, Sender>
+pub struct Engine<Data, Call, Error>
 where
 	Data: ValidData,
-	Sender: SansanSender<()>,
+	Call: SansanSender<()>,
+	Error: SansanSender<SansanError>,
 {
+	// Trait bound.
+	_p: PhantomData<(Call, Error)>,
+
 	// Data and objects.
 	audio:  AudioStateReader<Data>,
-	_config: PhantomData<Sender>,
 
 	// Signal to [Kernel] to tell all of our internal
 	// actors (threads) to start shutting down.
@@ -107,16 +111,17 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- Engine Impl
-impl<Data, Sender> Engine<Data, Sender>
+impl<Data, Call, Error> Engine<Data, Call, Error>
 where
 	Data: ValidData,
-	Sender: ValidSender,
+	Call: SansanSender<()>,
+	Error: SansanSender<SansanError>,
 {
 	//---------------------------------------------------------------------------------------------------- Init
 	/// TODO
 	#[cold]
 	#[inline(never)]
-	pub fn init(config: Config<Data, Sender>) -> Result<Self, EngineInitError> {
+	pub fn init(config: Config<Data, Call, Error>) -> Result<Self, EngineInitError> {
 		// Some initial assertions that must be upheld.
 		// These may or may not have been already checked
 		// by other constructors, but we will check again here.
@@ -147,9 +152,7 @@ where
 			callback_check!(next);
 			callback_check!(queue_end);
 			callback_check!(repeat);
-			callback_check!(error_output);
-			callback_check!(error_decode);
-			callback_check!(error_source);
+			callback_check!(error);
 
 			// Special callback with tuple, same check.
 			if let Some((callback, _)) = &config.callbacks.elapsed {
@@ -268,7 +271,7 @@ where
 		if callbacks.all_none() {
 			drop((callbacks, shutdown, next, queue_end, repeat, elapsed));
 		} else {
-			Caller::<Data, Sender>::init(crate::actor::caller::InitArgs {
+			Caller::<Data, Call>::init(crate::actor::caller::InitArgs {
 				cb_next:       callbacks.next,
 				cb_queue_end:  callbacks.queue_end,
 				cb_repeat:     callbacks.repeat,
@@ -428,8 +431,8 @@ where
 
 		//-------------------------------------------------------------- Return
 		Ok(Self {
+			_p: PhantomData,
 			audio: audio_state_reader,
-			_config: PhantomData,
 			shutdown,
 			shutdown_hang,
 			shutdown_done,
@@ -591,10 +594,11 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- Drop
-impl<Data, Sender> Drop for Engine<Data, Sender>
+impl<Data, Call, Error> Drop for Engine<Data, Call, Error>
 where
 	Data: ValidData,
-	Sender: SansanSender<()>,
+	Call: SansanSender<()>,
+	Error: SansanSender<SansanError>,
 {
 	#[cold]
 	#[inline(never)]
