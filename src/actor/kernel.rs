@@ -4,7 +4,7 @@ use crossbeam::channel::{Sender, Receiver, Select};
 use rand::SeedableRng;
 use someday::ApplyReturn;
 use crate::{
-	macros::{send,recv,try_recv,try_send,debug2},
+	macros::{send,recv,try_recv,try_send,debug2,select_recv},
 	state::{
 		AudioState,
 		ValidData,
@@ -222,10 +222,10 @@ where
 		assert_eq!(1,  select.recv(&c.recv_play));
 		assert_eq!(2,  select.recv(&c.recv_pause));
 		assert_eq!(3,  select.recv(&c.recv_stop));
-		assert_eq!(4,  select.recv(&c.recv_clear));
-		assert_eq!(5,  select.recv(&c.recv_shuffle));
-		assert_eq!(6,  select.recv(&c.recv_next));
-		assert_eq!(7,  select.recv(&c.recv_previous));
+		assert_eq!(4,  select.recv(&c.recv_next));
+		assert_eq!(5,  select.recv(&c.recv_previous));
+		assert_eq!(6,  select.recv(&c.recv_clear));
+		assert_eq!(7,  select.recv(&c.recv_shuffle));
 		assert_eq!(8,  select.recv(&c.recv_repeat));
 		assert_eq!(9,  select.recv(&c.recv_volume));
 		assert_eq!(10, select.recv(&c.recv_restore));
@@ -243,37 +243,40 @@ where
 		// Loop, receiving signals and routing them
 		// to their appropriate handler function.
 		loop {
-			match select.select().index() {
-				0  => { try_recv!(c.recv_toggle);   self.toggle()   },
-				1  => { try_recv!(c.recv_play);     self.play()     },
-				2  => { try_recv!(c.recv_pause);    self.pause()    },
-				3  => { try_recv!(c.recv_stop);     self.stop()     },
-				4  => self.clear(try_recv!(c.recv_clear)),
-				5  => self.shuffle(try_recv!(c.recv_shuffle), &c.to_decode),
-				6  => { try_recv!(c.recv_next);     self.next()     },
-				7  => { try_recv!(c.recv_previous); self.previous() },
-				8  => self.repeat      (try_recv!(c.recv_repeat)),
-				9  => self.volume      (try_recv!(c.recv_volume)),
-				10 => self.restore     (try_recv!(c.recv_restore)),
-				11 => self.add         (try_recv!(c.recv_add),          &c.send_add),
-				12 => self.add_many    (try_recv!(c.recv_add_many),     &c.send_add_many),
-				13 => self.seek(try_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),
-				14 => self.skip        (try_recv!(c.recv_skip),         &c.send_skip),
-				15 => self.back        (try_recv!(c.recv_back), &c.send_back, &c.to_decode, &c.from_decode_seek),
-				16 => self.set_index   (try_recv!(c.recv_set_index),    &c.send_set_index),
-				17 => self.remove      (try_recv!(c.recv_remove),       &c.send_remove),
-				18 => self.remove_range(try_recv!(c.recv_remove_range), &c.send_remove_range),
+			match select.ready() {
+				0  =>                  { select_recv!(c.recv_toggle); self.toggle() },
+				1  =>                  { select_recv!(c.recv_play); self.play() },
+				2  =>                  { select_recv!(c.recv_pause); self.pause() },
+				3  =>                  { select_recv!(c.recv_stop); self.stop() },
+				4  =>                  { select_recv!(c.recv_next); self.next() },
+				5  =>                  { select_recv!(c.recv_previous); self.previous() },
+				6  => self.clear       ( select_recv!(c.recv_clear)),
+				7  => self.shuffle     ( select_recv!(c.recv_shuffle), &c.to_decode),
+				8  => self.repeat      ( select_recv!(c.recv_repeat)),
+				9  => self.volume      ( select_recv!(c.recv_volume)),
+				10 => self.restore     ( select_recv!(c.recv_restore)),
+				11 => self.add         ( select_recv!(c.recv_add), &c.send_add),
+				12 => self.add_many    ( select_recv!(c.recv_add_many), &c.send_add_many),
+				13 => self.seek        ( select_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),
+				14 => self.skip        ( select_recv!(c.recv_skip), &c.send_skip),
+				15 => self.back        ( select_recv!(c.recv_back), &c.send_back, &c.to_decode, &c.from_decode_seek),
+				16 => self.set_index   ( select_recv!(c.recv_set_index), &c.send_set_index),
+				17 => self.remove      ( select_recv!(c.recv_remove), &c.send_remove),
+				18 => self.remove_range( select_recv!(c.recv_remove_range), &c.send_remove_range),
 
 				19 => {
+					select_recv!(c.shutdown);
 					debug2!("Kernel - shutting down");
-					let _ = c.shutdown.try_recv();
+
 					// Tell all actors to shutdown.
 					for actor in c.shutdown_actor.iter() {
 						let _ = actor.try_send(());
 					}
+
 					// Wait until all threads are ready to shutdown.
 					debug2!("Kernel - waiting on others...");
 					self.shutdown_wait.wait();
+
 					// Exit loop (thus, the thread).
 					return;
 				},
@@ -281,14 +284,17 @@ where
 				// hanging [Engine] indicating we're done, which
 				// allows the caller to return.
 				20 => {
+					select_recv!(c.shutdown_hang);
 					debug2!("Kernel - shutting down (hang)");
-					c.shutdown_hang.try_recv().unwrap();
+
 					for actor in c.shutdown_actor.iter() {
 						let _ = actor.try_send(());
 					}
+
 					debug2!("Kernel - waiting on others...");
 					self.shutdown_wait.wait();
 					let _ = c.shutdown_done.try_send(());
+
 					return;
 				},
 

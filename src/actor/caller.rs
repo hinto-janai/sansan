@@ -4,7 +4,7 @@ use crossbeam::channel::{Receiver, Select, Sender};
 use crate::{
 	config::{Callback,Callbacks},
 	state::{AudioState,AudioStateReader,ValidData},
-	macros::{send,try_recv,debug2,try_send},
+	macros::{send,try_recv,debug2,try_send,select_recv},
 	channel::SansanSender,
 	error::SansanError,
 };
@@ -135,15 +135,15 @@ where
 
 		loop {
 			// Route signal to its appropriate handler function [fn_*()].
-			match select.select().index() {
-				0 => { try_recv!(channels.next);      self.next(); },
-				1 => { try_recv!(channels.queue_end); self.queue_end(); },
-				2 => { try_recv!(channels.repeat);    self.repeat(); },
-				3 => { try_recv!(channels.elapsed);   self.elapsed(); },
+			match select.ready() {
+				0 => { select_recv!(channels.next);      self.next(); },
+				1 => { select_recv!(channels.queue_end); self.queue_end(); },
+				2 => { select_recv!(channels.repeat);    self.repeat(); },
+				3 => { select_recv!(channels.elapsed);   self.elapsed(); },
 
 				4 => {
+					select_recv!(channels.shutdown);
 					debug2!("Caller - shutting down");
-					channels.shutdown.try_recv().unwrap();
 					// Wait until all threads are ready to shutdown.
 					debug2!("Caller - waiting on others...");
 					self.shutdown_wait.wait();

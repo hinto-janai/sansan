@@ -45,7 +45,7 @@ pub(crate) use send;
 macro_rules! try_send {
     ($channel:expr, $($msg:tt)+) => {
 		if cfg!(debug_assertions) {
-        	$channel.send($($msg)+).unwrap()
+        	$channel.try_send($($msg)+).unwrap()
 		} else {
 	        unsafe { $channel.try_send($($msg)+).unwrap_unchecked() }
 		}
@@ -57,13 +57,29 @@ pub(crate) use try_send;
 macro_rules! try_recv {
     ($channel:expr) => {
 		if cfg!(debug_assertions) {
-        	$channel.recv().unwrap()
+        	$channel.try_recv().unwrap()
 		} else {
 	        unsafe { $channel.try_recv().unwrap_unchecked() }
 		}
     }
 }
 pub(crate) use try_recv;
+
+// `recv` a [Select] operation channel message.
+//
+// These select operations get triggered spuriously,
+// so we have to make sure something was actually
+// sent to the channel, else, we [continue] in
+// whatever loop we are in.
+macro_rules! select_recv {
+	($channel:expr) => {
+		match $channel.try_recv() {
+			Ok(msg) => msg,
+			_ => continue,
+		}
+	}
+}
+pub(crate) use select_recv;
 
 //---------------------------------------------------------------------------------------------------- Logging
 // Logs with `log` but only if in debug

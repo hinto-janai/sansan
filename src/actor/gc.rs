@@ -5,7 +5,7 @@ use std::{
 };
 use crate::{
 	state::{AudioState,ValidData,Current},
-	macros::{debug2,warn2,try_recv},
+	macros::{debug2,warn2,try_recv,select_recv},
 	source::SourceDecode,
 };
 use crossbeam::channel::{Receiver, Select};
@@ -57,16 +57,15 @@ impl<Data: ValidData> Gc<Data> {
 
 		// Loop, receive garbage, and immediately drop it.
 		loop {
-			let signal = select.select();
-			match signal.index() {
-				0 => drop(try_recv!(self.from_audio)),
-				1 => drop(try_recv!(self.from_decode)),
-				2 => drop(try_recv!(self.from_kernel)),
-				3 => drop(try_recv!(self.from_pool_decode)),
-				4 => drop(try_recv!(self.from_pool_kernel)),
+			match select.select().index() {
+				0 => drop(self.from_audio.try_recv()),
+				1 => drop(self.from_decode.try_recv()),
+				2 => drop(self.from_kernel.try_recv()),
+				3 => drop(self.from_pool_decode.try_recv()),
+				4 => drop(self.from_pool_kernel.try_recv()),
 				5 => {
+					select_recv!(self.shutdown);
 					debug2!("Gc - shutting down");
-					self.shutdown.try_recv().unwrap();
 					debug2!("Gc - waiting on others...");
 					// Wait until all threads are ready to shutdown.
 					self.shutdown_wait.wait();

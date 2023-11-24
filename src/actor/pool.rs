@@ -8,7 +8,7 @@ use crate::{
 	actor::audio::TookAudioBuffer,
 	actor::decode::DECODE_BUFFER_LEN,
 	actor::kernel::QUEUE_LEN,
-	macros::{recv,send,try_send,try_recv,debug2},
+	macros::{recv,send,try_send,try_recv,debug2,select_recv},
 };
 use symphonia::core::{audio::AudioBuffer, units::Time};
 use std::{
@@ -122,13 +122,15 @@ impl<Data: ValidData> Pool<Data> {
 		// Loop, receiving signals and routing them
 		// to their appropriate handler function.
 		loop {
-			let signal = select.select();
-			match signal.index() {
-				0 => self.from_decode(&channels),
+			match select.ready() {
+				0 => {
+					select_recv!(channels.from_decode);
+					self.from_decode(&channels);
+				},
 				// 1 => self.from_kernel(&channels),
 				1 => {
+					select_recv!(channels.shutdown);
 					debug2!("Pool - shutting down");
-					channels.shutdown.try_recv().unwrap();
 					debug2!("Pool - waiting on others...");
 					// Wait until all threads are ready to shutdown.
 					self.shutdown_wait.wait();

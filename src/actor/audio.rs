@@ -21,7 +21,7 @@ use crate::audio::{
 	cubeb::Cubeb,
 	rubato::Rubato,
 };
-use crate::macros::{send,try_recv,debug2,try_send};
+use crate::macros::{send,try_recv,debug2,try_send,select_recv};
 use crate::signal::Volume;
 use crate::state::AtomicAudioState;
 
@@ -182,7 +182,7 @@ where
 			}
 
 			// Attempt to receive signal from other actors.
-			let signal = match select.try_select() {
+			let select_index = match select.try_ready() {
 				Ok(s) => s,
 				_ => {
 					// If we're playing, continue to
@@ -193,29 +193,29 @@ where
 					// Else, hang until we receive
 					// a message from somebody.
 					} else {
-						select.select()
+						select.ready()
 					}
 				},
 			};
 
 			// Route signal to its appropriate handler function [fn_*()].
-			match signal.index() {
+			match select_index {
 				// From `Decode`.
 				0 => {
-					let msg = try_recv!(channels.from_decode);
+					let msg = select_recv!(channels.from_decode);
 					self.play_audio_buffer(msg, &channels.to_gc, &channels.to_caller_elapsed);
 				},
 
 				// From `Kernel`.
 				1 => {
-					let msg = try_recv!(channels.from_kernel);
+					let msg = select_recv!(channels.from_kernel);
 					self.discard_audio(&channels.from_decode, &channels.to_gc);
 				},
 
 				// Shutdown.
 				2 => {
+					select_recv!(channels.shutdown);
 					debug2!("Audio - shutting down");
-					channels.shutdown.try_recv().unwrap();
 					// Wait until all threads are ready to shutdown.
 					debug2!("Audio - waiting on others...");
 					self.shutdown_wait.wait();
