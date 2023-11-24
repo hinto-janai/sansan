@@ -30,7 +30,7 @@ type ToDecode = (AudioBuffer<f32>, Time);
 pub(crate) struct Pool<Data: ValidData> {
 	shutdown_wait: Arc<Barrier>,
 	buffer_decode: VecDeque<ToDecode>,
-	buffer_kernel: VecDeque<Current<Data>>,
+	_p: PhantomData<Data>,
 }
 
 // See [src/actor/kernel.rs]'s [Channels]
@@ -38,8 +38,6 @@ struct Channels<Data: ValidData> {
 	shutdown:     Receiver<()>,
 	to_decode:    Sender<VecDeque<ToDecode>>,
 	from_decode:  Receiver<VecDeque<ToDecode>>,
-	to_kernel:    Sender<VecDeque<Current<Data>>>,
-	from_kernel:  Receiver<VecDeque<Current<Data>>>,
 	to_gc_decode: Sender<AudioBuffer<f32>>,
 	to_gc_kernel: Sender<Current<Data>>,
 }
@@ -51,8 +49,6 @@ pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) shutdown:      Receiver<()>,
 	pub(crate) to_decode:     Sender<VecDeque<ToDecode>>,
 	pub(crate) from_decode:   Receiver<VecDeque<ToDecode>>,
-	pub(crate) to_kernel:     Sender<VecDeque<Current<Data>>>,
-	pub(crate) from_kernel:   Receiver<VecDeque<Current<Data>>>,
 	pub(crate) to_gc_decode:  Sender<AudioBuffer<f32>>,
 	pub(crate) to_gc_kernel:  Sender<Current<Data>>,
 }
@@ -72,8 +68,6 @@ impl<Data: ValidData> Pool<Data> {
 					shutdown,
 					to_decode,
 					from_decode,
-					to_kernel,
-					from_kernel,
 					to_gc_decode,
 					to_gc_kernel,
 				} = args;
@@ -90,17 +84,12 @@ impl<Data: ValidData> Pool<Data> {
 				// allocation optimization black magic.
 				let buffer_to_decode = VecDeque::with_capacity(DECODE_BUFFER_LEN);
 				let buffer_decode    = VecDeque::with_capacity(DECODE_BUFFER_LEN);
-				let buffer_to_kernel = VecDeque::with_capacity(QUEUE_LEN);
-				let buffer_kernel    = VecDeque::with_capacity(QUEUE_LEN);
 				to_decode.try_send(buffer_to_decode).unwrap();
-				to_kernel.try_send(buffer_to_kernel).unwrap();
 
 				let channels = Channels {
 					shutdown,
 					to_decode,
 					from_decode,
-					to_kernel,
-					from_kernel,
 					to_gc_decode,
 					to_gc_kernel,
 				};
@@ -108,7 +97,7 @@ impl<Data: ValidData> Pool<Data> {
 				let this = Pool {
 					shutdown_wait,
 					buffer_decode,
-					buffer_kernel,
+					_p: PhantomData,
 				};
 
 				if let Some(init_barrier) = init_barrier {
@@ -128,8 +117,7 @@ impl<Data: ValidData> Pool<Data> {
 		let mut select  = Select::new();
 
 		assert_eq!(0, select.recv(&channels.from_decode));
-		assert_eq!(1, select.recv(&channels.from_kernel));
-		assert_eq!(2, select.recv(&channels.shutdown));
+		assert_eq!(1, select.recv(&channels.shutdown));
 
 		// Loop, receiving signals and routing them
 		// to their appropriate handler function.
@@ -137,10 +125,11 @@ impl<Data: ValidData> Pool<Data> {
 			let signal = select.select();
 			match signal.index() {
 				0 => self.from_decode(&channels),
-				1 => self.from_kernel(&channels),
-				2 => {
+				// 1 => self.from_kernel(&channels),
+				1 => {
 					debug2!("Pool - shutting down");
 					channels.shutdown.try_recv().unwrap();
+					debug2!("Pool - waiting on others...");
 					// Wait until all threads are ready to shutdown.
 					self.shutdown_wait.wait();
 					// Exit loop (thus, the thread).
@@ -180,17 +169,17 @@ impl<Data: ValidData> Pool<Data> {
 		self.buffer_decode.reserve_exact(DECODE_BUFFER_LEN);
 	}
 
-	#[inline]
-	fn from_kernel(&mut self, channels: &Channels<Data>) {
-		let mut buffer = try_recv!(channels.from_kernel);
+	// #[inline]
+	// fn from_kernel(&mut self, channels: &Channels<Data>) {
+	// 	let mut buffer = try_recv!(channels.from_kernel);
 
-		std::mem::swap(&mut self.buffer_kernel, &mut buffer);
-		try_send!(channels.to_kernel, buffer);
+	// 	std::mem::swap(&mut self.buffer_kernel, &mut buffer);
+	// 	try_send!(channels.to_kernel, buffer);
 
-		self.buffer_kernel
-			.drain(..)
-			.for_each(|track| try_send!(channels.to_gc_kernel, track));
+	// 	self.buffer_kernel
+	// 		.drain(..)
+	// 		.for_each(|track| try_send!(channels.to_gc_kernel, track));
 
-		self.buffer_kernel.reserve_exact(QUEUE_LEN);
-	}
+	// 	self.buffer_kernel.reserve_exact(QUEUE_LEN);
+	// }
 }

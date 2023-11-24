@@ -145,6 +145,7 @@ where
 					debug2!("Caller - shutting down");
 					channels.shutdown.try_recv().unwrap();
 					// Wait until all threads are ready to shutdown.
+					debug2!("Caller - waiting on others...");
 					self.shutdown_wait.wait();
 					// Exit loop (thus, the thread).
 					return;

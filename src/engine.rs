@@ -14,7 +14,7 @@ use crate::{
 	error::SansanError,
 	audio::{cubeb::Cubeb,rubato::Rubato},
 	channel::SansanSender,
-	macros::{send,recv,try_send,try_recv},
+	macros::{send,recv,try_send,try_recv,debug2},
 	source::Source,
 	signal::{
 		Add,AddMany,Back,Clear,Previous,RemoveRange,Remove,
@@ -48,7 +48,7 @@ use crossbeam::channel::Receiver as R;
 // [6] Gc (Garbage Collector)
 //
 // TODO: finalize all actors
-pub(crate) const ACTOR_COUNT: usize = 3;
+pub(crate) const ACTOR_COUNT: usize = 7;
 
 //---------------------------------------------------------------------------------------------------- Engine
 /// TODO
@@ -161,20 +161,26 @@ where
 
 		// If [config.init_blocking] is true, make a [Some(barrier)]
 		// so all actors can wait on it after successful init, else [None].
-		let init_barrier = if config.init_blocking {
-			let mut actor_count = ACTOR_COUNT;
+		let effective_actor_count = {
+			let mut count = ACTOR_COUNT;
 
 			// If [Media Control] is not spawned
 			if !config.media_controls {
-				actor_count -= 1;
+				count -= 1;
 			}
 
 			// If [Caller] is not spawned
 			if config.callbacks.all_none() {
-				actor_count -= 1;
+				count -= 1;
 			}
 
-			Some(Arc::new(Barrier::new(actor_count)))
+			debug2!("Engine - actor count: {count}");
+
+			count
+		};
+
+		let init_barrier = if config.init_blocking {
+			Some(Arc::new(Barrier::new(effective_actor_count)))
 		} else {
 			None
 		};
@@ -190,7 +196,7 @@ where
 		// exited and dropped a channel, while another thread
 		// hasn't yet exited and has [send()]'ed a message,
 		// causing a panic.
-		let shutdown_wait = Arc::new(Barrier::new(ACTOR_COUNT));
+		let shutdown_wait = Arc::new(Barrier::new(effective_actor_count));
 
 		// Initialize the "AtomicAudioState".
 		//
@@ -368,18 +374,14 @@ where
 
 		//-------------------------------------------------------------- Spawn [Pool]
 		let (p_shutdown, shutdown) = bounded(1);
-		let (p_to_k,    k_from_p)  = bounded(1); // TODO: get rid of
-		let (k_to_p,    p_from_k)  = bounded(1); // TODO: get rid of
-		let (p_to_gc_d, gc_from_d) = unbounded();
-		let (p_to_gc_k, gc_from_k) = unbounded();
+		let (p_to_gc_d, gc_from_p_d) = unbounded();
+		let (p_to_gc_k, gc_from_p_k) = unbounded();
 		Pool::<Data>::init(crate::actor::pool::InitArgs {
 			init_barrier:  init_barrier.clone(), // Option<Arc<_>>,
 			shutdown_wait: Arc::clone(&shutdown_wait),
 			shutdown,
 			to_decode:     p_to_d,
 			from_decode:   p_from_d,
-			to_kernel:     p_to_k,
-			from_kernel:   p_from_k,
 			to_gc_decode:  p_to_gc_d,
 			to_gc_kernel:  p_to_gc_k,
 		}).expect("sansan [Engine] - could not spawn [Pool] thread");
@@ -391,15 +393,17 @@ where
 			init_barrier:  init_barrier.clone(), // Option<Arc<_>>,
 			shutdown_wait: Arc::clone(&shutdown_wait),
 			shutdown,
-			from_audio: gc_from_a,
-			from_decode: gc_from_d,
-			from_kernel: gc_from_k,
+			from_audio:       gc_from_a,
+			from_decode:      gc_from_d,
+			from_kernel:      gc_from_k,
+			from_pool_decode: gc_from_p_d,
+			from_pool_kernel: gc_from_p_k,
 		}).expect("sansan [Engine] - could not spawn [Gc] thread");
 
 		//-------------------------------------------------------------- Spawn [Kernel]
 		let (shutdown, k_shutdown)           = bounded(1);
-		let (shutdown_hang, k_shutdown_hang) = bounded(0);
-		let (k_shutdown_done, shutdown_done) = bounded(0);
+		let (shutdown_hang, k_shutdown_hang) = bounded(1);
+		let (k_shutdown_done, shutdown_done) = bounded(1);
 		let channels = crate::actor::kernel::Channels {
 			shutdown: k_shutdown,
 			shutdown_hang: k_shutdown_hang,
@@ -408,6 +412,8 @@ where
 				a_shutdown,
 				d_shutdown,
 				gc_shutdown,
+				p_shutdown,
+				c_shutdown,
 			]),
 			recv_toggle,
 			recv_play,
