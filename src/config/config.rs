@@ -166,9 +166,9 @@ where
 	/// Config::<(), (), ()> {
 	///     callbacks:             Callbacks::DEFAULT,
 	///     callback_low_priority: true,
-	///     shutdown_blocking:     true,
+	///     init_blocking:         false,
+	///     shutdown_blocking:     false,
 	///     restore:               None,
-	///     audio_state:           AudioStateConfig::DEFAULT,
 	///     previous_threshold:    3.0,
 	///     media_controls:        false,
 	///     error_behavior_output: ErrorBehavior::DEFAULT,
