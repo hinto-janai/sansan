@@ -631,13 +631,13 @@ where
 		if self.shutdown_blocking {
 			// Tell [Kernel] to shutdown,
 			// and to tell us when it's done.
-			try_send!(self.shutdown_hang, ());
+			self.shutdown_hang.try_send(()).unwrap();
 			// Hang until [Kernel] responds.
-			recv!(self.shutdown_done);
+			self.shutdown_done.recv().unwrap();
 		} else {
 			// Tell [Kernel] to shutdown,
 			// and to not notify us.
-			try_send!(self.shutdown, ());
+			self.shutdown.try_send(()).unwrap();
 		}
 	}
 }

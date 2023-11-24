@@ -266,9 +266,10 @@ where
 
 				19 => {
 					debug2!("Kernel - shutting down");
+					c.shutdown.try_recv().unwrap();
 					// Tell all actors to shutdown.
 					for actor in c.shutdown_actor.iter() {
-						try_send!(actor, ());
+						actor.try_send(()).unwrap();
 					}
 					// Wait until all threads are ready to shutdown.
 					self.shutdown_wait.wait();
@@ -280,11 +281,12 @@ where
 				// allows the caller to return.
 				20 => {
 					debug2!("Kernel - shutting down (hang)");
+					c.shutdown_hang.try_recv().unwrap();
 					for actor in c.shutdown_actor.iter() {
-						try_send!(actor, ());
+						actor.try_send(()).unwrap();
 					}
 					self.shutdown_wait.wait();
-					try_send!(c.shutdown_done, ());
+					c.shutdown_done.try_send(()).unwrap();
 					return;
 				},
 

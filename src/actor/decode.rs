@@ -7,7 +7,7 @@ use crate::{
 	source::{Source, SourceDecode},
 	state::{AudioState, ValidData},
 	actor::audio::TookAudioBuffer,
-	macros::{recv,send,try_send,debug2}, config::ErrorBehavior, error::SourceError,
+	macros::{recv,send,try_send,try_recv,debug2}, config::ErrorBehavior, error::SourceError,
 };
 use symphonia::core::{
 	audio::AudioBuffer,
@@ -191,6 +191,7 @@ impl<Data: ValidData> Decode<Data> {
 					1 => self.msg_from_kernel(&channels),
 					2 => {
 						debug2!("Debug - shutting down");
+						channels.shutdown.try_recv().unwrap();
 						// Wait until all threads are ready to shutdown.
 						self.shutdown_wait.wait();
 						// Exit loop (thus, the thread).

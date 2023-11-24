@@ -215,6 +215,7 @@ where
 				// Shutdown.
 				2 => {
 					debug2!("Audio - shutting down");
+					channels.shutdown.try_recv().unwrap();
 					// Wait until all threads are ready to shutdown.
 					self.shutdown_wait.wait();
 					// Exit loop (thus, the thread).

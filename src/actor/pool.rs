@@ -92,8 +92,8 @@ impl<Data: ValidData> Pool<Data> {
 				let buffer_decode    = VecDeque::with_capacity(DECODE_BUFFER_LEN);
 				let buffer_to_kernel = VecDeque::with_capacity(QUEUE_LEN);
 				let buffer_kernel    = VecDeque::with_capacity(QUEUE_LEN);
-				try_send!(to_decode, buffer_to_decode);
-				try_send!(to_kernel, buffer_to_kernel);
+				to_decode.try_send(buffer_to_decode).unwrap();
+				to_kernel.try_send(buffer_to_kernel).unwrap();
 
 				let channels = Channels {
 					shutdown,
@@ -140,6 +140,7 @@ impl<Data: ValidData> Pool<Data> {
 				1 => self.from_kernel(&channels),
 				2 => {
 					debug2!("Pool - shutting down");
+					channels.shutdown.try_recv().unwrap();
 					// Wait until all threads are ready to shutdown.
 					self.shutdown_wait.wait();
 					// Exit loop (thus, the thread).

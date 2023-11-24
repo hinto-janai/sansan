@@ -59,6 +59,7 @@ impl<Data: ValidData> Gc<Data> {
 				2 => drop(try_recv!(self.from_kernel)),
 				3 => {
 					debug2!("Gc - shutting down");
+					self.shutdown.try_recv().unwrap();
 					// Wait until all threads are ready to shutdown.
 					self.shutdown_wait.wait();
 					// Exit loop (thus, the thread).
