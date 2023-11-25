@@ -54,7 +54,7 @@ impl<Data: ValidData> ApplyReturn<Signal<Data>, Add<Data>, Result<Option<Source<
 		// send to [Decode], if we set our [current] to it.
 		let option = match insert {
 			InsertMethod::Back => {
-				let option = if s.play && w.queue.is_empty() && w.current.is_none() {
+				let option = if w.queue.is_empty() && w.current.is_none() {
 					Some(s.source.clone())
 				} else {
 					None
@@ -66,7 +66,7 @@ impl<Data: ValidData> ApplyReturn<Signal<Data>, Add<Data>, Result<Option<Source<
 			},
 
 			InsertMethod::Front => {
-				let option = if s.play && w.current.is_none() {
+				let option = if w.current.is_none() {
 					Some(s.source.clone())
 				} else {
 					None
