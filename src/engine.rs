@@ -372,16 +372,14 @@ where
 
 		//-------------------------------------------------------------- Spawn [Pool]
 		let (p_shutdown, shutdown) = bounded(1);
-		let (p_to_gc_d, gc_from_p_d) = unbounded();
-		let (p_to_gc_k, gc_from_p_k) = unbounded();
+		let (p_to_gc, gc_from_p) = unbounded();
 		Pool::<Data>::init(crate::actor::pool::InitArgs {
 			init_barrier:  init_barrier.clone(), // Option<Arc<_>>,
 			shutdown_wait: Arc::clone(&shutdown_wait),
 			shutdown,
-			to_decode:     p_to_d,
-			from_decode:   p_from_d,
-			to_gc_decode:  p_to_gc_d,
-			to_gc_kernel:  p_to_gc_k,
+			to_decode:   p_to_d,
+			from_decode: p_from_d,
+			to_gc:       p_to_gc,
 		}).expect("sansan [Engine] - could not spawn [Pool] thread");
 
 		//-------------------------------------------------------------- Spawn [Gc]
@@ -391,11 +389,10 @@ where
 			init_barrier:  init_barrier.clone(), // Option<Arc<_>>,
 			shutdown_wait: Arc::clone(&shutdown_wait),
 			shutdown,
-			from_audio:       gc_from_a,
-			from_decode:      gc_from_d,
-			from_kernel:      gc_from_k,
-			from_pool_decode: gc_from_p_d,
-			from_pool_kernel: gc_from_p_k,
+			from_audio:  gc_from_a,
+			from_decode: gc_from_d,
+			from_kernel: gc_from_k,
+			from_pool:   gc_from_p,
 		}).expect("sansan [Engine] - could not spawn [Gc] thread");
 
 		//-------------------------------------------------------------- Spawn [Kernel]

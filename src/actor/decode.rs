@@ -14,7 +14,7 @@ use crate::{
 use symphonia::core::{
 	audio::AudioBuffer,
 	units::Time,
-	formats::{SeekMode,SeekTo},
+	formats::{SeekMode,SeekTo,Packet},
 };
 use std::{
 	sync::{
@@ -61,7 +61,7 @@ pub(crate) struct Decode<Data: ValidData> {
 // See [src/actor/kernel.rs]'s [Channels]
 struct Channels<Data: ValidData> {
 	shutdown:         Receiver<()>,
-	to_gc:            Sender<SourceDecode>,
+	to_gc:            Sender<DecodeToGc>,
 	to_audio:         Sender<ToAudio>,
 	from_audio:       Receiver<TookAudioBuffer>,
 	to_kernel_seek:   Sender<Result<SetTime, SeekError>>,
@@ -85,13 +85,18 @@ pub(crate) enum KernelToDecode<Data: ValidData> {
 	DiscardAudioAndStop,
 }
 
+pub(crate) enum DecodeToGc {
+	Packet(Packet),
+	Source(SourceDecode),
+}
+
 //---------------------------------------------------------------------------------------------------- Decode Impl
 pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) init_barrier:        Option<Arc<Barrier>>,
 	pub(crate) audio_ready_to_recv: Arc<AtomicBool>,
 	pub(crate) shutdown_wait:       Arc<Barrier>,
 	pub(crate) shutdown:            Receiver<()>,
-	pub(crate) to_gc:               Sender<SourceDecode>,
+	pub(crate) to_gc:               Sender<DecodeToGc>,
 	pub(crate) to_pool:             Sender<VecDeque<ToAudio>>,
 	pub(crate) from_pool:           Receiver<VecDeque<ToAudio>>,
 	pub(crate) to_audio:            Sender<ToAudio>,
@@ -235,15 +240,23 @@ impl<Data: ValidData> Decode<Data> {
 			// Decode the packet into audio samples.
 			match self.source.decoder.decode(&packet) {
 				Ok(decoded) => {
+					// Convert and take ownership of audio buffer.
 					let mut audio = decoded.make_equivalent::<f32>();
 					decoded.convert(&mut audio);
+
+					// Calculate timestamp.
 					let time  = self.source.timebase.calc_time(packet.ts);
 					self.set_current_audio_time(time);
+
+					// Send to [Audio] if we can, else store locally.
 					self.send_or_store_audio(&channels.to_audio, (audio, time));
 				}
 
 				Err(e) => self.handle_error(e, self.eb_decode, "decode"),
 			}
+
+			// Send garbage to [Gc] instead of dropping locally.
+			try_send!(channels.to_gc, DecodeToGc::Packet(packet));
 		}
 	}
 
@@ -288,12 +301,12 @@ impl<Data: ValidData> Decode<Data> {
 	}
 
 	#[inline]
-	fn new_source(&mut self, source: Source<Data>, to_gc: &Sender<SourceDecode>) {
+	fn new_source(&mut self, source: Source<Data>, to_gc: &Sender<DecodeToGc>) {
 		match source.try_into() {
 			Ok(mut s) => {
 				self.swap_audio_buffer();
 				std::mem::swap(&mut self.source, &mut s);
-				try_send!(to_gc, s);
+				try_send!(to_gc, DecodeToGc::Source(s));
 				self.done_decoding = false;
 			},
 

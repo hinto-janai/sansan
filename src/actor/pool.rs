@@ -35,11 +35,15 @@ pub(crate) struct Pool<Data: ValidData> {
 
 // See [src/actor/kernel.rs]'s [Channels]
 struct Channels<Data: ValidData> {
-	shutdown:     Receiver<()>,
-	to_decode:    Sender<VecDeque<ToDecode>>,
-	from_decode:  Receiver<VecDeque<ToDecode>>,
-	to_gc_decode: Sender<AudioBuffer<f32>>,
-	to_gc_kernel: Sender<Current<Data>>,
+	shutdown:    Receiver<()>,
+	to_decode:   Sender<VecDeque<ToDecode>>,
+	from_decode: Receiver<VecDeque<ToDecode>>,
+	to_gc:       Sender<PoolToGc<Data>>,
+}
+
+pub (crate) enum PoolToGc<Data: ValidData> {
+	Buffer(AudioBuffer<f32>),
+	Current(Current<Data>),
 }
 
 //---------------------------------------------------------------------------------------------------- InitArgs
@@ -49,8 +53,7 @@ pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) shutdown:      Receiver<()>,
 	pub(crate) to_decode:     Sender<VecDeque<ToDecode>>,
 	pub(crate) from_decode:   Receiver<VecDeque<ToDecode>>,
-	pub(crate) to_gc_decode:  Sender<AudioBuffer<f32>>,
-	pub(crate) to_gc_kernel:  Sender<Current<Data>>,
+	pub(crate) to_gc:         Sender<PoolToGc<Data>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Pool Impl
@@ -68,8 +71,7 @@ impl<Data: ValidData> Pool<Data> {
 					shutdown,
 					to_decode,
 					from_decode,
-					to_gc_decode,
-					to_gc_kernel,
+					to_gc,
 				} = args;
 
 				// INVARIANT:
@@ -90,8 +92,7 @@ impl<Data: ValidData> Pool<Data> {
 					shutdown,
 					to_decode,
 					from_decode,
-					to_gc_decode,
-					to_gc_kernel,
+					to_gc,
 				};
 
 				let this = Pool {
@@ -163,7 +164,7 @@ impl<Data: ValidData> Pool<Data> {
 		// Drop the [Time] in scope, it is just [u64] + [f64].
 		self.buffer_decode
 			.drain(..)
-			.for_each(|(audio, _time)| try_send!(channels.to_gc_decode, audio));
+			.for_each(|(audio, _time)| try_send!(channels.to_gc, PoolToGc::Buffer(audio)));
 
 		// Make sure the capacity is large enough.
 		self.buffer_decode.reserve_exact(DECODE_BUFFER_LEN);
