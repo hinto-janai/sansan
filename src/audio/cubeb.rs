@@ -139,7 +139,7 @@ where
 				// Resample.
 				let samples = resampler.resample(&audio);
 
-				self.samples[..samples.len()].copy_from_slice(samples);
+				self.samples.extend_from_slice(samples);
 
 				let capacity = audio.capacity();
 				let frames   = audio.frames();
@@ -350,7 +350,7 @@ where
 							send!(drained_send, ());
 						}
 					},
-					S::Error => error_cubeb.store(true, Ordering::Relaxed),
+					S::Error => error_cubeb.store(true, Ordering::Release),
 					_ => {},
 				}
 			});
@@ -394,6 +394,8 @@ where
 				channel_count,
 			))
 		};
+
+		std::mem::forget(ctx);
 
 		Ok(Self {
 			stream,
