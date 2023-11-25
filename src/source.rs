@@ -91,46 +91,56 @@ where
 	}
 }
 
-impl<Data: ValidData> From<(Arc<Path>, Data, Metadata)> for Source<Data> {
-	fn from(source: (Arc<Path>, Data, Metadata)) -> Self {
-		Self(SourceInner::ArcPath((source.0, source.1, source.2)))
-	}
+macro_rules! impl_from_for_source {
+	(
+			// Boilerplate to capture the input
+			// variable from the macro itself
+			// (syntax looks like a closure)
+			|$source:ident|
+		$(
+			$($input:ty)+ => // What type are we converting From?
+			$enum:ident   => // What [SourceInner] enum will be used?
+			$map:expr,       // What function to apply to the input to get it "correct"
+		)*
+	) => {
+		$(
+			impl<Data: ValidData> From<($($input)+, Data, Metadata)> for Source<Data> {
+				fn from(from: ($($input)+, Data, Metadata)) -> Self {
+					let ($source, source1, source2) = from;
+					Self(SourceInner::$enum(($map, source1, source2)))
+				}
+			}
+			impl<Data: ValidData> From<($($input)+, Data)> for Source<Data> {
+				fn from(from: ($($input)+, Data)) -> Self {
+					let ($source, source1) = from;
+					Self(SourceInner::$enum(($map, source1, Metadata::DEFAULT)))
+				}
+			}
+			impl<Data: ValidData + Default> From<$($input)+> for Source<Data> {
+				fn from($source: $($input)+) -> Self {
+					Self(SourceInner::$enum(($map, Data::default(), Metadata::DEFAULT)))
+				}
+			}
+		)*
+	};
 }
-impl<Data: ValidData> From<(&Arc<Path>, Data, Metadata)> for Source<Data> {
-	fn from(source: (&Arc<Path>, Data, Metadata)) -> Self {
-		Self(SourceInner::ArcPath((Arc::clone(source.0), source.1, source.2)))
-	}
-}
-impl<Data: ValidData> From<(&'static Path, Data, Metadata)> for Source<Data> {
-	fn from(source: (&'static Path, Data, Metadata)) -> Self {
-		Self(SourceInner::CowPath((Cow::Borrowed(source.0), source.1, source.2)))
-	}
-}
-impl<Data: ValidData> From<(PathBuf, Data, Metadata)> for Source<Data> {
-	fn from(source: (PathBuf, Data, Metadata)) -> Self {
-		Self(SourceInner::CowPath((Cow::Owned(source.0), source.1, source.2)))
-	}
-}
-
-impl<Data: ValidData> From<(Arc<[u8]>, Data, Metadata)> for Source<Data> {
-	fn from(source: (Arc<[u8]>, Data, Metadata)) -> Self {
-		Self(SourceInner::ArcByte((source.0, source.1, source.2)))
-	}
-}
-impl<Data: ValidData> From<(&Arc<[u8]>, Data, Metadata)> for Source<Data> {
-	fn from(source: (&Arc<[u8]>, Data, Metadata)) -> Self {
-		Self(SourceInner::ArcByte((Arc::clone(source.0), source.1, source.2)))
-	}
-}
-impl<Data: ValidData> From<(&'static [u8], Data, Metadata)> for Source<Data> {
-	fn from(source: (&'static [u8], Data, Metadata)) -> Self {
-		Self(SourceInner::CowByte((Cow::Borrowed(source.0), source.1, source.2)))
-	}
-}
-impl<Data: ValidData> From<(Vec<u8>, Data, Metadata)> for Source<Data> {
-	fn from(source: (Vec<u8>, Data, Metadata)) -> Self {
-		Self(SourceInner::CowByte((Cow::Owned(source.0), source.1, source.2)))
-	}
+// These mappings exist instead of a generic
+// <T: AsRef<Path>> since that covers too much,
+// and we cannot specify the way we construct.
+impl_from_for_source! { |source|
+	// Input         Enum       Source
+	Arc<Path>     => ArcPath => source,
+	&Arc<Path>    => ArcPath => Arc::clone(source),
+	&'static Path => CowPath => Cow::Borrowed(source),
+	PathBuf       => CowPath => Cow::Owned(source),
+	Arc<str>      => ArcPath => Arc::from(Path::new(&*source)),
+	&Arc<str>     => ArcPath => Arc::from(Path::new(&**source)),
+	&'static str  => CowPath => Cow::Borrowed(Path::new(source)),
+	String        => CowPath => Cow::Owned(PathBuf::from(source)),
+	Arc<[u8]>     => ArcByte => Arc::clone(&source),
+	&Arc<[u8]>    => ArcByte => Arc::clone(source),
+	&'static [u8] => CowByte => Cow::Borrowed(source),
+	Vec<u8>       => CowByte => Cow::Owned(source),
 }
 
 //---------------------------------------------------------------------------------------------------- SourceInner
