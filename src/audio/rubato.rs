@@ -120,6 +120,20 @@ impl Resampler for Rubato {
 			channel.drain(0..self.duration);
 		}
 
+		// INVARIANT:
+		// Resize the output and make sure
+		// the interleaved samples can fit.
+		//
+		// Sometimes, the interleaved samples will
+		// be slightly bigger than the output capacity
+		// and thus we must make sure the output won't
+		// panic when indexing.
+		let len = self.interleaved.len() / self.channel_count;
+		self.output
+			.iter_mut()
+			.filter(|channel| channel.len() < len)
+			.for_each(|channel| channel.resize(len, 0.0));
+
 		// Interleave the planar samples from Rubato.
 		for (i, frame) in self.interleaved.chunks_exact_mut(self.channel_count).enumerate() {
 			for (channel, s) in frame.iter_mut().enumerate() {
