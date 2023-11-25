@@ -45,8 +45,7 @@ where
 	Output: AudioOutput,
 {
 	atomic_state:  Arc<AtomicAudioState>, // Shared atomic audio state with the rest of the actors
-	playing_local: bool,                  // A local boolean so we don't have to atomic access each loop
-	playing:       Arc<AtomicBool>,       // The actual shared [playing] state between actors
+	playing:       bool,                  // A local boolean so we don't have to atomic access each loop
 	elapsed:       f64,                   // Elapsed time, used for the elapsed callback (f64 is reset each call)
 	ready_to_recv: Arc<AtomicBool>,       // [Audio]'s way of telling [Decode] it is ready for samples
 	shutdown_wait: Arc<Barrier>,          // Shutdown barrier between all actors
@@ -86,7 +85,6 @@ pub(crate) enum AudioToKernel {
 pub(crate) struct InitArgs {
 	pub(crate) init_barrier:      Option<Arc<Barrier>>,
 	pub(crate) atomic_state:      Arc<AtomicAudioState>,
-	pub(crate) playing:           Arc<AtomicBool>,
 	pub(crate) ready_to_recv:     Arc<AtomicBool>,
 	pub(crate) shutdown_wait:     Arc<Barrier>,
 	pub(crate) shutdown:          Receiver<()>,
@@ -114,7 +112,6 @@ where
 				let InitArgs {
 					init_barrier,
 					atomic_state,
-					playing,
 					ready_to_recv,
 					shutdown_wait,
 					shutdown,
@@ -144,8 +141,7 @@ where
 
 				let this = Audio {
 					atomic_state,
-					playing_local: false,
-					playing,
+					playing: false,
 					elapsed: 0.0,
 					ready_to_recv,
 					shutdown_wait,
@@ -174,8 +170,10 @@ where
 		assert_eq!(2, select.recv(&channels.shutdown));
 
 		loop {
+			self.playing = self.atomic_state.playing.load(Ordering::Acquire);
+
 			// If we're playing, check if we have samples to play.
-			if self.playing_local {
+			if self.playing {
 				if let Ok(msg) = channels.from_decode.try_recv() {
 					self.play_audio_buffer(msg, &channels.to_gc, &channels.to_caller_elapsed);
 				}
@@ -188,7 +186,7 @@ where
 					// If we're playing, continue to
 					// next iteration of loop so that
 					// we continue playing.
-					if self.playing_local {
+					if self.playing {
 						continue;
 					// Else, hang until we receive
 					// a message from somebody.

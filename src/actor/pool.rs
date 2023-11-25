@@ -123,10 +123,7 @@ impl<Data: ValidData> Pool<Data> {
 		// to their appropriate handler function.
 		loop {
 			match select.ready() {
-				0 => {
-					select_recv!(channels.from_decode);
-					self.from_decode(&channels);
-				},
+				0 => self.from_decode(&channels, select_recv!(channels.from_decode)),
 				// 1 => self.from_kernel(&channels),
 				1 => {
 					select_recv!(channels.shutdown);
@@ -150,10 +147,11 @@ impl<Data: ValidData> Pool<Data> {
 	// to exact messages/signals from the other actors.
 
 	#[inline]
-	fn from_decode(&mut self, channels: &Channels<Data>) {
-		// Receive old buffer.
-		let mut buffer = try_recv!(channels.from_decode);
-
+	fn from_decode(
+		&mut self,
+		channels: &Channels<Data>,
+		mut buffer: VecDeque<(AudioBuffer<f32>, Time)>
+	) {
 		// Quickly swap with local buffer that
 		// was cleaned from the last call.
 		std::mem::swap(&mut self.buffer_decode, &mut buffer);

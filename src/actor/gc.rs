@@ -57,12 +57,12 @@ impl<Data: ValidData> Gc<Data> {
 
 		// Loop, receive garbage, and immediately drop it.
 		loop {
-			match select.select().index() {
-				0 => drop(self.from_audio.try_recv()),
-				1 => drop(self.from_decode.try_recv()),
-				2 => drop(self.from_kernel.try_recv()),
-				3 => drop(self.from_pool_decode.try_recv()),
-				4 => drop(self.from_pool_kernel.try_recv()),
+			match select.ready() {
+				0 => drop(select_recv!(self.from_audio)),
+				1 => drop(select_recv!(self.from_decode)),
+				2 => drop(select_recv!(self.from_kernel)),
+				3 => drop(select_recv!(self.from_pool_decode)),
+				4 => drop(select_recv!(self.from_pool_kernel)),
 				5 => {
 					select_recv!(self.shutdown);
 					debug2!("Gc - shutting down");

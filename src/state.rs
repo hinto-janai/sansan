@@ -8,6 +8,7 @@ use crate::{
 use someday::{Reader, Commit, CommitRef};
 use std::{
 	sync::Arc,
+	sync::atomic::AtomicBool,
 	path::Path,
 	collections::VecDeque,
 };
@@ -72,12 +73,16 @@ where
 //---------------------------------------------------------------------------------------------------- AtomicAudioState
 #[derive(Debug)]
 pub(crate) struct AtomicAudioState {
+	pub(crate) audio_ready_to_recv: AtomicBool,
+	pub(crate) playing: AtomicBool,
 	pub(crate) repeat: AtomicRepeat,
 	pub(crate) volume: AtomicVolume,
 }
 
 impl AtomicAudioState {
 	pub(crate) const DEFAULT: Self = Self {
+		audio_ready_to_recv: AtomicBool::new(false),
+		playing: AtomicBool::new(false),
 		repeat: AtomicRepeat::DEFAULT,
 		volume: AtomicVolume::DEFAULT,
 	};
@@ -119,6 +124,7 @@ where
 // Wrapper around `someday::CommitRef` so that users don't have to handle `someday` types.
 //
 /// TODO
+#[derive(Clone,Debug,PartialEq)]
 pub struct AudioStateSnapshot<Data: ValidData>(pub(crate) CommitRef<AudioState<Data>>);
 
 impl<Data> std::ops::Deref for AudioStateSnapshot<Data>

@@ -7,7 +7,9 @@ use crate::{
 	source::{Source, SourceDecode},
 	state::{AudioState, ValidData},
 	actor::audio::TookAudioBuffer,
-	macros::{recv,send,try_send,try_recv,debug2}, config::ErrorBehavior, error::SourceError,
+	macros::{recv,send,try_send,try_recv,debug2,select_recv},
+	config::ErrorBehavior,
+	error::SourceError,
 };
 use symphonia::core::{
 	audio::AudioBuffer,
@@ -177,8 +179,8 @@ impl<Data: ValidData> Decode<Data> {
 		loop {
 			// Listen to other actors.
 			let signal = match self.done_decoding {
-				false => select.try_select(), // Non-blocking
-				true  => Ok(select.select()), // Blocking
+				false => select.try_ready(), // Non-blocking
+				true  => Ok(select.ready()), // Blocking
 			};
 
 			// Handle signals.
@@ -186,9 +188,12 @@ impl<Data: ValidData> Decode<Data> {
 			// This falls through and continues
 			// executing the below code.
 			if let Ok(signal) = signal {
-				match signal.index() {
-					0 => self.send_audio_if_ready(&channels.to_audio),
-					1 => self.msg_from_kernel(&channels),
+				match signal {
+					0 => {
+						select_recv!(&channels.from_audio);
+						self.send_audio_if_ready(&channels.to_audio);
+					},
+					1 => self.msg_from_kernel(&channels, select_recv!(&channels.from_kernel)),
 					2 => {
 						debug2!("Debug - shutting down");
 						channels.shutdown.try_recv().unwrap();
@@ -230,7 +235,8 @@ impl<Data: ValidData> Decode<Data> {
 			// Decode the packet into audio samples.
 			match self.source.decoder.decode(&packet) {
 				Ok(decoded) => {
-					let audio = decoded.make_equivalent::<f32>();
+					let mut audio = decoded.make_equivalent::<f32>();
+					decoded.convert(&mut audio);
 					let time  = self.source.timebase.calc_time(packet.ts);
 					self.set_current_audio_time(time);
 					self.send_or_store_audio(&channels.to_audio, (audio, time));
@@ -245,14 +251,11 @@ impl<Data: ValidData> Decode<Data> {
 	// These are the functions that map message
 	// enums to the their proper signal handler.
 	#[inline]
-	fn msg_from_kernel(&mut self, channels: &Channels<Data>) {
-		let msg = recv!(channels.from_kernel);
-
-		use KernelToDecode as K;
+	fn msg_from_kernel(&mut self, channels: &Channels<Data>, msg: KernelToDecode<Data>) {
 		match msg {
-			K::NewSource(source)   => self.new_source(source, &channels.to_gc),
-			K::Seek(seek)          => self.seek(seek, &channels.to_kernel_seek),
-			K::DiscardAudioAndStop => self.discard_audio_and_stop(),
+			KernelToDecode::NewSource(source)   => self.new_source(source, &channels.to_gc),
+			KernelToDecode::Seek(seek)          => self.seek(seek, &channels.to_kernel_seek),
+			KernelToDecode::DiscardAudioAndStop => self.discard_audio_and_stop(),
 		}
 	}
 
@@ -291,6 +294,7 @@ impl<Data: ValidData> Decode<Data> {
 				self.swap_audio_buffer();
 				std::mem::swap(&mut self.source, &mut s);
 				try_send!(to_gc, s);
+				self.done_decoding = false;
 			},
 
 			Err(e) => self.handle_error(e, self.eb_source, "source"),

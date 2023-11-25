@@ -47,7 +47,9 @@ use crate::{
 		RemoveError,
 		RemoveRange,
 		RemoveRangeError,
-	}, error::SourceError, source::Source,
+	},
+	error::SourceError,
+	source::Source,
 };
 use std::collections::VecDeque;
 use std::sync::{

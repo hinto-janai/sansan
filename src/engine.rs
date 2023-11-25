@@ -325,7 +325,6 @@ where
 		let (k_to_a, a_from_k) = unbounded();
 
 		// Shared values [Audio] <-> [Kernel].
-		let playing             = Arc::new(AtomicBool::new(false));
 		let audio_ready_to_recv = Arc::new(AtomicBool::new(false));
 
 		let (a_shutdown, shutdown) = bounded(1);
@@ -334,7 +333,6 @@ where
 			init_barrier:      init_barrier.clone(), // Option<Arc<_>>,
 			shutdown,
 			atomic_state:      Arc::clone(&atomic_state),
-			playing:           Arc::clone(&playing),
 			ready_to_recv:     Arc::clone(&audio_ready_to_recv),
 			shutdown_wait:     Arc::clone(&shutdown_wait),
 			to_gc:             a_to_gc,
@@ -451,8 +449,6 @@ where
 		Kernel::<Data>::init(crate::actor::kernel::InitArgs {
 			init_barrier,
 			atomic_state,
-			playing,
-			audio_ready_to_recv,
 			shutdown_wait: Arc::clone(&shutdown_wait),
 			w: audio_state_writer,
 			channels,
