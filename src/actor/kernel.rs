@@ -47,7 +47,7 @@ use crate::{
 		RemoveError,
 		RemoveRange,
 		RemoveRangeError,
-	}, error::SourceError,
+	}, error::SourceError, source::Source,
 };
 use std::collections::VecDeque;
 use std::sync::{
@@ -74,8 +74,6 @@ pub(crate) struct Kernel<Data: ValidData> {
 	// This originally was [audio_state] but this field is
 	// accessed a lot, so it is just [w], for [w]riter.
 	w:                   someday::Writer<AudioState<Data>, Signal<Data>>,
-	playing:             Arc<AtomicBool>,
-	audio_ready_to_recv: Arc<AtomicBool>,
 	shutdown_wait:       Arc<Barrier>,
 	to_gc:               Sender<AudioState<Data>>,
 	previous_threshold:  f64,
@@ -156,8 +154,6 @@ pub(crate) struct Channels<Data: ValidData> {
 pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) init_barrier:        Option<Arc<Barrier>>,
 	pub(crate) atomic_state:        Arc<AtomicAudioState>,
-	pub(crate) playing:             Arc<AtomicBool>,
-	pub(crate) audio_ready_to_recv: Arc<AtomicBool>,
 	pub(crate) shutdown_wait:       Arc<Barrier>,
 	pub(crate) w:                   someday::Writer<AudioState<Data>, Signal<Data>>,
 	pub(crate) channels:            Channels<Data>,
@@ -180,8 +176,6 @@ where
 				let InitArgs {
 					init_barrier,
 					atomic_state,
-					playing,
-					audio_ready_to_recv,
 					shutdown_wait,
 					w,
 					channels,
@@ -191,9 +185,7 @@ where
 
 				let this = Kernel {
 					atomic_state,
-					playing,
 					w,
-					audio_ready_to_recv,
 					shutdown_wait,
 					to_gc,
 					previous_threshold,
@@ -251,11 +243,11 @@ where
 				4  =>                  { select_recv!(c.recv_next); self.next() },
 				5  =>                  { select_recv!(c.recv_previous); self.previous() },
 				6  => self.clear       ( select_recv!(c.recv_clear)),
-				7  => self.shuffle     ( select_recv!(c.recv_shuffle), &c.to_decode),
+				7  => self.shuffle     ( select_recv!(c.recv_shuffle), &c.to_audio, &c.to_decode),
 				8  => self.repeat      ( select_recv!(c.recv_repeat)),
 				9  => self.volume      ( select_recv!(c.recv_volume)),
 				10 => self.restore     ( select_recv!(c.recv_restore)),
-				11 => self.add         ( select_recv!(c.recv_add), &c.send_add),
+				11 => self.add         ( select_recv!(c.recv_add), &c.to_audio, &c.to_decode, &c.send_add),
 				12 => self.add_many    ( select_recv!(c.recv_add_many), &c.send_add_many),
 				13 => self.seek        ( select_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),
 				14 => self.skip        ( select_recv!(c.recv_skip), &c.send_skip),
@@ -360,7 +352,12 @@ where
 	}
 
 	#[inline]
-	fn shuffle(&mut self, shuffle: Shuffle, to_decode: &Sender<KernelToDecode<Data>>) {
+	fn shuffle(
+		&mut self,
+		shuffle: Shuffle,
+		to_audio: &Sender<DiscardCurrentAudio>,
+		to_decode: &Sender<KernelToDecode<Data>>,
+	) {
 		if self.w.queue.len() > 1 {
 			// INVARIANT: must be [push_clone()], see
 			// [crate::signal::signal.rs]'s [Apply]
@@ -370,7 +367,7 @@ where
 			// set our [current] to queue[0], so we must forward
 			// it to [Decode].
 			if let Some(source) = self.w.commit_return(shuffle) {
-				try_send!(to_decode, KernelToDecode::NewSource(source));
+				self.new_source(to_audio, to_decode, source);
 			}
 			self.w.push_clone();
 		}
@@ -411,9 +408,23 @@ where
 	}
 
 	#[inline]
-	fn add(&mut self, add: Add<Data>, to_engine: &Sender<Result<AudioStateSnapshot<Data>, AddError>>) {
+	fn add(
+		&mut self,
+		add: Add<Data>,
+		to_audio: &Sender<DiscardCurrentAudio>,
+		to_decode: &Sender<KernelToDecode<Data>>,
+		to_engine: &Sender<Result<AudioStateSnapshot<Data>, AddError>>
+	) {
+		// This [Add] might set our [current],
+		// it will return a [Some(source)] if so.
+		// We must forward it to [Decode].
 		match self.add_commit_push(add) {
-			Ok(_)  => try_send!(to_engine, Ok(self.commit_push_get())),
+			Ok(o) => {
+				if let Some(source) = o {
+					self.new_source(to_audio, to_decode, source);
+				}
+				try_send!(to_engine, Ok(self.commit_push_get()));
+			},
 			Err(e) => try_send!(to_engine, Err(e)),
 		}
 	}
@@ -513,18 +524,30 @@ where
 	}
 
 	//---------------------------------------------------------------------------------------------------- Misc Functions
-	fn tell_audio_to_discard(&mut self, to_audio: &Sender<DiscardCurrentAudio>) {
+	#[inline]
+	fn new_source(
+		&self,
+		to_audio: &Sender<DiscardCurrentAudio>,
+		to_decode: &Sender<KernelToDecode<Data>>,
+		source: Source<Data>,
+	) {
+		self.tell_audio_to_discard(to_audio);
+		self.tell_decode_to_discard(to_decode);
+		try_send!(to_decode, KernelToDecode::NewSource(source));
+	}
+
+	fn tell_audio_to_discard(&self, to_audio: &Sender<DiscardCurrentAudio>) {
 		// INVARIANT:
 		// This is set by [Kernel] since it
 		// _knows_ when we're discarding first.
 		//
 		// [Audio] is responsible for setting it
 		// back to [true].
-		self.audio_ready_to_recv.store(false, Ordering::Release);
+		self.atomic_state.audio_ready_to_recv.store(false, Ordering::Release);
 		try_send!(to_audio, DiscardCurrentAudio);
 	}
 
-	fn tell_decode_to_discard(&mut self, to_decode: &Sender<KernelToDecode<Data>>) {
+	fn tell_decode_to_discard(&self, to_decode: &Sender<KernelToDecode<Data>>) {
 		try_send!(to_decode, KernelToDecode::DiscardAudioAndStop);
 	}
 
