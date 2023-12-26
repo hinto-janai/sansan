@@ -2,28 +2,28 @@
 use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 //---------------------------------------------------------------------------------------------------- Atomic Float
-// An AtomicF(32|64) implementation.
-//
-// This internally uses [AtomicU(32|64)], where the
-// u(32|64) is the bit pattern of the internal float.
-//
-// This uses [.to_bits()] and [from_bits()] to
-// convert between actual floats, and the bit
-// representations for storage.
-//
-// Using `UnsafeCell<float>` is also viable,
-// and would allow for a `const fn new(f: float) -> Self`
-// except that becomes problematic with NaN's and infinites:
-// - https://github.com/rust-lang/rust/issues/73328
-// - https://github.com/rust-lang/rfcs/pull/3514
-//
-// This is most likely safe(?) but... instead of risking UB,
-// this just uses the Atomic unsigned integer as the inner
-// type instead of transmuting from `UnsafeCell`.
-//
-// This creates the types:
-// - `AtomicF32`
-// - `AtomicF64`
+/// An AtomicF(32|64) implementation.
+///
+/// This internally uses [AtomicU(32|64)], where the
+/// u(32|64) is the bit pattern of the internal float.
+///
+/// This uses [`f64::to_bits()`] and [`f64::from_bits()`] to
+/// convert between actual floats, and the bit
+/// representations for storage.
+///
+/// Using `UnsafeCell<float>` is also viable,
+/// and would allow for a `const fn new(f: float) -> Self`
+/// except that becomes problematic with NaN's and infinites:
+/// - <https://github.com/rust-lang/rust/issues/73328>
+/// - <https://github.com/rust-lang/rfcs/pull/3514>
+///
+/// This is most likely safe(?) but... instead of risking UB,
+/// this just uses the Atomic unsigned integer as the inner
+/// type instead of transmuting from `UnsafeCell`.
+///
+/// This creates the types:
+/// - `AtomicF32`
+/// - `AtomicF64`
 macro_rules! impl_atomic_f {
     (
 		$atomic_float:ident,       // Name of the new float type
@@ -41,7 +41,7 @@ macro_rules! impl_atomic_f {
         ///
         /// ## Portability
         /// [Quoting the std library: ](https://doc.rust-lang.org/1.70.0/std/primitive.f32.html#method.to_bits)
-        /// "See from_bits for some discussion of the portability of this operation (there are almost no issues)."
+        /// "See `from_bits` for some discussion of the portability of this operation (there are almost no issues)."
         ///
         /// ## Compile-time failure
         /// This internal functions `std` uses will panic _at compile time_
@@ -91,7 +91,7 @@ macro_rules! impl_atomic_f {
             #[inline]
             /// Create a new atomic float.
             ///
-            /// Equivalent to https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.new
+            /// Equivalent to <https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.new>.
             pub(crate) fn new(f: $float) -> Self {
                 // FIXME: Update to const when available.
                 // https://doc.rust-lang.org/1.70.0/src/core/num/f32.rs.html#998
@@ -104,7 +104,7 @@ macro_rules! impl_atomic_f {
             }
 
             #[inline]
-            /// Equivalent to https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.into_inner
+            /// Equivalent to <https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.into_inner>.
             pub(crate) fn into_inner(self) -> $float {
                 $float::from_bits(self.0.into_inner())
             }
@@ -118,7 +118,7 @@ macro_rules! impl_atomic_f {
             #[inline]
             /// Store a float inside the atomic.
             ///
-            /// Equivalent to https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.store
+            /// Equivalent to <https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.store>.
             pub(crate) fn store(&self, f: $float, ordering: Ordering) {
                 self.0.store(f.to_bits(), ordering);
             }
@@ -132,7 +132,7 @@ macro_rules! impl_atomic_f {
             #[inline]
             /// Load the internal float from the atomic.
             ///
-            /// Equivalent to https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.load
+            /// Equivalent to <https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.load>.
             pub(crate) fn load(&self, ordering: Ordering) -> $float {
                 // FIXME: Update to const when available.
                 // https://doc.rust-lang.org/1.70.0/src/core/num/f32.rs.html#1088
@@ -146,13 +146,13 @@ macro_rules! impl_atomic_f {
             }
 
             #[inline]
-            /// Equivalent to https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.swap
+            /// Equivalent to <https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.swap>.
             pub(crate) fn swap(&self, val: $float, ordering: Ordering) -> $float {
                 $float::from_bits(self.0.swap($float::to_bits(val), ordering))
             }
 
             #[inline]
-            /// Equivalent to https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.compare_exchange
+            /// Equivalent to <https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.compare_exchange>.
             pub(crate) fn compare_exchange(
                 &self,
                 current: $float,
@@ -170,7 +170,7 @@ macro_rules! impl_atomic_f {
             }
 
             #[inline]
-            /// Equivalent to https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.compare_exchange_weak
+            /// Equivalent to <https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.compare_exchange_weak>.
             pub(crate) fn compare_exchange_weak(
                 &self,
                 current: $float,
@@ -197,9 +197,9 @@ macro_rules! impl_atomic_f {
             // This means using some type of CAS,
             // which comes with the regular tradeoffs...
 
-            // The (private) function using CAS to implement `fetch_*()` operations.
-            //
-            // This is function body used in all the below `fetch_*()` functions.
+            /// The (private) function using CAS to implement `fetch_*()` operations.
+            ///
+            /// This is function body used in all the below `fetch_*()` functions.
             fn fetch_update_unwrap<F>(&self, ordering: Ordering, mut update: F) -> $float
             where
                 F: FnMut($float) -> $float,
@@ -214,7 +214,7 @@ macro_rules! impl_atomic_f {
                     ordering => ordering,
                 };
 
-                // SAFETY:
+                // INVARIANT:
                 // unwrap is safe since `fetch_update()` only panics
                 // if the closure we pass it returns `None`.
                 // As seen below, we're passing a `Some`.
@@ -226,7 +226,7 @@ macro_rules! impl_atomic_f {
 
             #[inline]
             /// This function is implemented with [`Self::fetch_update`], and is not 100% equivalent to
-            /// https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.fetch_add.
+            /// <https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.fetch_add>.
             ///
             /// In particular, this method will not circumvent the [ABA Problem](https://en.wikipedia.org/wiki/ABA_problem).
             ///
@@ -237,7 +237,7 @@ macro_rules! impl_atomic_f {
 
             #[inline]
             /// This function is implemented with [`Self::fetch_update`], and is not 100% equivalent to
-            /// https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.fetch_sub.
+            /// <https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.fetch_sub>.
             ///
             /// In particular, this method will not circumvent the [ABA Problem](https://en.wikipedia.org/wiki/ABA_problem).
             ///
@@ -248,7 +248,7 @@ macro_rules! impl_atomic_f {
 
             #[inline]
             /// This function is implemented with [`Self::fetch_update`], and is not 100% equivalent to
-            /// https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.fetch_max.
+            /// <https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.fetch_max>.
             ///
             /// In particular, this method will not circumvent the [ABA Problem](https://en.wikipedia.org/wiki/ABA_problem).
             ///
@@ -259,7 +259,7 @@ macro_rules! impl_atomic_f {
 
             #[inline]
             /// This function is implemented with [`Self::fetch_update`], and is not 100% equivalent to
-            /// https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.fetch_min.
+            /// <https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.fetch_min>.
             ///
             /// In particular, this method will not circumvent the [ABA Problem](https://en.wikipedia.org/wiki/ABA_problem).
             ///
@@ -269,7 +269,7 @@ macro_rules! impl_atomic_f {
             }
 
             #[inline]
-            /// Equivalent to https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.fetch_update
+            /// Equivalent to <https://doc.rust-lang.org/1.70.0/std/sync/atomic/struct.AtomicUsize.html#method.fetch_update>.
             pub(crate) fn fetch_update<F>(
                 &self,
                 set_order: Ordering,
@@ -361,6 +361,7 @@ impl_atomic_f! {
 
 //---------------------------------------------------------------------------------------------------- TESTS
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
 
