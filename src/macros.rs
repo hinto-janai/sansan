@@ -7,49 +7,33 @@
 
 // Receive a channel message, unwrap.
 macro_rules! recv {
-    ($channel:expr) => {
-		if cfg!(debug_assertions) {
-        	$channel.recv().unwrap()
-		} else {
-	        unsafe { $channel.recv().unwrap_unchecked() }
-		}
-    }
+    ($channel:expr) => {{
+		$channel.recv().unwrap()
+	}}
 }
 pub(crate) use recv;
 
 // Send a channel message, unwrap.
 macro_rules! send {
-    ($channel:expr, $($msg:tt)+) => {
-		if cfg!(debug_assertions) {
-        	$channel.send($($msg)+).unwrap()
-		} else {
-	        unsafe { $channel.send($($msg)+).unwrap_unchecked() }
-		}
-    }
+	($channel:expr, $($msg:tt)+) => {{
+		$channel.send($($msg)+).unwrap()
+	}}
 }
 pub(crate) use send;
 
 // `try_send` a channel message, unwrap.
 macro_rules! try_send {
-    ($channel:expr, $($msg:tt)+) => {
-		if cfg!(debug_assertions) {
-        	$channel.try_send($($msg)+).unwrap()
-		} else {
-	        unsafe { $channel.try_send($($msg)+).unwrap_unchecked() }
-		}
-    }
+    ($channel:expr, $($msg:tt)+) => {{
+        $channel.try_send($($msg)+).unwrap()
+    }}
 }
 pub(crate) use try_send;
 
 // `try_recv` a channel message, unwrap.
 macro_rules! try_recv {
-    ($channel:expr) => {
-		if cfg!(debug_assertions) {
-        	$channel.try_recv().unwrap()
-		} else {
-	        unsafe { $channel.try_recv().unwrap_unchecked() }
-		}
-    }
+    ($channel:expr) => {{
+        $channel.try_recv().unwrap()
+    }}
 }
 pub(crate) use try_recv;
 
@@ -60,12 +44,12 @@ pub(crate) use try_recv;
 // sent to the channel, else, we [continue] in
 // whatever loop we are in.
 macro_rules! select_recv {
-	($channel:expr) => {
+	($channel:expr) => {{
 		match $channel.try_recv() {
 			Ok(msg) => msg,
 			_ => continue,
 		}
-	}
+	}}
 }
 pub(crate) use select_recv;
 
