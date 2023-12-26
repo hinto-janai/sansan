@@ -2,7 +2,6 @@
 use crate::{
 	state::{AudioState,ValidData},
 	channel::SansanSender,
-	macros::unreachable2,
 	error::{OutputError,DecodeError,SourceError,SansanError},
 	signal::SeekError,
 };
