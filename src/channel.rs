@@ -55,6 +55,9 @@ where
 	type Error;
 
 	/// Attempt to send the message `t`.
+	///
+	/// # Errors
+    /// If the message could not be sent, this method should return `Self::Error`.
 	fn try_send(&self, t: T) -> Result<(), Self::Error>;
 }
 
@@ -69,6 +72,8 @@ where
 	type Error;
 
 	/// Attempt to receive a message.
+	/// # Errors
+    /// If the message could not be received, this method should return `Self::Error`.
 	fn try_recv(&self) -> Result<T, Self::Error>;
 }
 
