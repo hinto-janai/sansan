@@ -93,10 +93,11 @@ impl Resampler for Rubato {
 	#[inline]
 	fn resample(&mut self, audio: &symphonia::core::audio::AudioBuffer<f32>) -> &[f32] {
 		// Collect `f32`'s from all channels into a single slice.
-		for (channel_index, input) in self.input.iter_mut().enumerate() {
-			let channel = symphonia::core::audio::Signal::chan(audio, channel_index);
-			input.extend_from_slice(channel);
-		}
+		self.input
+			.iter_mut()
+			.enumerate()
+			.map(|(channel, input)| (symphonia::core::audio::Signal::chan(audio, channel), input))
+			.for_each(|(channel, input)| input.extend_from_slice(channel));
 
 		// Resample.
 		//
@@ -116,9 +117,11 @@ impl Resampler for Rubato {
 		).unwrap();
 
 		// Remove consumed samples from the input buffer.
-		for channel in self.input.iter_mut() {
-			channel.drain(0..self.duration);
-		}
+		self.input
+			.iter_mut()
+			.for_each(|channel| {
+				drop(channel.drain(0..self.duration));
+			});
 
 		// Resize the interleaved buffer such that
 		// it matches the new output buffer length.
@@ -127,11 +130,19 @@ impl Resampler for Rubato {
 		self.interleaved.resize(self.channel_count * self.output[0].len(), 0.0);
 
 		// Interleave the planar samples from Rubato.
-		for (i, frame) in self.interleaved.chunks_exact_mut(self.channel_count).enumerate() {
-			for (channel, s) in frame.iter_mut().enumerate() {
-				*s = self.output[channel][i];
+		for frame in self.interleaved.chunks_exact_mut(self.channel_count) {
+			for channel in self.output.iter() {
+				for (interleaved_sample, channel_sample) in frame.iter_mut().zip(channel.iter()) {
+					*interleaved_sample = *channel_sample;
+				}
 			}
 		}
+		// Old [indexing] version of the above for reference.
+//		for (i, frame) in self.interleaved.chunks_exact_mut(self.channel_count).enumerate() {
+//			for (ch, s) in frame.iter_mut().enumerate() {
+//				*s = self.output[ch][i];
+//			}
+//		}
 
 		&self.interleaved
 	}
