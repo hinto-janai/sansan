@@ -1,3 +1,5 @@
+//! TODO
+
 //---------------------------------------------------------------------------------------------------- Use
 use std::{thread::JoinHandle, marker::PhantomData};
 use crossbeam::channel::{Receiver, Select, Sender};
@@ -27,23 +29,26 @@ use std::{
 use strum::EnumCount;
 
 //---------------------------------------------------------------------------------------------------- Constants
-// How many [AudioBuffer]'s is [Decode] allowed to hold locally?
-//
-// This is base capacity of the [VecDeque] holding
-// [AudioBuffer]'s that [Decode] is holding locally,
-// and hasn't yet sent to [Audio].
-//
-// A 4-minute track is roughly 3000-4000 [AudioBuffer]'s
-// so this can hold up-to 4 tracks before needed to resize.
-//
-// [Decode] only pre-loads 1 song in advance,
-// so this should never actually resize.
+/// How many [`AudioBuffer`]'s is [Decode] allowed to hold locally?
+///
+/// This is base capacity of the [`VecDeque`] holding
+/// [`AudioBuffer`]'s that [Decode] is holding locally,
+/// and hasn't yet sent to [Audio].
+///
+/// A 4-minute track is roughly 3000-4000 [`AudioBuffer`]'s
+/// so this can hold up-to 4 tracks before needed to resize.
+///
+/// [Decode] only pre-loads 1 song in advance,
+/// so this should never actually resize.
 pub(crate) const DECODE_BUFFER_LEN: usize = 16_000;
 
 //---------------------------------------------------------------------------------------------------- Types
+/// TODO
 type ToAudio = (AudioBuffer<f32>, Time);
 
 //---------------------------------------------------------------------------------------------------- Decode
+/// TODO
+#[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct Decode<Data: ValidData> {
 	audio_ready_to_recv: Arc<AtomicBool>,             // [Audio]'s way of telling [Decode] it is ready for samples
 	buffer:              VecDeque<ToAudio>,           // Local decoded packets, ready to send to [Audio]
@@ -58,7 +63,8 @@ pub(crate) struct Decode<Data: ValidData> {
 	_p:                  PhantomData<Data>,
 }
 
-// See [src/actor/kernel.rs]'s [Channels]
+/// See [src/actor/kernel.rs]'s [Channels]
+#[allow(clippy::missing_docs_in_private_items)]
 struct Channels<Data: ValidData> {
 	shutdown:         Receiver<()>,
 	to_gc:            Sender<DecodeToGc>,
@@ -70,27 +76,33 @@ struct Channels<Data: ValidData> {
 }
 
 //---------------------------------------------------------------------------------------------------- (Actual) Messages
+/// TODO
 pub(crate) enum KernelToDecode<Data: ValidData> {
-	// Convert this [Source] into a real
-	// [SourceDecode] and start decoding it.
-	//
-	// This also implicitly also means we
-	// should drop our old audio buffers.
+	/// Convert this [Source] into a real
+	/// [SourceDecode] and start decoding it.
+	///
+	/// This also implicitly also means we
+	/// should drop our old audio buffers.
 	NewSource(Source<Data>),
-	// Seek to this timestamp in the currently
-	// playing track and start decoding from there
+	/// Seek to this timestamp in the currently
+	/// playing track and start decoding from there
 	Seek(signal::Seek),
-	// Clear all audio buffers, the current source,
-	// and stop decoding.
+	/// Clear all audio buffers, the current source,
+	/// and stop decoding.
 	DiscardAudioAndStop,
 }
 
+/// TODO
 pub(crate) enum DecodeToGc {
+	/// TODO
 	Packet(Packet),
+	/// TODO
 	Source(SourceDecode),
 }
 
 //---------------------------------------------------------------------------------------------------- Decode Impl
+/// TODO
+#[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) init_barrier:        Option<Arc<Barrier>>,
 	pub(crate) audio_ready_to_recv: Arc<AtomicBool>,
@@ -114,6 +126,7 @@ impl<Data: ValidData> Decode<Data> {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]
+	/// Initialize `Decode`.
 	pub(crate) fn init(args: InitArgs<Data>) -> Result<JoinHandle<()>, std::io::Error> {
 		std::thread::Builder::new()
 			.name("Decode".into())
@@ -146,7 +159,7 @@ impl<Data: ValidData> Decode<Data> {
 					from_kernel,
 				};
 
-				let this = Decode {
+				let this = Self {
 					audio_ready_to_recv,
 					buffer: VecDeque::with_capacity(DECODE_BUFFER_LEN),
 					source: SourceDecode::dummy(),
@@ -164,13 +177,14 @@ impl<Data: ValidData> Decode<Data> {
 					init_barrier.wait();
 				}
 
-				Decode::main(this, channels);
+				Self::main(this, channels);
 			})
 	}
 
 	//---------------------------------------------------------------------------------------------------- Main Loop
 	#[cold]
 	#[inline(never)]
+	/// `Decode`'s main function.
 	fn main(mut self, channels: Channels<Data>) {
 		// Create channels that we will
 		// be selecting/listening to for all time.
@@ -183,6 +197,7 @@ impl<Data: ValidData> Decode<Data> {
 		// The "Decode" loop.
 		loop {
 			// Listen to other actors.
+			#[allow(clippy::match_bool)]
 			let signal = match self.done_decoding {
 				false => select.try_ready(), // Non-blocking
 				true  => Ok(select.ready()), // Blocking
@@ -263,7 +278,9 @@ impl<Data: ValidData> Decode<Data> {
 	//---------------------------------------------------------------------------------------------------- Message Routing
 	// These are the functions that map message
 	// enums to the their proper signal handler.
+
 	#[inline]
+	/// Handle message's from `Kernel`.
 	fn msg_from_kernel(&mut self, channels: &Channels<Data>, msg: KernelToDecode<Data>) {
 		match msg {
 			KernelToDecode::NewSource(source)   => self.new_source(source, &channels.to_gc),
@@ -279,10 +296,10 @@ impl<Data: ValidData> Decode<Data> {
 	// to exact messages/signals from the other actors.
 
 	#[inline]
-	// If [Audio]'s is ready, take out the
-	// oldest buffer and send it.
+	/// If [Audio]'s is ready, take out the
+	/// oldest buffer and send it.
 	fn send_audio_if_ready(&mut self, to_audio: &Sender<ToAudio>) {
-		if self.audio_is_ready(&to_audio) {
+		if self.audio_is_ready(to_audio) {
 			if let Some(data) = self.buffer.pop_front() {
 				try_send!(to_audio, data);
 			}
@@ -290,17 +307,18 @@ impl<Data: ValidData> Decode<Data> {
 	}
 
 	#[inline]
-	// Send decoded audio data to [Audio]
-	// if they are ready, else, store locally.
+	/// Send decoded audio data to [Audio]
+	/// if they are ready, else, store locally.
 	fn send_or_store_audio(&mut self, to_audio: &Sender<ToAudio>, data: ToAudio) {
-		if !self.audio_is_ready(to_audio) {
-			self.buffer.push_back(data);
-		} else {
+		if self.audio_is_ready(to_audio) {
 			try_send!(to_audio, data);
+		} else {
+			self.buffer.push_back(data);
 		}
 	}
 
 	#[inline]
+	/// TODO
 	fn new_source(&mut self, source: Source<Data>, to_gc: &Sender<DecodeToGc>) {
 		match source.try_into() {
 			Ok(mut s) => {
@@ -315,6 +333,7 @@ impl<Data: ValidData> Decode<Data> {
 	}
 
 	#[inline]
+	/// TODO
 	fn seek(&mut self, seek: signal::Seek, to_kernel_seek: &Sender<Result<SetTime, SeekError>>) {
 		use signal::Seek as S;
 
@@ -373,6 +392,7 @@ impl<Data: ValidData> Decode<Data> {
 
 	#[cold]
 	#[inline(never)]
+	/// TODO
 	fn handle_error<E: std::error::Error>(
 		&mut self,
 		error:      E,
@@ -390,19 +410,21 @@ impl<Data: ValidData> Decode<Data> {
 	}
 
 	#[inline]
+	/// TODO
 	fn set_current_audio_time(&mut self, time: Time) {
 		self.source.time_now = time;
 	}
 
 	#[inline]
+	/// TODO
 	fn discard_audio_and_stop(&mut self) {
 		self.swap_audio_buffer();
 		self.done_decoding();
 	}
 
 	#[inline]
-	// Swap our current audio buffer
-	// with a fresh empty one from `Pool`.
+	/// Swap our current audio buffer
+	/// with a fresh empty one from `Pool`.
 	fn swap_audio_buffer(&mut self) {
 		// INVARIANT:
 		// Pool must send 1 buffer on init such
@@ -422,13 +444,14 @@ impl<Data: ValidData> Decode<Data> {
 	}
 
 	#[inline]
+	/// TODO
 	fn done_decoding(&mut self) {
 		self.done_decoding = true;
 	}
 
 	#[inline]
 	/// If [Audio] is in a state that is
-	// willing to accept new audio buffers.
+	/// willing to accept new audio buffers.
 	fn audio_is_ready(&self, to_audio: &Sender<ToAudio>) -> bool {
 		!to_audio.is_full() && self.audio_ready_to_recv.load(std::sync::atomic::Ordering::Acquire)
 	}

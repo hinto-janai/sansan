@@ -1,3 +1,5 @@
+//! TODO
+
 //---------------------------------------------------------------------------------------------------- Use
 use std::thread::JoinHandle;
 use crossbeam::channel::{Receiver, Select, Sender};
@@ -17,6 +19,8 @@ use std::sync::{
 //---------------------------------------------------------------------------------------------------- Constants
 
 //---------------------------------------------------------------------------------------------------- Caller
+/// TODO
+#[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct Caller<Data, Call>
 where
 	Data: ValidData,
@@ -31,7 +35,8 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- Channels
-// See [src/actor/kernel.rs]'s [Channels]
+/// See [src/actor/kernel.rs]'s [Channels]
+#[allow(clippy::missing_docs_in_private_items)]
 struct Channels {
 	shutdown:  Receiver<()>,
 	next:      Receiver<()>,
@@ -41,6 +46,8 @@ struct Channels {
 }
 
 //---------------------------------------------------------------------------------------------------- Caller Impl
+/// TODO
+#[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct InitArgs<Data, Call>
 where
 	Data: ValidData,
@@ -70,6 +77,7 @@ where
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]
+	/// Initialize `Caller`.
 	pub(crate) fn init(args: InitArgs<Data, Call>) -> Result<JoinHandle<()>, std::io::Error> {
 		std::thread::Builder::new()
 			.name("Caller".into())
@@ -98,7 +106,7 @@ where
 					elapsed,
 				};
 
-				let this = Caller {
+				let this = Self {
 					cb_next,
 					cb_queue_end,
 					cb_repeat,
@@ -115,13 +123,14 @@ where
 					lpt::lpt();
 				}
 
-				Caller::main(this, channels);
+				Self::main(this, channels);
 			})
 	}
 
 	//---------------------------------------------------------------------------------------------------- Main Loop
 	#[cold]
 	#[inline(never)]
+	/// `Caller`'s main function.
 	fn main(mut self, channels: Channels) {
 		// Create channels that we will
 		// be selecting/listening to for all time.
@@ -163,26 +172,31 @@ where
 	// to exact messages/signals from the other actors.
 
 	#[inline]
+	/// TODO
 	fn next(&mut self) {
 		Self::call(&self.audio_state.get(), &mut self.cb_next);
 	}
 
 	#[inline]
+	/// TODO
 	fn queue_end(&mut self) {
 		Self::call(&self.audio_state.get(), &mut self.cb_queue_end);
 	}
 
 	#[inline]
+	/// TODO
 	fn repeat(&mut self) {
 		Self::call(&self.audio_state.get(), &mut self.cb_repeat);
 	}
 
 	#[inline]
+	/// TODO
 	fn elapsed(&mut self) {
 		Self::call(&self.audio_state.get(), &mut self.cb_elapsed);
 	}
 
 	#[inline]
+	/// TODO
 	fn call(
 		audio_state: &AudioState<Data>,
 		callback: &mut Option<Callback<Data, Call, ()>>

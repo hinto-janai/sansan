@@ -1,3 +1,5 @@
+//! TODO
+
 //---------------------------------------------------------------------------------------------------- Use
 use std::{thread::JoinHandle, process::Output};
 use crossbeam::channel::{Sender, Receiver, Select};
@@ -60,21 +62,23 @@ use std::sync::{
 use strum::EnumCount;
 
 //---------------------------------------------------------------------------------------------------- Constants
-// QUEUE_LEN is the initial buffer size of the [AudioState]'s queue.
-//
-// This should be big enough such a resize never
-// occurs (in most situations) but not too big incase
-// the generic [Data] the user provides is large.
+/// `QUEUE_LEN` is the initial buffer size of the [`AudioState`]'s queue.
+///
+/// This should be big enough such a resize never
+/// occurs (in most situations) but not too big incase
+/// the generic [Data] the user provides is large.
 pub(crate) const QUEUE_LEN: usize = 256;
 
 //---------------------------------------------------------------------------------------------------- Kernel
+/// TODO
+#[allow(clippy::missing_docs_in_private_items)]
 #[derive(Debug)]
 pub(crate) struct Kernel<Data: ValidData> {
 	atomic_state:        Arc<AtomicAudioState>,
-	// The [W]riter half of the [Engine]'s [AudioState].
-	//
-	// This originally was [audio_state] but this field is
-	// accessed a lot, so it is just [w], for [w]riter.
+	/// The [W]riter half of the [Engine]'s [`AudioState`].
+	///
+	/// This originally was [audio_state] but this field is
+	/// accessed a lot, so it is just [w], for [w]riter.
 	w:                   someday::Writer<AudioState<Data>, Signal<Data>>,
 	shutdown_wait:       Arc<Barrier>,
 	to_gc:               Sender<AudioState<Data>>,
@@ -89,17 +93,18 @@ pub(crate) struct Kernel<Data: ValidData> {
 pub(crate) struct DiscardCurrentAudio;
 
 //---------------------------------------------------------------------------------------------------- Recv
-// TL;DR - this structs exists because [self] borrowing rules are too strict
-//
-// This is struct [Kernel] uses that exists
-// because in [Kernel::main()], we must [&] the receive
-// channels for [Select], but later when receiving the messages
-// we need [&mut] access, which conflicts with the in-scope [&].
-//
-// Technically, the [&] and [&mut] are touching different data
-// but since they're both behind [self], Rust complains, so the
-// receive channels are in this one-off [Recv] instead of within
-// [Kernel] as fields.
+/// TL;DR - this structs exists because [self] borrowing rules are too strict
+///
+/// This is struct [Kernel] uses that exists
+/// because in [`Kernel::main()`], we must [&] the receive
+/// channels for [Select], but later when receiving the messages
+/// we need [&mut] access, which conflicts with the in-scope [&].
+///
+/// Technically, the [&] and [&mut] are touching different data
+/// but since they're both behind [self], Rust complains, so the
+/// receive channels are in this one-off [Recv] instead of within
+/// [Kernel] as fields.
+#[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct Channels<Data: ValidData> {
 	// Shutdown signal.
 	pub(crate) shutdown: Receiver<()>,
@@ -153,6 +158,7 @@ pub(crate) struct Channels<Data: ValidData> {
 }
 
 //---------------------------------------------------------------------------------------------------- Kernel Impl
+#[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) init_barrier:        Option<Arc<Barrier>>,
 	pub(crate) atomic_state:        Arc<AtomicAudioState>,
@@ -171,6 +177,7 @@ where
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]
+	/// Initialize `Kernel`.
 	pub(crate) fn init(args: InitArgs<Data>) -> Result<JoinHandle<()>, std::io::Error> {
 		std::thread::Builder::new()
 			.name("Kernel".into())
@@ -185,7 +192,7 @@ where
 					previous_threshold,
 				} = args;
 
-				let this = Kernel {
+				let this = Self {
 					atomic_state,
 					w,
 					shutdown_wait,
@@ -197,13 +204,15 @@ where
 					init_barrier.wait();
 				}
 
-				Kernel::main(this, channels);
+				Self::main(this, channels);
 			})
 	}
 
 	//---------------------------------------------------------------------------------------------------- Main Loop
 	#[cold]
 	#[inline(never)]
+	#[allow(clippy::cognitive_complexity)]
+	/// `Kernel`'s main function.
 	fn main(mut self, c: Channels<Data>) {
 		// Create channels that we will
 		// be selecting/listening to for all time.
@@ -264,7 +273,8 @@ where
 
 					// Tell all actors to shutdown.
 					for actor in c.shutdown_actor.iter() {
-						let _ = actor.try_send(());
+						#[allow(dropping_copy_types)]
+						drop(actor.try_send(()));
 					}
 
 					// Wait until all threads are ready to shutdown.
@@ -282,12 +292,14 @@ where
 					debug2!("Kernel - shutting down (hang)");
 
 					for actor in c.shutdown_actor.iter() {
-						let _ = actor.try_send(());
+						#[allow(dropping_copy_types)]
+						drop(actor.try_send(()));
 					}
 
 					debug2!("Kernel - waiting on others...");
 					self.shutdown_wait.wait();
-					let _ = c.shutdown_done.try_send(());
+					#[allow(dropping_copy_types)]
+					drop(c.shutdown_done.try_send(()));
 
 					return;
 				},
@@ -299,6 +311,7 @@ where
 
 	//---------------------------------------------------------------------------------------------------- Misc Functions
 	#[inline]
+	/// TODO
 	fn new_source(
 		&self,
 		to_audio: &Sender<DiscardCurrentAudio>,
@@ -306,10 +319,11 @@ where
 		source: Source<Data>,
 	) {
 		self.tell_audio_to_discard(to_audio);
-		self.tell_decode_to_discard(to_decode);
+		Self::tell_decode_to_discard(to_decode);
 		try_send!(to_decode, KernelToDecode::NewSource(source));
 	}
 
+	/// TODO
 	fn tell_audio_to_discard(&self, to_audio: &Sender<DiscardCurrentAudio>) {
 		// INVARIANT:
 		// This is set by [Kernel] since it
@@ -321,22 +335,27 @@ where
 		try_send!(to_audio, DiscardCurrentAudio);
 	}
 
-	fn tell_decode_to_discard(&self, to_decode: &Sender<KernelToDecode<Data>>) {
+	/// TODO
+	fn tell_decode_to_discard(to_decode: &Sender<KernelToDecode<Data>>) {
 		try_send!(to_decode, KernelToDecode::DiscardAudioAndStop);
 	}
 
+	/// TODO
 	fn queue_empty(&self) -> bool {
 		self.w.queue.is_empty()
 	}
 
+	/// TODO
 	fn playing(&self) -> bool {
 		self.w.playing
 	}
 
+	/// TODO
 	fn source_is_some(&self) -> bool {
 		self.w.current.is_some()
 	}
 
+	/// TODO
 	fn add_commit_push<Input, Output>(&mut self, input: Input) -> Output
 	where
 		Input: Clone,
@@ -347,6 +366,7 @@ where
 		// be cloned, so they should never be passed
 		// to this function.
 		#[cfg(debug_assertions)]
+		#[allow(clippy::wildcard_enum_match_arm)]
 		{
 			match input.clone().into() {
 				Signal::Shuffle(_) => panic!("shuffle was passed to add_commit_push()"),
@@ -360,14 +380,17 @@ where
 		output
 	}
 
+	/// TODO
 	fn commit_push_get(&mut self) -> AudioStateSnapshot<Data> {
 		AudioStateSnapshot(self.w.commit_and().push_and().head_remote_ref())
 	}
 
+	/// TODO
 	fn get(&self) -> AudioStateSnapshot<Data> {
 		AudioStateSnapshot(self.w.head_remote_ref())
 	}
 
+	/// TODO
 	fn less_than_threshold(&self, threshold: f64) -> bool {
 		if let Some(current) = &self.w.current {
 			current.elapsed < threshold
@@ -383,6 +406,7 @@ where
 	// to exact messages/signals from the other actors.
 
 	#[inline]
+	/// TODO
 	fn toggle(&mut self) {
 		if self.playing() {
 			self.pause();
@@ -392,6 +416,7 @@ where
 	}
 
 	#[inline]
+	/// TODO
 	fn play(&mut self) {
 		if !self.playing() && self.source_is_some() {
 			self.add_commit_push(Play);
@@ -399,12 +424,14 @@ where
 	}
 
 	#[inline]
+	/// TODO
 	fn pause(&mut self) {
 		if self.playing() && self.source_is_some() {
 			self.add_commit_push(Pause);
 		}
 	}
 
+	/// TODO
 	fn stop(&mut self) {
 		if self.source_is_some() || !self.queue_empty() {
 			// INVARIANT: must be [push_clone()], see
@@ -415,6 +442,7 @@ where
 		}
 	}
 
+	/// TODO
 	fn clear(&mut self, clear: Clear) {
 		match clear {
 			Clear::Queue => if self.queue_empty() { return },
@@ -424,11 +452,13 @@ where
 	}
 
 	#[inline]
+	/// TODO
 	fn restore(&mut self, restore: AudioState<Data>) {
 		todo!();
 	}
 
 	#[inline]
+	/// TODO
 	fn shuffle(
 		&mut self,
 		shuffle: Shuffle,
@@ -451,6 +481,7 @@ where
 	}
 
 	#[inline]
+	/// TODO
 	fn repeat(&mut self, repeat: Repeat) {
 		if self.w.repeat != repeat {
 			self.atomic_state.repeat.set(repeat);
@@ -459,6 +490,7 @@ where
 	}
 
 	#[inline]
+	/// TODO
 	fn volume(&mut self, volume: Volume) {
 		if self.w.volume != volume {
 			self.atomic_state.volume.set(volume);
@@ -467,6 +499,7 @@ where
 	}
 
 	#[inline]
+	/// TODO
 	fn next(&mut self) {
 		// INVARIANT:
 		// Applying [Next] returns an `Option<Source>`.
@@ -480,11 +513,13 @@ where
 	}
 
 	#[inline]
+	/// TODO
 	fn previous(&mut self) {
 		todo!();
 	}
 
 	#[inline]
+	/// TODO
 	fn add(
 		&mut self,
 		add: Add<Data>,
@@ -507,12 +542,14 @@ where
 	}
 
 	#[inline]
+	/// TODO
 	fn add_many(&mut self, add_many: AddMany<Data>, to_engine: &Sender<Result<AudioStateSnapshot<Data>, AddManyError>>) {
 		todo!();
 		try_send!(to_engine, Ok(self.commit_push_get()));
 	}
 
 	#[inline]
+	/// TODO
 	fn seek(
 		&mut self,
 		seek: Seek,
@@ -538,12 +575,14 @@ where
 	}
 
 	#[inline]
+	/// TODO
 	fn skip(&mut self, skip: Skip, to_engine: &Sender<Result<AudioStateSnapshot<Data>, SkipError>>) {
 		todo!();
 		try_send!(to_engine, Ok(self.commit_push_get()));
 	}
 
 	#[inline]
+	/// TODO
 	fn back(
 		&mut self,
 		mut back: Back,
@@ -577,24 +616,27 @@ where
 		}
 
 		match self.add_commit_push(back) {
-			Ok(_)  => try_send!(to_engine, Ok(self.commit_push_get())),
+			Ok(())  => try_send!(to_engine, Ok(self.commit_push_get())),
 			Err(e) => try_send!(to_engine, Err(e)),
 		}
 	}
 
 	#[inline]
+	/// TODO
 	fn set_index(&mut self, set_index: SetIndex, to_engine: &Sender<Result<AudioStateSnapshot<Data>, SetIndexError>>) {
 		todo!();
 		try_send!(to_engine, Ok(self.commit_push_get()));
 	}
 
 	#[inline]
+	/// TODO
 	fn remove(&mut self, remove: Remove, to_engine: &Sender<Result<AudioStateSnapshot<Data>, RemoveError>>) {
 		todo!();
 		try_send!(to_engine, Ok(self.commit_push_get()));
 	}
 
 	#[inline]
+	/// TODO
 	fn remove_range(&mut self, remove_range: RemoveRange, to_engine: &Sender<Result<AudioStateSnapshot<Data>, RemoveRangeError>>) {
 		todo!();
 		try_send!(to_engine, Ok(self.commit_push_get()));

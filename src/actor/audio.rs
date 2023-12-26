@@ -1,3 +1,5 @@
+//! TODO
+
 //---------------------------------------------------------------------------------------------------- Use
 use std::thread::JoinHandle;
 use crossbeam::channel::{Receiver, Select, Sender};
@@ -26,19 +28,21 @@ use crate::signal::Volume;
 use crate::state::AtomicAudioState;
 
 //---------------------------------------------------------------------------------------------------- Constants
-// AUDIO_BUFFER_LEN is the buffer size of the channel
-// holding all the freshly decoded [AudioBuffer]'s.
-//
-// This is how many [AudioBuffer]'s [Audio] can simply
-// play back without any interaction with [Decode].
-// In a worst-case scenario where [Decode] hits some terrible
-// allocation delay, [Audio] will still be able to continue on,
-// playing back this buffer.
-//
-// 64 [AudioBuffer]'s (with average sample-rate) is around 2 seconds.
+/// `AUDIO_BUFFER_LEN` is the buffer size of the channel
+/// holding all the freshly decoded [`AudioBuffer`]'s.
+///
+/// This is how many [`AudioBuffer`]'s [`Audio`] can simply
+/// play back without any interaction with [Decode].
+/// In a worst-case scenario where [Decode] hits some terrible
+/// allocation delay, [`Audio`] will still be able to continue on,
+/// playing back this buffer.
+///
+/// 64 [`AudioBuffer`]'s (with average sample-rate) is around 2 seconds.
 pub(crate) const AUDIO_BUFFER_LEN: usize = 64;
 
 //---------------------------------------------------------------------------------------------------- Audio
+/// TODO
+#[allow(clippy::missing_docs_in_private_items)]
 #[derive(Debug)]
 pub(crate) struct Audio<Output>
 where
@@ -55,6 +59,7 @@ where
 
 //---------------------------------------------------------------------------------------------------- Channels
 // See [src/actor/kernel.rs]'s [Channels]
+#[allow(clippy::missing_docs_in_private_items)]
 struct Channels {
 	shutdown: Receiver<()>,
 
@@ -69,19 +74,21 @@ struct Channels {
 }
 
 //---------------------------------------------------------------------------------------------------- (Actual) Messages
-// Audio -> Decode
-//
-// There's only 1 message variant,
-// so this is a ZST struct, not an enum.
-//
-// We (Audio) took out an audio buffer from
-// the channel, please send another one :)
+/// Audio -> Decode
+///
+/// There's only 1 message variant,
+/// so this is a ZST struct, not an enum.
+///
+/// We (Audio) took out an audio buffer from
+/// the channel, please send another one :)
 pub(crate) struct TookAudioBuffer;
 
+/// TODO
 pub(crate) enum AudioToKernel {
 }
 
 //---------------------------------------------------------------------------------------------------- Audio Impl
+#[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct InitArgs {
 	pub(crate) init_barrier:      Option<Arc<Barrier>>,
 	pub(crate) atomic_state:      Arc<AtomicAudioState>,
@@ -105,6 +112,7 @@ where
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]
+	/// Initialize `Audio`.
 	pub(crate) fn init(args: InitArgs) -> Result<JoinHandle<()>, std::io::Error> {
 		std::thread::Builder::new()
 			.name("Audio".into())
@@ -160,6 +168,7 @@ where
 	//---------------------------------------------------------------------------------------------------- Main Loop
 	#[cold]
 	#[inline(never)]
+	/// `Audio`'s main function.
 	fn main(mut self, channels: Channels) {
 		// Create channels that we will
 		// be selecting/listening to for all time.
@@ -179,20 +188,21 @@ where
 				}
 			}
 
+			#[allow(clippy::single_match_else)]
 			// Attempt to receive signal from other actors.
 			let select_index = match select.try_ready() {
 				Ok(s) => s,
-				_ => {
+				Err(_) => {
 					// If we're playing, continue to
 					// next iteration of loop so that
 					// we continue playing.
 					if self.playing {
 						continue;
+					}
+
 					// Else, hang until we receive
 					// a message from somebody.
-					} else {
-						select.ready()
-					}
+					select.ready()
 				},
 			};
 
@@ -237,6 +247,7 @@ where
 	// to exact messages/signals from the other actors.
 
 	#[inline]
+	/// Send `AudioBuffer` bytes to the backend and "play" it.
 	fn play_audio_buffer(
 		&mut self,
 		msg: (AudioBuffer<f32>, symphonia::core::units::Time),
@@ -274,6 +285,7 @@ where
 			// TODO: Send error the engine backchannel
 			// or discard depending on user config.
 			use ErrorBehavior as E;
+			#[allow(clippy::match_same_arms)] // TODO
 			match self.eb_output {
 				E::Pause    => (), // TODO: tell [Kernel] to pause
 				E::Continue => (),
@@ -299,6 +311,7 @@ where
 	}
 
 	#[inline]
+	/// TODO
 	fn discard_audio(
 		&mut self,
 		from_decode: &Receiver<(AudioBuffer<f32>, Time)>,

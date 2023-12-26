@@ -1,3 +1,5 @@
+//! TODO
+
 //---------------------------------------------------------------------------------------------------- Use
 use std::{
 	sync::{Arc,Barrier},
@@ -14,7 +16,8 @@ use crossbeam::channel::{Receiver, Select};
 use symphonia::core::audio::AudioBuffer;
 
 //---------------------------------------------------------------------------------------------------- Gc
-// The [G]arbage [c]ollector.
+/// The [G]arbage [c]ollector.
+#[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct Gc<Data: ValidData> {
 	pub(crate) shutdown_wait: Arc<Barrier>,
 	pub(crate) init_barrier:  Option<Arc<Barrier>>,
@@ -30,15 +33,17 @@ impl<Data: ValidData> Gc<Data> {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]
+	/// Initialize [`Gc`].
 	pub(crate) fn init(self) -> Result<JoinHandle<()>, std::io::Error> {
 		std::thread::Builder::new()
 			.name("Gc".into())
-			.spawn(move || Gc::main(self))
+			.spawn(move || Self::main(self))
 	}
 
 	//---------------------------------------------------------------------------------------------------- Main Loop
 	#[cold]
 	#[inline(never)]
+	/// Initialize `Gc`.
 	fn main(self) {
 		let mut select = Select::new();
 

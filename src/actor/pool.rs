@@ -1,3 +1,5 @@
+//! TODO
+
 //---------------------------------------------------------------------------------------------------- Use
 use std::{thread::JoinHandle, marker::PhantomData};
 use crossbeam::channel::{Receiver, Select, Sender};
@@ -24,16 +26,20 @@ use strum::EnumCount;
 //---------------------------------------------------------------------------------------------------- Constants
 
 //---------------------------------------------------------------------------------------------------- Types
+/// TODO
 type ToDecode = (AudioBuffer<f32>, Time);
 
 //---------------------------------------------------------------------------------------------------- Pool
+/// TODO
+#[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct Pool<Data: ValidData> {
 	shutdown_wait: Arc<Barrier>,
 	buffer_decode: VecDeque<ToDecode>,
 	_p: PhantomData<Data>,
 }
 
-// See [src/actor/kernel.rs]'s [Channels]
+/// See [src/actor/kernel.rs]'s `Channels`
+#[allow(clippy::missing_docs_in_private_items)]
 struct Channels<Data: ValidData> {
 	shutdown:    Receiver<()>,
 	to_decode:   Sender<VecDeque<ToDecode>>,
@@ -41,12 +47,16 @@ struct Channels<Data: ValidData> {
 	to_gc:       Sender<PoolToGc<Data>>,
 }
 
+/// TODO
 pub (crate) enum PoolToGc<Data: ValidData> {
+	/// TODO
 	Buffer(AudioBuffer<f32>),
+	/// TODO
 	Current(Current<Data>),
 }
 
 //---------------------------------------------------------------------------------------------------- InitArgs
+#[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) init_barrier:  Option<Arc<Barrier>>,
 	pub(crate) shutdown_wait: Arc<Barrier>,
@@ -61,6 +71,7 @@ impl<Data: ValidData> Pool<Data> {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]
+	/// Initialize `Pool`.
 	pub(crate) fn init(args: InitArgs<Data>) -> Result<JoinHandle<()>, std::io::Error> {
 		std::thread::Builder::new()
 			.name("Pool".into())
@@ -95,7 +106,7 @@ impl<Data: ValidData> Pool<Data> {
 					to_gc,
 				};
 
-				let this = Pool {
+				let this = Self {
 					shutdown_wait,
 					buffer_decode,
 					_p: PhantomData,
@@ -105,13 +116,14 @@ impl<Data: ValidData> Pool<Data> {
 					init_barrier.wait();
 				}
 
-				Pool::main(this, channels);
+				Self::main(this, channels);
 			})
 	}
 
 	//---------------------------------------------------------------------------------------------------- Main Loop
 	#[cold]
 	#[inline(never)]
+	/// `Pool`'s main function.
 	fn main(mut self, channels: Channels<Data>) {
 		// Create channels that we will
 		// be selecting/listening to for all time.
@@ -148,6 +160,8 @@ impl<Data: ValidData> Pool<Data> {
 	// to exact messages/signals from the other actors.
 
 	#[inline]
+	#[allow(clippy::wrong_self_convention)]
+	/// TODO
 	fn from_decode(
 		&mut self,
 		channels: &Channels<Data>,

@@ -109,7 +109,10 @@
 	clippy::arithmetic_side_effects,
 	clippy::default_trait_access,
 	clippy::similar_names,
+	clippy::needless_pass_by_value,
 )]
+
+#![cfg_attr(debug_assertions, allow(clippy::todo))]
 
 //---------------------------------------------------------------------------------------------------- Public API
 /// TODO
