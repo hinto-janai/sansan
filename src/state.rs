@@ -24,6 +24,7 @@ where
 	Data: ValidData,
 {
 	#[inline]
+	#[must_use]
 	/// TODO
 	pub fn get(&self) -> AudioStateSnapshot<Data> {
 		AudioStateSnapshot(self.0.head_spin())
@@ -71,15 +72,22 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- AtomicAudioState
+/// TODO
 #[derive(Debug)]
 pub(crate) struct AtomicAudioState {
+	/// TODO
 	pub(crate) audio_ready_to_recv: AtomicBool,
+	/// TODO
 	pub(crate) playing: AtomicBool,
+	/// TODO
 	pub(crate) repeat: AtomicRepeat,
+	/// TODO
 	pub(crate) volume: AtomicVolume,
 }
 
 impl AtomicAudioState {
+	/// TODO
+	#[allow(clippy::declare_interior_mutable_const)]
 	pub(crate) const DEFAULT: Self = Self {
 		audio_ready_to_recv: AtomicBool::new(false),
 		playing: AtomicBool::new(false),
