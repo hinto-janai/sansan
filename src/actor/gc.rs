@@ -72,7 +72,7 @@ impl<Data: ValidData> Gc<Data> {
 					return;
 				},
 
-				_ => crate::macros::unreachable2!(),
+				_ => unreachable!(),
 			}
 		}
 	}

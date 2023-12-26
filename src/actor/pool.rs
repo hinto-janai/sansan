@@ -136,7 +136,7 @@ impl<Data: ValidData> Pool<Data> {
 					return;
 				},
 
-				_ => crate::macros::unreachable2!(),
+				_ => unreachable!(),
 			}
 		}
 	}

@@ -35,7 +35,7 @@ impl Repeat {
 			0 => Self::Off,
 			1 => Self::Current,
 			2 => Self::Queue,
-			_ => crate::macros::unreachable2!(),
+			_ => unreachable!(),
 		}
 	}
 

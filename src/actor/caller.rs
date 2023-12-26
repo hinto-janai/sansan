@@ -151,7 +151,7 @@ where
 					return;
 				},
 
-				_ => crate::macros::unreachable2!(),
+				_ => unreachable!(),
 			}
 		}
 	}

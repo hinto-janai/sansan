@@ -95,7 +95,7 @@ impl<Data: ValidData> Apply<Signal<Data>> for AudioState<Data> {
 			//
 			// [writer.sync()] should also never be taken
 			// as that gets skipped if [push_clone()] is used.
-			Signal::Shuffle(_) => crate::macros::unreachable2!(),
+			Signal::Shuffle(_) => unreachable!(),
 		}
 	}
 }

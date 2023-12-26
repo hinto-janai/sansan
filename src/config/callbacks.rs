@@ -61,7 +61,7 @@ where
 			Self::Dynamic(x)   => { x(audio_state); },
 			Self::Channel(x)   => { let _ = x.try_send(msg); },
 			Self::Pointer(x)   => { x(audio_state); },
-			Self::__Phantom(_) => crate::macros::unreachable2!(),
+			Self::__Phantom(_) => unreachable!(),
 		}
 	}
 }
@@ -78,7 +78,7 @@ where
 			Self::Dynamic(_)   => write!(f, "Callback::Dynamic"),
 			Self::Channel(_)   => write!(f, "Callback::Channel"),
 			Self::Pointer(_)   => write!(f, "Callback::Pointer"),
-			Self::__Phantom(_) => crate::macros::unreachable2!(),
+			Self::__Phantom(_) => unreachable!(),
 		}
 	}
 }

@@ -292,14 +292,89 @@ where
 					return;
 				},
 
-				_ => crate::macros::unreachable2!(),
+				_ => unreachable!(),
 			}
 		}
 	}
 
-	//---------------------------------------------------------------------------------------------------- Message Routing
-	// These are the functions that map message
-	// enums to the their proper signal handler.
+	//---------------------------------------------------------------------------------------------------- Misc Functions
+	#[inline]
+	fn new_source(
+		&self,
+		to_audio: &Sender<DiscardCurrentAudio>,
+		to_decode: &Sender<KernelToDecode<Data>>,
+		source: Source<Data>,
+	) {
+		self.tell_audio_to_discard(to_audio);
+		self.tell_decode_to_discard(to_decode);
+		try_send!(to_decode, KernelToDecode::NewSource(source));
+	}
+
+	fn tell_audio_to_discard(&self, to_audio: &Sender<DiscardCurrentAudio>) {
+		// INVARIANT:
+		// This is set by [Kernel] since it
+		// _knows_ when we're discarding first.
+		//
+		// [Audio] is responsible for setting it
+		// back to [true].
+		self.atomic_state.audio_ready_to_recv.store(false, Ordering::Release);
+		try_send!(to_audio, DiscardCurrentAudio);
+	}
+
+	fn tell_decode_to_discard(&self, to_decode: &Sender<KernelToDecode<Data>>) {
+		try_send!(to_decode, KernelToDecode::DiscardAudioAndStop);
+	}
+
+	fn queue_empty(&self) -> bool {
+		self.w.queue.is_empty()
+	}
+
+	fn playing(&self) -> bool {
+		self.w.playing
+	}
+
+	fn source_is_some(&self) -> bool {
+		self.w.current.is_some()
+	}
+
+	fn add_commit_push<Input, Output>(&mut self, input: Input) -> Output
+	where
+		Input: Clone,
+		Signal<Data>: From<Input>,
+		AudioState<Data>: ApplyReturn<Signal<Data>, Input, Output>,
+	{
+		// SAFETY: Special signals, they must always
+		// be cloned, so they should never be passed
+		// to this function.
+		#[cfg(debug_assertions)]
+		{
+			match input.clone().into() {
+				Signal::Shuffle(_) => panic!("shuffle was passed to add_commit_push()"),
+				Signal::Stop(_)    => panic!("stop was passed to add_commit_push()"),
+				_ => (),
+			}
+		}
+
+		let output = self.w.commit_return(input);
+		self.w.push();
+		output
+	}
+
+	fn commit_push_get(&mut self) -> AudioStateSnapshot<Data> {
+		AudioStateSnapshot(self.w.commit_and().push_and().head_remote_ref())
+	}
+
+	fn get(&self) -> AudioStateSnapshot<Data> {
+		AudioStateSnapshot(self.w.head_remote_ref())
+	}
+
+	fn less_than_threshold(&self, threshold: f64) -> bool {
+		if let Some(current) = &self.w.current {
+			current.elapsed < threshold
+		} else {
+			false
+		}
+	}
 
 	//---------------------------------------------------------------------------------------------------- Signal Handlers
 	// Function Handlers.
@@ -523,84 +598,5 @@ where
 	fn remove_range(&mut self, remove_range: RemoveRange, to_engine: &Sender<Result<AudioStateSnapshot<Data>, RemoveRangeError>>) {
 		todo!();
 		try_send!(to_engine, Ok(self.commit_push_get()));
-	}
-
-	//---------------------------------------------------------------------------------------------------- Misc Functions
-	#[inline]
-	fn new_source(
-		&self,
-		to_audio: &Sender<DiscardCurrentAudio>,
-		to_decode: &Sender<KernelToDecode<Data>>,
-		source: Source<Data>,
-	) {
-		self.tell_audio_to_discard(to_audio);
-		self.tell_decode_to_discard(to_decode);
-		try_send!(to_decode, KernelToDecode::NewSource(source));
-	}
-
-	fn tell_audio_to_discard(&self, to_audio: &Sender<DiscardCurrentAudio>) {
-		// INVARIANT:
-		// This is set by [Kernel] since it
-		// _knows_ when we're discarding first.
-		//
-		// [Audio] is responsible for setting it
-		// back to [true].
-		self.atomic_state.audio_ready_to_recv.store(false, Ordering::Release);
-		try_send!(to_audio, DiscardCurrentAudio);
-	}
-
-	fn tell_decode_to_discard(&self, to_decode: &Sender<KernelToDecode<Data>>) {
-		try_send!(to_decode, KernelToDecode::DiscardAudioAndStop);
-	}
-
-	fn queue_empty(&self) -> bool {
-		self.w.queue.is_empty()
-	}
-
-	fn playing(&self) -> bool {
-		self.w.playing
-	}
-
-	fn source_is_some(&self) -> bool {
-		self.w.current.is_some()
-	}
-
-	fn add_commit_push<Input, Output>(&mut self, input: Input) -> Output
-	where
-		Input: Clone,
-		Signal<Data>: From<Input>,
-		AudioState<Data>: ApplyReturn<Signal<Data>, Input, Output>,
-	{
-		// SAFETY: Special signals, they must always
-		// be cloned, so they should never be passed
-		// to this function.
-		#[cfg(debug_assertions)]
-		{
-			match input.clone().into() {
-				Signal::Shuffle(_) => panic!("shuffle was passed to add_commit_push()"),
-				Signal::Stop(_)    => panic!("stop was passed to add_commit_push()"),
-				_ => (),
-			}
-		}
-
-		let output = self.w.commit_return(input);
-		self.w.push();
-		output
-	}
-
-	fn commit_push_get(&mut self) -> AudioStateSnapshot<Data> {
-		AudioStateSnapshot(self.w.commit_and().push_and().head_remote_ref())
-	}
-
-	fn get(&self) -> AudioStateSnapshot<Data> {
-		AudioStateSnapshot(self.w.head_remote_ref())
-	}
-
-	fn less_than_threshold(&self, threshold: f64) -> bool {
-		if let Some(current) = &self.w.current {
-			current.elapsed < threshold
-		} else {
-			false
-		}
 	}
 }

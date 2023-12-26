@@ -209,7 +209,7 @@ impl<Data: ValidData> Decode<Data> {
 						return;
 					},
 
-					_ => crate::macros::unreachable2!(),
+					_ => unreachable!(),
 				}
 			}
 
