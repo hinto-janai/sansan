@@ -1,11 +1,11 @@
 // Global macros for internal sansan usage.
 
 //---------------------------------------------------------------------------------------------------- Channels
-// SAFETY:
+// INVARIANT:
 // These macros are used in situations where
 // a [send/recv] erroring is a logical error.
 
-// Receive a channel message, unwrap.
+/// Receive a channel message, unwrap.
 macro_rules! recv {
     ($channel:expr) => {{
 		$channel.recv().unwrap()
@@ -13,7 +13,7 @@ macro_rules! recv {
 }
 pub(crate) use recv;
 
-// Send a channel message, unwrap.
+/// Send a channel message, unwrap.
 macro_rules! send {
 	($channel:expr, $($msg:tt)+) => {{
 		$channel.send($($msg)+).unwrap()
@@ -21,7 +21,7 @@ macro_rules! send {
 }
 pub(crate) use send;
 
-// `try_send` a channel message, unwrap.
+/// `try_send` a channel message, unwrap.
 macro_rules! try_send {
     ($channel:expr, $($msg:tt)+) => {{
         $channel.try_send($($msg)+).unwrap()
@@ -29,7 +29,7 @@ macro_rules! try_send {
 }
 pub(crate) use try_send;
 
-// `try_recv` a channel message, unwrap.
+/// `try_recv` a channel message, unwrap.
 macro_rules! try_recv {
     ($channel:expr) => {{
         $channel.try_recv().unwrap()
@@ -37,12 +37,12 @@ macro_rules! try_recv {
 }
 pub(crate) use try_recv;
 
-// `recv` a [Select] operation channel message.
-//
-// These select operations get triggered spuriously,
-// so we have to make sure something was actually
-// sent to the channel, else, we [continue] in
-// whatever loop we are in.
+/// `recv` a [Select] operation channel message.
+///
+/// These select operations get triggered spuriously,
+/// so we have to make sure something was actually
+/// sent to the channel, else, we [continue] in
+/// whatever loop we are in.
 macro_rules! select_recv {
 	($channel:expr) => {{
 		match $channel.try_recv() {
@@ -57,6 +57,7 @@ pub(crate) use select_recv;
 // Logs with `log` but only if in debug
 // mode or if the log feature is enabled.
 
+/// `log::error`
 macro_rules! error2 {
     ($($arg:tt)+) => {{
         #[cfg(feature = "log")]
@@ -65,6 +66,7 @@ macro_rules! error2 {
 }
 pub(crate) use error2;
 
+/// `log::warn`
 macro_rules! warn2 {
     ($($arg:tt)+) => {{
         #[cfg(feature = "log")]
@@ -73,6 +75,7 @@ macro_rules! warn2 {
 }
 pub(crate) use warn2;
 
+/// `log::info`
 macro_rules! info2 {
     ($($arg:tt)+) => {{
         #[cfg(feature = "log")]
@@ -81,6 +84,7 @@ macro_rules! info2 {
 }
 pub(crate) use info2;
 
+/// `log::debug`
 macro_rules! debug2 {
     ($($arg:tt)+) => {{
         #[cfg(feature = "log")]
@@ -89,6 +93,7 @@ macro_rules! debug2 {
 }
 pub(crate) use debug2;
 
+/// `log::trace`
 macro_rules! trace2 {
     ($($arg:tt)+) => {{
         #[cfg(feature = "log")]
