@@ -1,3 +1,5 @@
+//! TODO
+
 //---------------------------------------------------------------------------------------------------- use
 use std::marker::PhantomData;
 use crate::{
@@ -19,6 +21,7 @@ use strum::{
 //---------------------------------------------------------------------------------------------------- Config
 // #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 // #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug)]
 /// TODO
 pub struct Config<Data, Call, Error>

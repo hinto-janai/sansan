@@ -1,3 +1,5 @@
+//! TODO
+
 //---------------------------------------------------------------------------------------------------- use
 use crate::{
 	state::{AudioState,ValidData},
@@ -58,7 +60,7 @@ where
 	pub(crate) fn call(&mut self, audio_state: &AudioState<Data>, msg: Msg) {
 		match self {
 			Self::Dynamic(x)   => { x(audio_state); },
-			Self::Channel(x)   => { let _ = x.try_send(msg); },
+			Self::Channel(x)   => { drop(x.try_send(msg)); },
 			Self::Pointer(x)   => { x(audio_state); },
 			Self::__Phantom(_) => unreachable!(),
 		}
@@ -131,10 +133,15 @@ where
 	Notify: SansanSender<()>,
 	Error:  SansanSender<SansanError>,
 {
+	/// TODO
 	pub(crate) next:      Option<Callback<Data, Notify, ()>>,
+	/// TODO
 	pub(crate) queue_end: Option<Callback<Data, Notify, ()>>,
+	/// TODO
 	pub(crate) repeat:    Option<Callback<Data, Notify, ()>>,
+	/// TODO
 	pub(crate) elapsed:   Option<(Callback<Data, Notify, ()>, f64)>,
+	/// TODO
 	pub(crate) error:     Option<Callback<Data, Error, SansanError>>,
 }
 
@@ -148,6 +155,8 @@ where
 	/// A fresh [`Self`] with no callbacks, same as [`Self::new()`]
 	pub const DEFAULT: Self = Self::new();
 
+	#[cold]
+	#[must_use]
 	/// Returns a fresh [`Self`] with no callbacks (all set to [`None`])
 	///
 	/// ```rust
@@ -166,7 +175,8 @@ where
 	}
 
 	/// TODO
-	pub fn all_none(&self) -> bool {
+	#[must_use]
+	pub const fn all_none(&self) -> bool {
 		self.next.is_none()         &&
 		self.queue_end.is_none()    &&
 		self.repeat.is_none()       &&
@@ -175,7 +185,8 @@ where
 	}
 
 	/// TODO
-	pub fn all_some(&self) -> bool {
+	#[must_use]
+	pub const fn all_some(&self) -> bool {
 		self.next.is_some()         &&
 		self.queue_end.is_some()    &&
 		self.repeat.is_some()       &&
@@ -184,7 +195,6 @@ where
 	}
 
 	#[cold]
-	#[inline(never)]
 	/// TODO
 	pub fn next(&mut self, callback: Callback<Data, Notify, ()>) -> &mut Self {
 		self.next = Some(callback);
@@ -192,7 +202,6 @@ where
 	}
 
 	#[cold]
-	#[inline(never)]
 	/// TODO
 	pub fn queue_end(&mut self, callback: Callback<Data, Notify, ()>) -> &mut Self {
 		self.queue_end = Some(callback);
@@ -200,7 +209,6 @@ where
 	}
 
 	#[cold]
-	#[inline(never)]
 	/// TODO
 	pub fn repeat(&mut self, callback: Callback<Data, Notify, ()>) -> &mut Self {
 		self.repeat = Some(callback);
@@ -208,7 +216,6 @@ where
 	}
 
 	#[cold]
-	#[inline(never)]
 	/// TODO
 	///
 	/// ## Panics
@@ -225,7 +232,6 @@ where
 	}
 
 	#[cold]
-	#[inline(never)]
 	/// TODO
 	pub fn error(&mut self, callback: Callback<Data, Error, SansanError>) -> &mut Self {
 		self.error = Some(callback);
