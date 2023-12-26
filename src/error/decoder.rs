@@ -1,3 +1,5 @@
+//! TODO
+
 //---------------------------------------------------------------------------------------------------- Decoder Errors
 #[allow(unused_imports)] // docs
 use crate::source::Source;
@@ -36,7 +38,7 @@ impl From<symphonia::core::errors::Error> for DecodeError {
 			E::Unsupported(s) => Self::Unsupported(s),
 			E::LimitError(s)  => Self::Limit(s),
 			E::IoError(s)     => Self::Io(s),
-			_ => Self::Unknown,
+			E::SeekError(_) | E::ResetRequired => Self::Unknown,
 		}
 	}
 }
