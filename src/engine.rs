@@ -37,21 +37,22 @@ use crossbeam::channel::Sender as S;
 use crossbeam::channel::Receiver as R;
 
 //---------------------------------------------------------------------------------------------------- Constants
-// Total count of all the "actors" in our system.
-//
-// [0] Audio
-// [1] Decode
-// [2] Kernel
-// [3] Pool
-// [4] Caller
-// [5] Mc (Media Control)
-// [6] Gc (Garbage Collector)
-//
-// TODO: finalize all actors
+/// Total count of all the "actors" in our system.
+///
+/// [0] Audio
+/// [1] Decode
+/// [2] Kernel
+/// [3] Pool
+/// [4] Caller
+/// [5] Mc (Media Control)
+/// [6] Gc (Garbage Collector)
+///
+/// TODO: finalize all actors
 pub(crate) const ACTOR_COUNT: usize = 7;
 
 //---------------------------------------------------------------------------------------------------- Engine
 /// TODO
+#[allow(clippy::missing_docs_in_private_items)]
 #[derive(Debug)]
 pub struct Engine<Data, Call, Error>
 where
@@ -59,23 +60,23 @@ where
 	Call: SansanSender<()>,
 	Error: SansanSender<SansanError>,
 {
-	// Trait bound.
+	/// Trait bound.
 	_p: PhantomData<(Call, Error)>,
 
-	// Data and objects.
+	/// Data and objects.
 	audio:  AudioStateReader<Data>,
 
-	// Signal to [Kernel] to tell all of our internal
-	// actors (threads) to start shutting down.
+	/// Signal to [Kernel] to tell all of our internal
+	/// actors (threads) to start shutting down.
 	shutdown: S<()>,
-	// Same as above, but for [shutdown_hang()].
+	/// Same as above, but for [shutdown_hang()].
 	shutdown_hang: S<()>,
-	// [Kernel] telling us the shutdown
-	// process has been completed.
+	/// [Kernel] telling us the shutdown
+	/// process has been completed.
 	shutdown_done: R<()>,
 	shutdown_blocking: bool,
 
-	// Signals that input/output `()`
+	/// Signals that input/output `()`
 	send_toggle:       S<()>,
 	send_play:         S<()>,
 	send_pause:        S<()>,
@@ -83,14 +84,14 @@ where
 	send_previous:     S<()>,
 	send_stop:         S<()>,
 
-	// Signals that have input and output `()`
+	/// Signals that have input and output `()`
 	send_clear:        S<Clear>,
 	send_restore:      S<AudioState<Data>>,
 	send_repeat:       S<Repeat>,
 	send_volume:       S<Volume>,
 	send_shuffle:      S<Shuffle>,
 
-	// Signals that return `Result<T, E>`
+	/// Signals that return `Result<T, E>`
 	send_add:          S<Add<Data>>,
 	recv_add:          R<Result<AudioStateSnapshot<Data>, AddError>>,
 	send_add_many:     S<AddMany<Data>>,
@@ -119,6 +120,15 @@ where
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]
+	#[allow(clippy::unwrap_in_result)]
+	#[allow(clippy::panic_in_result_fn)]
+	#[allow(clippy::cognitive_complexity)]
+	/// TODO
+	///
+	/// # Errors
+	/// TODO
+	///
+	/// # Panics
 	/// TODO
 	pub fn init(config: Config<Data, Call, Error>) -> Result<Self, EngineInitError> {
 		// Some initial assertions that must be upheld.
@@ -137,9 +147,11 @@ where
 				config.previous_threshold,
 			);
 
-			// Check all callbacks aren't the illegal [__Phantom] variant.
+			#[allow(clippy::items_after_statements)]
+			/// Check all callbacks aren't the illegal [__Phantom] variant.
 			static CALLBACK_ERROR_MSG: &str =
 				"__Phantom is used for the generic <Msg> bounds. It is not a real variant, do not use it.";
+			/// TODO
 			macro_rules! callback_check {
 				($callback:ident) => {
 					if let Some(callback) = &config.callbacks.$callback {
@@ -285,7 +297,7 @@ where
 		let to_caller_next      = if callbacks.next.is_some()      { Some(to_caller_next)      } else { None };
 		let to_caller_queue_end = if callbacks.queue_end.is_some() { Some(to_caller_queue_end) } else { None };
 		let to_caller_repeat    = if callbacks.repeat.is_some()    { Some(to_caller_repeat)    } else { None };
-		let to_caller_elapsed   = callbacks.elapsed.as_ref().and_then(|(_, secs)| Some((to_caller_elapsed, *secs)));
+		let to_caller_elapsed   = callbacks.elapsed.as_ref().map(|(_, secs)| (to_caller_elapsed, *secs));
 
 		// INVARIANT:
 		//
@@ -301,7 +313,7 @@ where
 				cb_next:       callbacks.next,
 				cb_queue_end:  callbacks.queue_end,
 				cb_repeat:     callbacks.repeat,
-				cb_elapsed:    callbacks.elapsed.and_then(|(cb, _)| Some(cb)),
+				cb_elapsed:    callbacks.elapsed.map(|(cb, _)| cb),
 				low_priority:  config.callback_low_priority,
 				audio_state:   AudioStateReader::clone(&audio_state_reader),
 				shutdown_wait: Arc::clone(&shutdown_wait),
@@ -336,7 +348,7 @@ where
 			ready_to_recv:     Arc::clone(&audio_ready_to_recv),
 			shutdown_wait:     Arc::clone(&shutdown_wait),
 			to_gc:             a_to_gc,
-			to_caller_elapsed: to_caller_elapsed.clone(),
+			to_caller_elapsed,
 			to_decode:         a_to_d,
 			from_decode:       a_from_d,
 			to_kernel:         a_to_k,
@@ -492,6 +504,7 @@ where
 	}
 
 	//---------------------------------------------------------------------------------------------------- Regular Fn
+	#[must_use]
 	/// TODO
 	pub fn reader(&self) -> AudioStateReader<Data> {
 		AudioStateReader::clone(&self.audio)
@@ -565,11 +578,17 @@ where
 	}
 
 	/// TODO
+	///
+	/// # Errors
+	/// TODO
 	pub fn seek(&mut self, seek: Seek) -> Result<AudioStateSnapshot<Data>, SeekError> {
 		try_send!(self.send_seek, seek);
 		recv!(self.recv_seek)
 	}
 
+	/// TODO
+	///
+	/// # Errors
 	/// TODO
 	pub fn skip(&mut self, skip: Skip) -> Result<AudioStateSnapshot<Data>, SkipError> {
 		try_send!(self.send_skip, skip);
@@ -577,17 +596,26 @@ where
 	}
 
 	/// TODO
+	///
+	/// # Errors
+	/// TODO
 	pub fn back(&mut self, back: Back) -> Result<AudioStateSnapshot<Data>, BackError> {
 		try_send!(self.send_back, back);
 		recv!(self.recv_back)
 	}
 
 	/// TODO
+	///
+	/// # Errors
+	/// TODO
 	pub fn add(&mut self, add: Add<Data>) -> Result<AudioStateSnapshot<Data>, AddError> {
 		try_send!(self.send_add, add);
 		recv!(self.recv_add)
 	}
 
+	/// TODO
+	///
+	/// # Errors
 	/// TODO
 	pub fn add_many(&mut self, add_many: AddMany<Data>) -> Result<AudioStateSnapshot<Data>, AddManyError> {
 		if add_many.sources.is_empty() {
@@ -599,17 +627,26 @@ where
 	}
 
 	/// TODO
+	///
+	/// # Errors
+	/// TODO
 	pub fn set_index(&mut self, set_index: SetIndex) -> Result<AudioStateSnapshot<Data>, SetIndexError> {
 		try_send!(self.send_set_index, set_index);
 		recv!(self.recv_set_index)
 	}
 
 	/// TODO
+	///
+	/// # Errors
+	/// TODO
 	pub fn remove(&mut self, remove: Remove) -> Result<AudioStateSnapshot<Data>, RemoveError> {
 		try_send!(self.send_remove, remove);
 		recv!(self.recv_remove)
 	} // defines what happens on included remove song, other errors, etc
 
+	/// TODO
+	///
+	/// # Errors
 	/// TODO
 	pub fn remove_range(&mut self, remove_range: RemoveRange) -> Result<AudioStateSnapshot<Data>, RemoveRangeError> {
 		try_send!(self.send_remove_range, remove_range);
