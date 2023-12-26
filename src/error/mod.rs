@@ -1,3 +1,5 @@
+//! TODO
+
 mod decoder;
 pub use decoder::DecodeError;
 

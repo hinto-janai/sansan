@@ -110,9 +110,12 @@
 	clippy::default_trait_access,
 	clippy::similar_names,
 	clippy::needless_pass_by_value,
+	clippy::inline_always,
+	clippy::if_then_some_else_none,
 )]
 
 #![cfg_attr(debug_assertions, allow(clippy::todo))]
+#![cfg_attr(debug_assertions, allow(clippy::multiple_crate_versions))]
 
 //---------------------------------------------------------------------------------------------------- Public API
 /// TODO
@@ -123,6 +126,7 @@ pub mod state;
 // 	ValidData,
 // };
 
+///
 mod engine;
 pub use engine::Engine;
 

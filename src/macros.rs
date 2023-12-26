@@ -1,4 +1,4 @@
-// Global macros for internal sansan usage.
+//! Global macros for internal sansan usage.
 
 //---------------------------------------------------------------------------------------------------- Channels
 // INVARIANT:

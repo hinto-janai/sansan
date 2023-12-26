@@ -1,5 +1,6 @@
-pub(crate) mod output;
+//! TODO
 
+pub(crate) mod output;
 pub(crate) mod resampler;
 
 // Output backends.
