@@ -106,6 +106,9 @@
 	clippy::integer_division,
 	clippy::type_complexity,
 	clippy::pattern_type_mismatch,
+	clippy::arithmetic_side_effects,
+	clippy::default_trait_access,
+	clippy::similar_names,
 )]
 
 //---------------------------------------------------------------------------------------------------- Public API

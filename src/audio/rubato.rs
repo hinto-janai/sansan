@@ -1,9 +1,9 @@
-// Audio resampling
-//
-// This file implements the abstract `Resampler`
-// trait using `rubato` as a backend.
-//
-// For documentation on `Resampler`, see `resampler.rs`.
+//! Audio resampling
+//!
+//! This file implements the abstract `Resampler`
+//! trait using `rubato` as a backend.
+//!
+//! For documentation on `Resampler`, see `resampler.rs`.
 
 //----------------------------------------------------------------------------------------------- use
 use rubato::FftFixedIn;
@@ -20,37 +20,37 @@ use crate::audio::resampler::Resampler;
 ///    do to using internal fixed buffers.
 ///
 /// It may be worth pre-creating `Rubato` objects with
-/// common audio sample rates, i.e - 44_100, 48_000, 96_000, etc,
+/// common audio sample rates, i.e - `44_100`, `48_000`, `96_000`, etc,
 /// as re-creating one per-track basis is expensive.
 pub(crate) struct Rubato {
-	// The actual resampling object.
+	/// The actual resampling object.
 	resampler: FftFixedIn<f32>,
 
-	// Temporary buffer(s) holding all the channels,
-	// which hold copied input data. It is quite
-	// unfortunate we have to copy audio samples
-	// we already have, but the input/output length
-	// must be "static" such that `resample()` works.
-	//
-	// We cannot "extend" a `&[]` that isn't quite
-	// long enough, so much copy the bytes into
-	// a slice that is the right length.
+	/// Temporary buffer(s) holding all the channels,
+	/// which hold copied input data. It is quite
+	/// unfortunate we have to copy audio samples
+	/// we already have, but the input/output length
+	/// must be "static" such that `resample()` works.
+	///
+	/// We cannot "extend" a `&[]` that isn't quite
+	/// long enough, so much copy the bytes into
+	/// a slice that is the right length.
 	input: Vec<Vec<f32>>,
 
-	// Temporary buffer(s) holding all the channels
-	// of the successfully resampled audio data.
+	/// Temporary buffer(s) holding all the channels
+	/// of the successfully resampled audio data.
 	output: Vec<Vec<f32>>,
 
-	// Ultimate "output" that will be used.
-	//
-	// This is a single `Vec` of interleaved
-	// audio data from all channels.
+	/// Ultimate "output" that will be used.
+	///
+	/// This is a single `Vec` of interleaved
+	/// audio data from all channels.
 	interleaved: Vec<f32>,
 
-	// The audio sample duration this Resampler is for.
+	/// The audio sample duration this Resampler is for.
 	duration: usize,
 
-	// The amount of channels this Resampler is for.
+	/// The amount of channels this Resampler is for.
 	channel_count: usize,
 }
 
@@ -70,7 +70,7 @@ impl Resampler for Rubato {
 
 		// Create resampler.
 		//
-		// SAFETY: this panics if input/output sample rate is 0.
+		// INVARIANT: this panics if input/output sample rate is 0.
 		// This function has a warning against this, so unwrap.
 		let resampler = FftFixedIn::<f32>::new(
 			sample_rate_input,
@@ -87,7 +87,7 @@ impl Resampler for Rubato {
 		// Interleaved capacity must be the capacity of all channels combined
 		let interleaved = vec![0.0; duration * channel_count];
 
-		Self { resampler, input, output, duration, interleaved, channel_count }
+		Self { resampler, input, output, interleaved, duration, channel_count }
 	}
 
 	#[inline]
@@ -101,7 +101,7 @@ impl Resampler for Rubato {
 
 		// Resample.
 		//
-		// SAFETY: we unwrap here because it is
+		// INVARIANT: we unwrap here because it is
 		// a logical error for this function to error.
 		//
 		// It means we gave `Resampler::new` wrong input,
@@ -131,7 +131,7 @@ impl Resampler for Rubato {
 
 		// Interleave the planar samples from Rubato.
 		for frame in self.interleaved.chunks_exact_mut(self.channel_count) {
-			for channel in self.output.iter() {
+			for channel in &self.output {
 				for (interleaved_sample, channel_sample) in frame.iter_mut().zip(channel.iter()) {
 					*interleaved_sample = *channel_sample;
 				}
@@ -227,10 +227,11 @@ mod tests {
 	// Makes sure known input `[f32]` always gets
 	// resampled into the expect output `[f32]`.
 	fn resample_output() {
+		use std::num::NonZeroUsize;
+
 		let audio: Vec<AudioBuffer<f32>> = create_test_audio();
 
 		// Create resampler.
-		use std::num::NonZeroUsize;
 		let mut resampler = super::Rubato::new(
 			NonZeroUsize::new(SAMPLE_RATE).unwrap(),     // Original sample rate
 			NonZeroUsize::new(SAMPLE_RATE * 2).unwrap(), // Target is 2x the sample rate (88,200)

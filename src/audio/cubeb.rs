@@ -1,11 +1,11 @@
-// Audio hardware input/output
-//
-// This file implements the abstract `AudioOutput`
-// trait using `cubeb-rs` as a backend.
-//
-// For documentation on `AudioOutput`, see `output.rs`.
-//
-// TODO: channel stereo support message
+//! Audio hardware input/output
+//!
+//! This file implements the abstract `AudioOutput`
+//! trait using `cubeb-rs` as a backend.
+//!
+//! For documentation on `AudioOutput`, see `output.rs`.
+//!
+//! TODO: channel stereo support message
 
 //----------------------------------------------------------------------------------------------- use
 use crate::{
@@ -25,75 +25,75 @@ use std::sync::{
 use crate::macros::{recv,send,try_send,try_recv};
 
 //----------------------------------------------------------------------------------------------- Constants
-// The most common sample rate to fallback to if we cannot
-// poll the audio devices "preferred" audio sample rate.
+/// The most common sample rate to fallback to if we cannot
+/// poll the audio devices "preferred" audio sample rate.
 const SAMPLE_RATE_FALLBACK: u32 = 44_100;
 
-// The amount of milliseconds our audio buffer is between
-// us and `cubeb`'s callback function (if the user does
-// not provide a value).
+/// The amount of milliseconds our audio buffer is between
+/// us and `cubeb`'s callback function (if the user does
+/// not provide a value).
 const AUDIO_MILLISECOND_BUFFER_FALLBACK: usize = 20;
 
-// The amount of raw [f32] samples held in our [Vec<f32>] sample buffer.
-//
-// Tracks seem to max out at `8192`, so do that * 2 to be safe.
+/// The amount of raw [f32] samples held in our [Vec<f32>] sample buffer.
+///
+/// Tracks seem to max out at `8192`, so do that * 2 to be safe.
 pub(crate) const AUDIO_SAMPLE_BUFFER_LEN: usize = 16_384;
 
 //----------------------------------------------------------------------------------------------- Cubeb
-//
+/// TODO
 pub(crate) struct Cubeb<R>
 where
 	R: Resampler,
 {
-	// We send audio data to this channel which
-	// the audio stream will receive and write.
+	/// We send audio data to this channel which
+	/// the audio stream will receive and write.
 	sender: Sender<StereoFrame<f32>>,
 
-	// A signal to `cubeb` that is should ignore
-	// and discard all sent audio samples and
-	// return ASAP.
+	/// A signal to `cubeb` that is should ignore
+	/// and discard all sent audio samples and
+	/// return ASAP.
 	discard: Sender<()>,
 
-	// A signal from `cubeb` telling us it has
-	// completely drained the audio buffer.
+	/// A signal from `cubeb` telling us it has
+	/// completely drained the audio buffer.
 	drained: Receiver<()>,
 
-	// The actual audio stream.
+	/// The actual audio stream.
 	stream: cubeb::Stream<StereoFrame<f32>>,
 
-	// A mutable bool shared between the caller
-	// and the cubeb audio stream.
-	//
-	// cubeb will set this to `true` in cases
-	// of error, and the caller should be
-	// polling it and setting it to false
-	// when the error is ACK'ed.
-	//
-	// HACK:
-	// cubeb only provides 1 error type,
-	// we don't know which actions caused
-	// which errors, so we rely on this
-	// "something recently caused and error
-	// and i'm just gonna set this bool" hack.
+	/// A mutable bool shared between the caller
+	/// and the cubeb audio stream.
+	///
+	/// cubeb will set this to `true` in cases
+	/// of error, and the caller should be
+	/// polling it and setting it to false
+	/// when the error is ACK'ed.
+	///
+	/// HACK:
+	/// cubeb only provides 1 error type,
+	/// we don't know which actions caused
+	/// which errors, so we rely on this
+	/// "something recently caused and error
+	/// and i'm just gonna set this bool" hack.
 	error: Arc<AtomicBool>,
 
-	// The resampler.
+	/// The resampler.
 	resampler: Option<R>,
 
-	// Audio spec output was opened with.
+	/// Audio spec output was opened with.
 	spec: SignalSpec,
-	// Duration this output was opened with.
+	/// Duration this output was opened with.
 	duration: u64,
 
-	// A re-usable sample buffer.
+	/// A re-usable sample buffer.
 	sample_buf: SampleBuffer<f32>,
-	// A re-usable Vec of samples.
+	/// A re-usable Vec of samples.
 	samples: Vec<f32>,
 
-	// How many channels?
+	/// How many channels?
 	channels: usize,
 
-	// Are we currently playing?
+	/// Are we currently playing?
 	playing: bool,
 }
 
@@ -147,7 +147,7 @@ where
 				// Taken from: https://docs.rs/symphonia-core/0.5.3/src/symphonia_core/audio.rs.html#680-692
 				for plane in self.samples.chunks_mut(capacity) {
 					for sample in &mut plane[0..frames] {
-						*sample = *sample * volume;
+						*sample *= volume;
 					}
 				}
 
@@ -168,9 +168,9 @@ where
 				send!(self.sender, StereoFrame { l, r });
 			});
 		} else {
-			samples.iter().for_each(|f| {
+			for f in samples {
 				send!(self.sender, StereoFrame { l: *f, r: *f });
-			});
+			}
 		}
 
 		// Send garbage to GC.
@@ -184,12 +184,11 @@ where
 		self.samples.clear();
 
 		// If [cubeb] errored, forward it.
-		match self.error.load(Ordering::Acquire) {
-			false => Ok(()),
-			true  => {
-				self.error.store(false, Ordering::Release);
-				Err(OutputError::Write)
-			},
+		if self.error.load(Ordering::Acquire) {
+			self.error.store(false, Ordering::Release);
+			Err(OutputError::Write)
+		} else {
+			Ok(())
 		}
 	}
 
@@ -226,6 +225,7 @@ where
 
 	#[cold]
 	#[inline(never)]
+	#[allow(clippy::unwrap_in_result)]
 	fn try_open(
 		name: impl Into<Vec<u8>>,
 		signal_spec: SignalSpec,
@@ -314,6 +314,7 @@ where
 
 		// The actual audio stream.
 		let mut builder = cubeb::StreamBuilder::<StereoFrame<f32>>::new();
+		#[allow(clippy::cast_possible_wrap)]
 		builder
 			.name(name)
 			.default_output(&params)
@@ -351,7 +352,7 @@ where
 						}
 					},
 					S::Error => error_cubeb.store(true, Ordering::Release),
-					_ => {},
+					S::Started | S::Stopped => {},
 				}
 			});
 
@@ -395,6 +396,8 @@ where
 			))
 		};
 
+		// FIXME: bad stuff happens when this isn't here
+		#[allow(clippy::mem_forget)]
 		std::mem::forget(ctx);
 
 		Ok(Self {
@@ -418,7 +421,7 @@ where
 		use OutputError as E2;
 
 		match self.stream.start() {
-			Ok(_) => { self.playing = true; Ok(()) },
+			Ok(()) => { self.playing = true; Ok(()) },
 			Err(e) => Err(match e.code() {
 				E::DeviceUnavailable               => E2::DeviceUnavailable,
 				E::InvalidFormat | E::NotSupported => E2::InvalidFormat,
@@ -432,7 +435,7 @@ where
 		use OutputError as E2;
 
 		match self.stream.stop() {
-			Ok(_) => { self.playing = false; Ok(()) },
+			Ok(()) => { self.playing = false; Ok(()) },
 			Err(e) => Err(match e.code() {
 				E::DeviceUnavailable               => E2::DeviceUnavailable,
 				E::InvalidFormat | E::NotSupported => E2::InvalidFormat,

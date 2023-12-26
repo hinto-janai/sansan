@@ -1,13 +1,13 @@
-// Audio hardware input/output
-//
-// This file defines and implements the structures and functions
-// required to take some ready-to-go audio samples (concretely, [f32]'s)
-// and actually send/write them to the audio hardware/server.
-//
-// Currently, this is provided by `cubeb-rs` from Mozilla.
-//
-// The trait `AudioOutput` is the ideal abstract
-// simplification of what this part of the system should do.
+//! Audio hardware input/output
+//!
+//! This file defines and implements the structures and functions
+//! required to take some ready-to-go audio samples (concretely, [f32]'s)
+//! and actually send/write them to the audio hardware/server.
+//!
+//! Currently, this is provided by `cubeb-rs` from Mozilla.
+//!
+//! The trait `AudioOutput` is the ideal abstract
+//! simplification of what this part of the system should do.
 
 //----------------------------------------------------------------------------------------------- use
 use crate::{
@@ -22,9 +22,9 @@ use thiserror::Error;
 use crossbeam::channel::Sender;
 
 //----------------------------------------------------------------------------------------------- AudioOutput Trait
-// # Safety
-// Implementors are expected to implement these functions
-// correctly according to the documentation invariants.
+/// # Safety Notes
+/// Implementors are expected to implement these functions
+/// correctly according to the documentation invariants.
 pub(crate) trait AudioOutput
 where
 	Self: Sized,
@@ -106,11 +106,11 @@ where
 	/// Is the stream currently in play mode?
 	fn is_playing(&mut self) -> bool;
 
-	// What is the audio specification
-	// this `AudioOutput` was created for?
+	/// What is the audio specification
+	/// this `AudioOutput` was created for?
 	fn spec(&self) -> &SignalSpec;
-	// What is the duration
-	// this `AudioOutput` was created for?
+	/// What is the duration
+	/// this `AudioOutput` was created for?
 	fn duration(&self) -> u64;
 
 	/// Toggle playback.
