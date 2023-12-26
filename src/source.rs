@@ -30,21 +30,25 @@ use crate::state::AudioState;
 // These are some misc options `Symphonia` needs.
 // Most of these are the default values, but as `const`.
 
+/// TODO
 const FORMAT_OPTIONS: FormatOptions = FormatOptions {
 	enable_gapless: true,
 	prebuild_seek_index: false,
 	seek_index_fill_rate: 20,
 };
 
+/// TODO
 const METADATA_OPTIONS: MetadataOptions = MetadataOptions {
 	limit_metadata_bytes: Limit::Default,
 	limit_visual_bytes: Limit::Default,
 };
 
+/// TODO
 const DECODER_OPTIONS: DecoderOptions = DecoderOptions {
 	verify: false,
 };
 
+/// TODO
 const MEDIA_SOURCE_STREAM_OPTIONS: MediaSourceStreamOptions = MediaSourceStreamOptions {
 	buffer_len: 64 * 1024,
 };
@@ -70,27 +74,28 @@ where
 {
 	#[inline]
 	/// TODO
-	pub fn data(&self) -> &Data {
+	pub const fn data(&self) -> &Data {
 		match &self.0 {
-			SourceInner::ArcPath((_, data, _)) => data,
-			SourceInner::ArcByte((_, data, _)) => data,
-			SourceInner::CowPath((_, data, _)) => data,
+			SourceInner::ArcPath((_, data, _)) |
+			SourceInner::ArcByte((_, data, _)) |
+			SourceInner::CowPath((_, data, _)) |
 			SourceInner::CowByte((_, data, _)) => data,
 		}
 	}
 
 	#[inline]
 	/// TODO
-	pub fn metadata(&self) -> &Metadata {
+	pub const fn metadata(&self) -> &Metadata {
 		match &self.0 {
-			SourceInner::ArcPath((_, _, meta)) => meta,
-			SourceInner::ArcByte((_, _, meta)) => meta,
-			SourceInner::CowPath((_, _, meta)) => meta,
+			SourceInner::ArcPath((_, _, meta)) |
+			SourceInner::ArcByte((_, _, meta)) |
+			SourceInner::CowPath((_, _, meta)) |
 			SourceInner::CowByte((_, _, meta)) => meta,
 		}
 	}
 }
 
+/// TODO
 macro_rules! impl_from_for_source {
 	(
 			// Boilerplate to capture the input
@@ -147,10 +152,15 @@ impl_from_for_source! { |source|
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug,Clone,PartialEq,PartialOrd)]
+/// TODO
 pub(crate) enum SourceInner<Data: ValidData> {
-	ArcPath((Arc<Path>,          Data, Metadata)),
-	ArcByte((Arc<[u8]>,          Data, Metadata)),
+	/// TODO
+	ArcPath((Arc<Path>, Data, Metadata)),
+	/// TODO
+	ArcByte((Arc<[u8]>, Data, Metadata)),
+	/// TODO
 	CowPath((Cow<'static, Path>, Data, Metadata)),
+	/// TODO
 	CowByte((Cow<'static, [u8]>, Data, Metadata)),
 }
 
@@ -165,8 +175,9 @@ impl Metadata {
 	/// TODO
 	pub const DEFAULT: Self = Self(MetadataInner::DEFAULT);
 
+	#[must_use]
 	/// TODO
-	pub fn from_arc(
+	pub const fn from_arc(
 		artist_name:   Option<Arc<str>>,
 		album_title:   Option<Arc<str>>,
 		track_title:   Option<Arc<str>>,
@@ -182,6 +193,7 @@ impl Metadata {
 		})
 	}
 
+	#[must_use]
 	/// TODO
 	pub fn from_borrowed(
 		artist_name:   Option<&str>,
@@ -191,14 +203,15 @@ impl Metadata {
 		total_runtime: Option<Duration>
 	) -> Self {
 		Self(MetadataInner::Arc {
-			artist_name: artist_name.and_then(|x| Some(Arc::from(x))),
-			album_title: album_title.and_then(|x| Some(Arc::from(x))),
-			track_title: track_title.and_then(|x| Some(Arc::from(x))),
-			cover_path: cover_path.and_then(|x| Some(Arc::from(x))),
+			artist_name: artist_name.map(Arc::from),
+			album_title: album_title.map(Arc::from),
+			track_title: track_title.map(Arc::from),
+			cover_path: cover_path.map(Arc::from),
 			total_runtime,
 		})
 	}
 
+	#[must_use]
 	/// TODO
 	pub fn from_owned(
 		artist_name:   Option<String>,
@@ -208,16 +221,17 @@ impl Metadata {
 		total_runtime: Option<Duration>
 	) -> Self {
 		Self(MetadataInner::Cow {
-			artist_name: artist_name.and_then(|x| Some(Cow::Owned(x))),
-			album_title: album_title.and_then(|x| Some(Cow::Owned(x))),
-			track_title: track_title.and_then(|x| Some(Cow::Owned(x))),
-			cover_path: cover_path.and_then(|x| Some(Cow::Owned(x))),
+			artist_name: artist_name.map(Cow::Owned),
+			album_title: album_title.map(Cow::Owned),
+			track_title: track_title.map(Cow::Owned),
+			cover_path: cover_path.map(Cow::Owned),
 			total_runtime,
 		})
 	}
 
+	#[must_use]
 	/// TODO
-	pub fn from_static(
+	pub const fn from_static(
 		artist_name:   Option<&'static str>,
 		album_title:   Option<&'static str>,
 		track_title:   Option<&'static str>,
@@ -225,16 +239,17 @@ impl Metadata {
 		total_runtime: Option<Duration>
 	) -> Self {
 		Self(MetadataInner::Cow {
-			artist_name: artist_name.and_then(|x| Some(Cow::Borrowed(x))),
-			album_title: album_title.and_then(|x| Some(Cow::Borrowed(x))),
-			track_title: track_title.and_then(|x| Some(Cow::Borrowed(x))),
-			cover_path: cover_path.and_then(|x| Some(Cow::Borrowed(x))),
+			artist_name: if let Some(x) = artist_name { Some(Cow::Borrowed(x)) } else { None },
+			album_title: if let Some(x) = album_title { Some(Cow::Borrowed(x)) } else { None },
+			track_title: if let Some(x) = track_title { Some(Cow::Borrowed(x)) } else { None },
+			cover_path: if let Some(x) = cover_path { Some(Cow::Borrowed(x)) } else { None },
 			total_runtime,
 		})
 	}
 
+	#[must_use]
 	/// TODO
-	pub fn from_cow(
+	pub const fn from_cow(
 		artist_name:   Option<Cow<'static, str>>,
 		album_title:   Option<Cow<'static, str>>,
 		track_title:   Option<Cow<'static, str>>,
@@ -250,6 +265,7 @@ impl Metadata {
 		})
 	}
 
+	#[must_use]
 	/// TODO
 	pub fn artist_name(&self) -> Option<&str> {
 		match &self.0 {
@@ -258,6 +274,7 @@ impl Metadata {
 		}
 	}
 
+	#[must_use]
 	/// TODO
 	pub fn album_title(&self) -> Option<&str> {
 		match &self.0 {
@@ -266,6 +283,7 @@ impl Metadata {
 		}
 	}
 
+	#[must_use]
 	/// TODO
 	pub fn track_title(&self) -> Option<&str> {
 		match &self.0 {
@@ -274,6 +292,7 @@ impl Metadata {
 		}
 	}
 
+	#[must_use]
 	/// TODO
 	pub fn cover_path(&self) -> Option<&Path> {
 		match &self.0 {
@@ -282,10 +301,11 @@ impl Metadata {
 		}
 	}
 
+	#[must_use]
 	/// TODO
-	pub fn total_runtime(&self) -> Option<Duration> {
+	pub const fn total_runtime(&self) -> Option<Duration> {
 		match &self.0 {
-			MetadataInner::Arc { total_runtime, .. } => *total_runtime,
+			MetadataInner::Arc { total_runtime, .. } |
 			MetadataInner::Cow { total_runtime, .. } => *total_runtime,
 		}
 	}
@@ -301,8 +321,9 @@ impl Default for Metadata {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug,Clone,PartialEq,PartialOrd)]
+/// TODO
+#[allow(clippy::missing_docs_in_private_items)]
 pub(crate) enum MetadataInner {
-	#[allow(missing_docs)]
 	Arc {
 		artist_name:   Option<Arc<str>>,
 		album_title:   Option<Arc<str>>,
@@ -310,7 +331,6 @@ pub(crate) enum MetadataInner {
 		cover_path:    Option<Arc<Path>>,
 		total_runtime: Option<Duration>
 	},
-	#[allow(missing_docs)]
 	Cow {
 		artist_name:   Option<Cow<'static, str>>,
 		album_title:   Option<Cow<'static, str>>,
@@ -321,6 +341,7 @@ pub(crate) enum MetadataInner {
 }
 
 impl MetadataInner {
+	/// TODO
 	pub(crate) const DEFAULT: Self = Self::Cow {
 		artist_name:   None,
 		album_title:   None,
@@ -337,43 +358,43 @@ impl Default for MetadataInner {
 }
 
 //---------------------------------------------------------------------------------------------------- SourceDecode
-// The type the `Decoder` thread wants.
-//
-// This is the type `Decoder` holds onto when decoding a track.
-// It contains the necessary data to decode a particular track,
-// and is created from the public API `Source` type.
+/// The type the `Decoder` thread wants.
+///
+/// This is the type `Decoder` holds onto when decoding a track.
+/// It contains the necessary data to decode a particular track,
+/// and is created from the public API `Source` type.
 pub(crate) struct SourceDecode {
-	// The current audio file/sound/source.
+	/// The current audio file/sound/source.
 	pub(crate) reader: Box<dyn FormatReader>,
-	// The current audio's decoder
+	/// The current audio's decoder
 	pub(crate) decoder: Box<dyn Decoder>,
-	// The audio's sample rate
+	/// The audio's sample rate
 	pub(crate) sample_rate: u32,
-	// The audio's current `Time`
+	/// The audio's current `Time`
 	pub(crate) time_now: Time,
-	// The audio's total runtime.
-	// This is calculated in `try_from_inner()` before any decoding.
+	/// The audio's total runtime.
+	/// This is calculated in `try_from_inner()` before any decoding.
 	pub(crate) time_total: Time,
-	// Same as above, but in [f64] seconds.
+	/// Same as above, but in [f64] seconds.
 	pub(crate) secs_total: f64,
-	// The audio's `TimeBase`.
-	// This is used to calculated elapsed time as the audio progresses.
+	/// The audio's `TimeBase`.
+	/// This is used to calculated elapsed time as the audio progresses.
 	pub(crate) timebase: TimeBase,
 }
 
 impl SourceDecode {
 	#[cold]
 	#[inline(never)]
-	// Returns a dummy [SourceDecode]
-	// that cannot actually be used.
-	//
-	// This exists so [Decode] does not
-	// have to keep an [Option<SourceDecode>].
-	//
-	// INVARIANT:
-	// This must not actually be _used_, as in the
-	// trait functions must not be called as they
-	// all panic.
+	/// Returns a dummy [`SourceDecode`]
+	/// that cannot actually be used.
+	///
+	/// This exists so [Decode] does not
+	/// have to keep an [Option<SourceDecode>].
+	///
+	/// INVARIANT:
+	/// This must not actually be _used_, as in the
+	/// trait functions must not be called as they
+	/// all panic.
 	pub(crate) fn dummy() -> Self {
 		use symphonia::core::{
 			errors::Result,
@@ -383,6 +404,7 @@ impl SourceDecode {
 			audio::AudioBufferRef,
 		};
 
+		/// TODO
 		struct DummyReader;
 		impl FormatReader for DummyReader {
 			#[cold] #[inline(never)]
@@ -401,6 +423,7 @@ impl SourceDecode {
 			fn into_inner(self: Box<Self>) -> MediaSourceStream { unreachable!() }
 		}
 
+		/// TODO
 		struct DummyDecoder;
 		impl Decoder for DummyDecoder {
 			#[cold] #[inline(never)]
@@ -435,7 +458,7 @@ impl SourceDecode {
 impl TryFrom<MediaSourceStream> for SourceDecode {
 	type Error = SourceError;
 
-	fn try_from(mss: MediaSourceStream) -> Result<SourceDecode, Self::Error> {
+	fn try_from(mss: MediaSourceStream) -> Result<Self, Self::Error> {
 		let result = get_probe().format(
 			&Hint::new(),
 			mss,
