@@ -603,7 +603,7 @@ where
 
 		self.atomic_state.repeat.set(repeat);
 		self.w.add_commit_push(|w, _| {
-			todo!();
+			w.repeat = repeat;
 		});
 	}
 
@@ -615,7 +615,7 @@ where
 
 		self.atomic_state.volume.set(volume);
 		self.w.add_commit_push(|w, _| {
-			todo!();
+			w.volume = volume;
 		});
 	}
 
