@@ -259,7 +259,7 @@ where
 				11 => self.add         ( select_recv!(c.recv_add), &c.to_audio, &c.to_decode, &c.send_add),
 				12 => self.add_many    ( select_recv!(c.recv_add_many), &c.to_audio, &c.to_decode, &c.send_add_many),
 				13 => self.seek        ( select_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),
-				14 => self.skip        ( select_recv!(c.recv_skip), &c.send_skip),
+				14 => self.skip        ( select_recv!(c.recv_skip), &c.to_audio, &c.to_decode, &c.send_skip),
 				15 => self.back        ( select_recv!(c.recv_back), &c.send_back, &c.to_decode, &c.from_decode_seek),
 				16 => self.set_index   ( select_recv!(c.recv_set_index), &c.send_set_index),
 				17 => self.remove      ( select_recv!(c.recv_remove), &c.send_remove),
@@ -528,7 +528,7 @@ where
 
 			match shuffle {
 				// Only shuffle the queue, leaving the
-				// currently playing Track (index) intact.
+				// currently playing track (index) intact.
 				Shuffle::Queue => {
 					let index = w.current.as_ref().map(|t| t.index);
 
@@ -642,22 +642,29 @@ where
 		//
 		// `Some(Source)` means there is a new source to play.
 		let (_, maybe_source, _) = self.w.add_commit_push(|w, _| {
-			let maybe_source_index = w.current.as_ref().and_then(|c| {
-				// If we are currently playing something...
-				// And there's 1 track after it...
-				let next_index = c.index + 1;
-				if next_index < w.queue.len() {
-					// Return that index
-					Some(next_index)
-				} else {
-					// Else, check for repeat modes...
-					match w.repeat {
-						Repeat::Off => None,              // Our queue is finished, nothing left to play
-						Repeat::Current => Some(c.index), // User wants to repeat current song, return the current index
-						Repeat::Queue => Some(0),         // User wants to repeat the queue, return the 0th index
+			// Default to the 0th track if there is no `Current`.
+			let Some(current) = w.current.as_ref() else {
+				return Some(w.queue[0].clone());
+			};
+
+			// The next index handling depends on our repeat mode.
+			let maybe_source_index = match w.repeat {
+				Repeat::Off => {
+					// If there's 1 track after this...
+					let next_index = current.index + 1;
+					if next_index < w.queue.len() {
+						// Return that index
+						Some(next_index)
+					} else {
+						// Else, we're at the end of the queue.
+						None
 					}
-				}
-			});
+				},
+				// User wants to repeat current song, return the current index
+				Repeat::Current => Some(current.index),
+				// User wants to repeat the queue, return the 0th index
+				Repeat::Queue => Some(0),
+			};
 
 			maybe_source_index.map(|index| w.queue[index].clone())
 		});
@@ -681,10 +688,10 @@ where
 		}
 
 		// This will always return a `Source`.
-		// If we're at 0, this just returns the current `Track`.
+		// If we're at 0, this just returns the `Current`.
 		let (_, source, _) = self.w.add_commit_push(|w, _| {
 			// If there is no track selected,
-			// default to the 0th `Track`.
+			// default to the 0th track.
 			let previous_index = match w.current.as_ref() {
 				Some(c) => c.index.saturating_sub(1),
 				None => 0,
@@ -913,8 +920,64 @@ where
 	}
 
 	/// TODO
-	fn skip(&mut self, skip: Skip, to_engine: &Sender<Result<AudioStateSnapshot<Data>, SkipError>>) {
-		todo!();
+	fn skip(
+		&mut self,
+		skip: Skip,
+		to_audio: &Sender<DiscardCurrentAudio>,
+		to_decode: &Sender<KernelToDecode<Data>>,
+		to_engine: &Sender<Result<AudioStateSnapshot<Data>, SkipError>>
+	) {
+		if self.queue_empty() {
+			try_send!(to_engine, Err(SkipError::QueueEmpty));
+			return;
+		}
+
+		// INVARIANT:
+		// The queue may or may not have
+		// any more [Source]'s left.
+		//
+		// We must check for [Repeat] as well.
+		//
+		// This returns an `Option<Source>`.
+		//
+		// `None` means our queue is done, and [Kernel]
+		// must clean the audio state up, and tell everyone else.
+		//
+		// `Some(Source)` means there is a new source to play.
+		let (_, maybe_source, _) = self.w.add_commit_push(|w, _| {
+			// Default to the 0th track if there is no `Current`.
+			let Some(current) = w.current.as_ref() else {
+				return Some(w.queue[0].clone());
+			};
+
+			// The next index handling depends on our repeat mode.
+			let maybe_source_index = match w.repeat {
+				Repeat::Off => {
+					// If there's exists a track at the user specified index...
+					let skip_index = current.index + skip.skip;
+					if skip_index < w.queue.len() {
+						// Return that index
+						Some(skip_index)
+					} else {
+						// Else, we're at the end of the queue.
+						None
+					}
+				},
+				// User wants to repeat current song, return the current index
+				Repeat::Current => Some(current.index),
+				// User wants to repeat the queue, return the 0th index
+				Repeat::Queue => Some(0),
+			};
+
+			maybe_source_index.map(|index| w.queue[index].clone())
+		});
+
+		// This [Skip] might set our [current],
+		// it will return a [Some(source)] if so.
+		// We must forward it to [Decode].
+		if let Some(source) = maybe_source {
+			self.new_source(to_audio, to_decode, source);
+		}
 		try_send!(to_engine, Ok(self.audio_state_snapshot()));
 	}
 
