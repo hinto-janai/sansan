@@ -398,12 +398,18 @@ where
 	//
 	// These are the functions invoked in response
 	// to exact messages/signals from the other actors.
+	//
+	// INVARIANT:
+	// The `Engine` does not check the validity of it's request
+	// (e.g: `repeat()` is called, but our current `Repeat` is the same)
+	// so `Kernel` must check all requests and return early (or with
+	// and error) if invalid.
 
 	/// TODO
 	fn toggle(&mut self) {
 		// INVARIANT:
 		// Both `pause()` and `play()`
-		// will `add_commit_push()`.
+		// must `add_commit_push()`.
 		if self.playing() {
 			self.pause();
 		} else {
@@ -413,39 +419,45 @@ where
 
 	/// TODO
 	fn play(&mut self) {
-		if !self.playing() && self.source_is_some() {
-			self.w.add_commit_push(|w, _| {
-				assert!(w.current.is_some());
-				assert!(!w.playing);
-				w.playing = true;
-			});
-			// TODO: tell audio/decode to start.
+		if !self.source_is_some() || self.playing() {
+			return;
 		}
+
+		self.w.add_commit_push(|w, _| {
+			assert!(w.current.is_some());
+			assert!(!w.playing);
+			w.playing = true;
+		});
+		// TODO: tell audio/decode to start.
 	}
 
 	/// TODO
 	fn pause(&mut self) {
-		if self.playing() && self.source_is_some() {
-			self.w.add_commit_push(|w, _| {
-				assert!(w.current.is_some());
-				assert!(w.playing);
-				w.playing = false;
-			});
+		if !self.source_is_some() || !self.playing() {
+			return;
 		}
+
+		self.w.add_commit_push(|w, _| {
+			assert!(w.current.is_some());
+			assert!(w.playing);
+			w.playing = false;
+		});
 	}
 
 	/// TODO
 	fn stop(&mut self) {
-		if self.source_is_some() || !self.queue_empty() {
-			self.w.add_commit(|w, _| {
-				assert!(w.current.is_some() || !w.queue.is_empty());
-				w.queue.clear();
-				w.current = None;
-			});
-			// The queue is empty, no need to re-apply,
-			// just clone the empty state.
-			self.w.push_clone();
+		if !self.source_is_some() || self.queue_empty() {
+			return;
 		}
+
+		self.w.add_commit(|w, _| {
+			assert!(w.current.is_some() || !w.queue.is_empty());
+			w.queue.clear();
+			w.current = None;
+		});
+		// The queue is empty, no need to re-apply,
+		// just clone the empty state.
+		self.w.push_clone();
 	}
 
 	/// TODO
@@ -454,6 +466,7 @@ where
 			Clear::Queue => if self.queue_empty() { return },
 			Clear::Source => if !self.source_is_some() { return },
 		}
+
 		self.w.add_commit_push(|w, _| {
 			match clear {
 				Clear::Queue => {
@@ -483,6 +496,7 @@ where
 		to_engine: &Sender<Result<AudioStateSnapshot<Data>, SeekError>>,
 	) {
 		let queue_len = self.w.queue.len();
+
 		if queue_len == 0 {
 			return;
 		}
@@ -769,24 +783,22 @@ where
 
 		// If the [current] has not passed the
 		// threshold, just seek to the beginning.
-		if let Some(t) = back.threshold {
-			if self.less_than_threshold(t) {
-				// Tell [Decode] to seek, return error if it errors.
-				try_send!(to_decode, KernelToDecode::Seek(Seek::Absolute(0.0)));
-				match recv!(from_decode_seek) {
-					Ok(seeked_time) => {
-						self.w.add_commit_push(|w, _| {
-							// INVARIANT:
-							// We checked the `Source` is loaded
-							// so this shouldn't panic.
-							w.current.as_mut().unwrap().elapsed = seeked_time;
-						});
-						try_send!(to_engine, Ok(self.audio_state_snapshot()));
-					},
-					Err(e) => try_send!(to_engine, Err(BackError::Seek(e))),
-				}
-				return;
+		if back.threshold.is_some_and(|t| self.less_than_threshold(t)) {
+			// Tell [Decode] to seek, return error if it errors.
+			try_send!(to_decode, KernelToDecode::Seek(Seek::Absolute(0.0)));
+			match recv!(from_decode_seek) {
+				Ok(seeked_time) => {
+					self.w.add_commit_push(|w, _| {
+						// INVARIANT:
+						// We checked the `Source` is loaded
+						// so this shouldn't panic.
+						w.current.as_mut().unwrap().elapsed = seeked_time;
+					});
+					try_send!(to_engine, Ok(self.audio_state_snapshot()));
+				},
+				Err(e) => try_send!(to_engine, Err(BackError::Seek(e))),
 			}
+			return;
 		}
 
 		self.w.add_commit_push(|w, _| {
