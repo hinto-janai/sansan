@@ -250,7 +250,7 @@ where
 				2  =>                  { select_recv!(c.recv_pause); self.pause() },
 				3  =>                  { select_recv!(c.recv_stop); self.stop() },
 				4  =>                  { select_recv!(c.recv_next); self.next(&c.to_audio, &c.to_decode) },
-				5  =>                  { select_recv!(c.recv_previous); self.previous() },
+				5  =>                  { select_recv!(c.recv_previous); self.previous(&c.to_audio, &c.to_decode) },
 				6  => self.clear       ( select_recv!(c.recv_clear)),
 				7  => self.shuffle     ( select_recv!(c.recv_shuffle), &c.to_audio, &c.to_decode, &c.from_decode_seek, &c.send_seek),
 				8  => self.repeat      ( select_recv!(c.recv_repeat)),
@@ -625,7 +625,7 @@ where
 		to_audio: &Sender<DiscardCurrentAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 	) {
-		if !self.source_is_some() || self.queue_empty() {
+		if self.queue_empty() {
 			return;
 		}
 
@@ -671,8 +671,28 @@ where
 	}
 
 	/// TODO
-	fn previous(&mut self) {
-		todo!();
+	fn previous(
+		&mut self,
+		to_audio: &Sender<DiscardCurrentAudio>,
+		to_decode: &Sender<KernelToDecode<Data>>,
+	) {
+		if self.queue_empty() {
+			return;
+		}
+
+		// This will always return a `Source`.
+		// If we're at 0, this just returns the current `Track`.
+		let (_, source, _) = self.w.add_commit_push(|w, _| {
+			// If there is no track selected,
+			// default to the 0th `Track`.
+			let previous_index = match w.current.as_ref() {
+				Some(c) => c.index.saturating_sub(1),
+				None => 0,
+			};
+			w.queue[previous_index].clone()
+		});
+
+		self.new_source(to_audio, to_decode, source);
 	}
 
 	/// TODO
