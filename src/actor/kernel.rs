@@ -381,10 +381,10 @@ where
 	// 	output
 	// }
 
-	/// TODO
-	fn commit_push_get(&mut self) -> AudioStateSnapshot<Data> {
-		AudioStateSnapshot(self.w.commit_and().push_and().head_remote_ref())
-	}
+	// /// TODO
+	// fn commit_push_get(&mut self) -> AudioStateSnapshot<Data> {
+	// 	AudioStateSnapshot(self.w.commit_and().push_and().head_remote_ref())
+	// }
 
 	#[inline]
 	/// TODO
@@ -419,7 +419,12 @@ where
 	/// TODO
 	fn play(&mut self) {
 		if !self.playing() && self.source_is_some() {
-			self.add_commit_push(Play);
+			self.w.add_commit_push(|w, _| {
+				debug_assert!(w.current.is_some());
+				debug_assert!(!w.playing);
+				w.playing = true;
+			});
+			// TODO: tell audio/decode to start.
 		}
 	}
 
