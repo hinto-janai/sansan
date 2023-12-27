@@ -15,19 +15,19 @@ pub enum Clear {
 }
 
 //---------------------------------------------------------------------------------------------------- someday::ApplyReturn
-impl<Data: ValidData> someday::ApplyReturn<Signal<Data>, Clear, ()> for AudioState<Data> {
-	fn apply_return(s: &mut Clear, w: &mut Self, _: &Self) {
-		// INVARIANT: [Kernel] checks debug invariants.
+// impl<Data: ValidData> someday::ApplyReturn<Signal<Data>, Clear, ()> for AudioState<Data> {
+// 	fn apply_return(s: &mut Clear, w: &mut Self, _: &Self) {
+// 		// INVARIANT: [Kernel] checks debug invariants.
 
-		match s {
-			Clear::Queue => {
-				debug_assert!(!w.queue.is_empty());
-				w.queue.clear();
-			},
-			Clear::Source => {
-				debug_assert!(w.current.is_some());
-				w.current = None;
-			},
-		}
-	}
-}
+// 		match s {
+// 			Clear::Queue => {
+// 				debug_assert!(!w.queue.is_empty());
+// 				w.queue.clear();
+// 			},
+// 			Clear::Source => {
+// 				debug_assert!(w.current.is_some());
+// 				w.current = None;
+// 			},
+// 		}
+// 	}
+// }

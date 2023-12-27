@@ -237,11 +237,11 @@ impl From<f32> for Volume {
 }
 
 //---------------------------------------------------------------------------------------------------- someday::ApplyReturn
-impl<Data: ValidData> someday::ApplyReturn<Signal<Data>, Volume, ()> for AudioState<Data> {
-	fn apply_return(s: &mut Volume, w: &mut Self, _: &Self) {
-		w.volume = *s;
-	}
-}
+// impl<Data: ValidData> someday::ApplyReturn<Signal<Data>, Volume, ()> for AudioState<Data> {
+// 	fn apply_return(s: &mut Volume, w: &mut Self, _: &Self) {
+// 		w.volume = *s;
+// 	}
+// }
 
 //---------------------------------------------------------------------------------------------------- AtomicVolume
 pub(crate) struct AtomicVolume(AtomicF32);

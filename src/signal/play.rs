@@ -10,12 +10,12 @@ use crate::state::{AudioState,ValidData};
 pub struct Play;
 
 //---------------------------------------------------------------------------------------------------- someday::Apply
-impl<Data: ValidData> someday::ApplyReturn<Signal<Data>, Play, ()> for AudioState<Data> {
-	fn apply_return(s: &mut Play, w: &mut Self, r: &Self) {
-		// INVARIANT: [Kernel] must check these.
-		debug_assert!(w.current.is_some());
-		debug_assert_eq!(w.playing, true);
+// impl<Data: ValidData> someday::ApplyReturn<Signal<Data>, Play, ()> for AudioState<Data> {
+// 	fn apply_return(s: &mut Play, w: &mut Self, r: &Self) {
+// 		// INVARIANT: [Kernel] must check these.
+// 		debug_assert!(w.current.is_some());
+// 		debug_assert_eq!(w.playing, true);
 
-		w.playing = true
-	}
-}
+// 		w.playing = true
+// 	}
+// }

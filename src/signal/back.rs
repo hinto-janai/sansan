@@ -1,6 +1,5 @@
 //---------------------------------------------------------------------------------------------------- use
 use crate::state::{AudioState,ValidData,Current};
-use someday::ApplyReturn;
 use crate::signal::{Signal,SeekError};
 use crate::source::Source;
 use strum::{
@@ -20,24 +19,24 @@ pub struct Back {
 	pub threshold: Option<f64>,
 }
 
-impl<Data: ValidData> ApplyReturn<Signal<Data>, Back, Result<(), BackError>> for AudioState<Data> {
-	fn apply_return(s: &mut Back, w: &mut Self, _: &Self) -> Result<(), BackError> {
-		// INVARIANT: [Kernel] checks that this
-		// [Back] can fully go backwards.
-		//
-		// The input was replaced with a viable
-		// [Back] if the over(under?)flowed.
-		//
-		// The queue has at least 1 length.
-		w.current = Some(Current {
-			source: w.queue[s.back].clone(),
-			index: 0,
-			elapsed: 0.0,
-		});
+// impl<Data: ValidData> ApplyReturn<Signal<Data>, Back, Result<(), BackError>> for AudioState<Data> {
+// 	fn apply_return(s: &mut Back, w: &mut Self, _: &Self) -> Result<(), BackError> {
+// 		// INVARIANT: [Kernel] checks that this
+// 		// [Back] can fully go backwards.
+// 		//
+// 		// The input was replaced with a viable
+// 		// [Back] if the over(under?)flowed.
+// 		//
+// 		// The queue has at least 1 length.
+// 		w.current = Some(Current {
+// 			source: w.queue[s.back].clone(),
+// 			index: 0,
+// 			elapsed: 0.0,
+// 		});
 
-		Ok(())
-	}
-}
+// 		Ok(())
+// 	}
+// }
 
 //---------------------------------------------------------------------------------------------------- BackError
 /// TODO

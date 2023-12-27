@@ -10,12 +10,12 @@ use crate::signal::Signal;
 pub(crate) struct Stop;
 
 //---------------------------------------------------------------------------------------------------- someday::ApplyReturn
-impl<Data: ValidData> someday::ApplyReturn<Signal<Data>, Stop, ()> for AudioState<Data> {
-	fn apply_return(_: &mut Stop, w: &mut Self, _: &Self) {
-		// INVARIANT: [Kernel] checks these.
-		debug_assert!(w.current.is_some() || !w.queue.is_empty());
+// impl<Data: ValidData> someday::ApplyReturn<Signal<Data>, Stop, ()> for AudioState<Data> {
+// 	fn apply_return(_: &mut Stop, w: &mut Self, _: &Self) {
+// 		// INVARIANT: [Kernel] checks these.
+// 		debug_assert!(w.current.is_some() || !w.queue.is_empty());
 
-		w.queue.clear();
-		w.current = None;
-	}
-}
+// 		w.queue.clear();
+// 		w.current = None;
+// 	}
+// }

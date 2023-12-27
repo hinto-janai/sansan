@@ -4,7 +4,6 @@
 use std::{thread::JoinHandle, process::Output};
 use crossbeam::channel::{Sender, Receiver, Select};
 use rand::SeedableRng;
-use someday::ApplyReturn;
 use crate::{
 	macros::{send,recv,try_recv,try_send,debug2,select_recv},
 	state::{
@@ -79,7 +78,7 @@ pub(crate) struct Kernel<Data: ValidData> {
 	///
 	/// This originally was [audio_state] but this field is
 	/// accessed a lot, so it is just [w], for [w]riter.
-	w:                   someday::Writer<AudioState<Data>, Signal<Data>>,
+	w:                   someday::Writer<AudioState<Data>>,
 	shutdown_wait:       Arc<Barrier>,
 	to_gc:               Sender<AudioState<Data>>,
 	previous_threshold:  f64,
@@ -163,7 +162,7 @@ pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) init_barrier:        Option<Arc<Barrier>>,
 	pub(crate) atomic_state:        Arc<AtomicAudioState>,
 	pub(crate) shutdown_wait:       Arc<Barrier>,
-	pub(crate) w:                   someday::Writer<AudioState<Data>, Signal<Data>>,
+	pub(crate) w:                   someday::Writer<AudioState<Data>>,
 	pub(crate) channels:            Channels<Data>,
 	pub(crate) to_gc:               Sender<AudioState<Data>>,
 	pub(crate) previous_threshold:  f64,
@@ -310,7 +309,6 @@ where
 	}
 
 	//---------------------------------------------------------------------------------------------------- Misc Functions
-	#[inline]
 	/// TODO
 	fn new_source(
 		&self,
@@ -340,51 +338,55 @@ where
 		try_send!(to_decode, KernelToDecode::DiscardAudioAndStop);
 	}
 
+	#[inline]
 	/// TODO
 	fn queue_empty(&self) -> bool {
 		self.w.queue.is_empty()
 	}
 
+	#[inline]
 	/// TODO
 	fn playing(&self) -> bool {
 		self.w.playing
 	}
 
+	#[inline]
 	/// TODO
 	fn source_is_some(&self) -> bool {
 		self.w.current.is_some()
 	}
 
-	/// TODO
-	fn add_commit_push<Input, Output>(&mut self, input: Input) -> Output
-	where
-		Input: Clone,
-		Signal<Data>: From<Input>,
-		AudioState<Data>: ApplyReturn<Signal<Data>, Input, Output>,
-	{
-		// SAFETY: Special signals, they must always
-		// be cloned, so they should never be passed
-		// to this function.
-		#[cfg(debug_assertions)]
-		#[allow(clippy::wildcard_enum_match_arm)]
-		{
-			match input.clone().into() {
-				Signal::Shuffle(_) => panic!("shuffle was passed to add_commit_push()"),
-				Signal::Stop(_)    => panic!("stop was passed to add_commit_push()"),
-				_ => (),
-			}
-		}
+	// /// TODO
+	// fn add_commit_push<Input, Output>(&mut self, input: Input) -> Output
+	// where
+	// 	Input: Clone,
+	// 	Signal<Data>: From<Input>,
+	// 	AudioState<Data>: ApplyReturn<Signal<Data>, Input, Output>,
+	// {
+	// 	// SAFETY: Special signals, they must always
+	// 	// be cloned, so they should never be passed
+	// 	// to this function.
+	// 	#[cfg(debug_assertions)]
+	// 	#[allow(clippy::wildcard_enum_match_arm)]
+	// 	{
+	// 		match input.clone().into() {
+	// 			Signal::Shuffle(_) => panic!("shuffle was passed to add_commit_push()"),
+	// 			Signal::Stop(_)    => panic!("stop was passed to add_commit_push()"),
+	// 			_ => (),
+	// 		}
+	// 	}
 
-		let output = self.w.commit_return(input);
-		self.w.push();
-		output
-	}
+	// 	let output = self.w.commit_return(input);
+	// 	self.w.push();
+	// 	output
+	// }
 
 	/// TODO
 	fn commit_push_get(&mut self) -> AudioStateSnapshot<Data> {
 		AudioStateSnapshot(self.w.commit_and().push_and().head_remote_ref())
 	}
 
+	#[inline]
 	/// TODO
 	fn get(&self) -> AudioStateSnapshot<Data> {
 		AudioStateSnapshot(self.w.head_remote_ref())
@@ -405,7 +407,6 @@ where
 	// These are the functions invoked in response
 	// to exact messages/signals from the other actors.
 
-	#[inline]
 	/// TODO
 	fn toggle(&mut self) {
 		if self.playing() {
@@ -415,7 +416,6 @@ where
 		}
 	}
 
-	#[inline]
 	/// TODO
 	fn play(&mut self) {
 		if !self.playing() && self.source_is_some() {
@@ -423,7 +423,6 @@ where
 		}
 	}
 
-	#[inline]
 	/// TODO
 	fn pause(&mut self) {
 		if self.playing() && self.source_is_some() {
@@ -451,13 +450,11 @@ where
 		self.add_commit_push(clear);
 	}
 
-	#[inline]
 	/// TODO
 	fn restore(&mut self, restore: AudioState<Data>) {
 		todo!();
 	}
 
-	#[inline]
 	/// TODO
 	fn shuffle(
 		&mut self,
@@ -480,7 +477,6 @@ where
 		}
 	}
 
-	#[inline]
 	/// TODO
 	fn repeat(&mut self, repeat: Repeat) {
 		if self.w.repeat != repeat {
@@ -489,7 +485,6 @@ where
 		}
 	}
 
-	#[inline]
 	/// TODO
 	fn volume(&mut self, volume: Volume) {
 		if self.w.volume != volume {
@@ -498,7 +493,6 @@ where
 		}
 	}
 
-	#[inline]
 	/// TODO
 	fn next(&mut self) {
 		// INVARIANT:
@@ -512,13 +506,11 @@ where
 		todo!();
 	}
 
-	#[inline]
 	/// TODO
 	fn previous(&mut self) {
 		todo!();
 	}
 
-	#[inline]
 	/// TODO
 	fn add(
 		&mut self,
@@ -541,14 +533,12 @@ where
 		}
 	}
 
-	#[inline]
 	/// TODO
 	fn add_many(&mut self, add_many: AddMany<Data>, to_engine: &Sender<Result<AudioStateSnapshot<Data>, AddManyError>>) {
 		todo!();
 		try_send!(to_engine, Ok(self.commit_push_get()));
 	}
 
-	#[inline]
 	/// TODO
 	fn seek(
 		&mut self,
@@ -574,14 +564,12 @@ where
 		}
 	}
 
-	#[inline]
 	/// TODO
 	fn skip(&mut self, skip: Skip, to_engine: &Sender<Result<AudioStateSnapshot<Data>, SkipError>>) {
 		todo!();
 		try_send!(to_engine, Ok(self.commit_push_get()));
 	}
 
-	#[inline]
 	/// TODO
 	fn back(
 		&mut self,
@@ -621,21 +609,18 @@ where
 		}
 	}
 
-	#[inline]
 	/// TODO
 	fn set_index(&mut self, set_index: SetIndex, to_engine: &Sender<Result<AudioStateSnapshot<Data>, SetIndexError>>) {
 		todo!();
 		try_send!(to_engine, Ok(self.commit_push_get()));
 	}
 
-	#[inline]
 	/// TODO
 	fn remove(&mut self, remove: Remove, to_engine: &Sender<Result<AudioStateSnapshot<Data>, RemoveError>>) {
 		todo!();
 		try_send!(to_engine, Ok(self.commit_push_get()));
 	}
 
-	#[inline]
 	/// TODO
 	fn remove_range(&mut self, remove_range: RemoveRange, to_engine: &Sender<Result<AudioStateSnapshot<Data>, RemoveRangeError>>) {
 		todo!();

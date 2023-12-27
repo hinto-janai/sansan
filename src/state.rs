@@ -135,10 +135,7 @@ where
 #[derive(Clone,Debug,PartialEq)]
 pub struct AudioStateSnapshot<Data: ValidData>(pub(crate) CommitRef<AudioState<Data>>);
 
-impl<Data> std::ops::Deref for AudioStateSnapshot<Data>
-where
-	Data: ValidData,
-{
+impl<Data: ValidData> std::ops::Deref for AudioStateSnapshot<Data> {
 	type Target = AudioState<Data>;
 	#[inline]
 	fn deref(&self) -> &Self::Target {
@@ -146,10 +143,7 @@ where
 	}
 }
 
-impl<Data> AsRef<AudioState<Data>> for AudioStateSnapshot<Data>
-where
-	Data: ValidData,
-{
+impl<Data: ValidData> AsRef<AudioState<Data>> for AudioStateSnapshot<Data> {
 	#[inline]
 	fn as_ref(&self) -> &AudioState<Data> {
 		&self.0

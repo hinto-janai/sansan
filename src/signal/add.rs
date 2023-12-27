@@ -4,7 +4,6 @@ use strum::{
 	AsRefStr,Display,EnumCount,EnumIter,
 	EnumString,EnumVariantNames,IntoStaticStr,
 };
-use someday::ApplyReturn;
 use crate::state::{AudioState,ValidData,Current};
 use crate::signal::Signal;
 
@@ -27,73 +26,73 @@ where
 	pub play: bool,
 }
 
-// This function returns an `Option<Source>` when the add
-// operation has made it such that we are setting our [current]
-// to the returned [Source].
-//
-// [Kernel] should forward this [Source] to [Decode].
-impl<Data: ValidData> ApplyReturn<Signal<Data>, Add<Data>, Result<Option<Source<Data>>, AddError>> for AudioState<Data> {
-	fn apply_return(s: &mut Add<Data>, w: &mut Self, _: &Self) -> Result<Option<Source<Data>>, AddError> {
-		// INVARIANT: [Kernel] & [Engine] do not do any checks,
-		// we must do all safety checking here.
+// // This function returns an `Option<Source>` when the add
+// // operation has made it such that we are setting our [current]
+// // to the returned [Source].
+// //
+// // [Kernel] should forward this [Source] to [Decode].
+// impl<Data: ValidData> ApplyReturn<Signal<Data>, Add<Data>, Result<Option<Source<Data>>, AddError>> for AudioState<Data> {
+// 	fn apply_return(s: &mut Add<Data>, w: &mut Self, _: &Self) -> Result<Option<Source<Data>>, AddError> {
+// 		// INVARIANT: [Kernel] & [Engine] do not do any checks,
+// 		// we must do all safety checking here.
 
-		if s.clear {
-			w.queue.clear();
-		}
+// 		if s.clear {
+// 			w.queue.clear();
+// 		}
 
-		// Re-route certain [Index] flavors into
-		// [Back/Front] and do safety checks.
-		let insert = match s.insert {
-			InsertMethod::Index(i) if i == 0             => { InsertMethod::Front },
-			InsertMethod::Index(i) if i == w.queue.len() => { InsertMethod::Back },
-			InsertMethod::Index(i) if i > w.queue.len()  => { return Err(AddError::OutOfBounds); },
-			_ => s.insert,
-		};
+// 		// Re-route certain [Index] flavors into
+// 		// [Back/Front] and do safety checks.
+// 		let insert = match s.insert {
+// 			InsertMethod::Index(i) if i == 0             => { InsertMethod::Front },
+// 			InsertMethod::Index(i) if i == w.queue.len() => { InsertMethod::Back },
+// 			InsertMethod::Index(i) if i > w.queue.len()  => { return Err(AddError::OutOfBounds); },
+// 			_ => s.insert,
+// 		};
 
-		// [option] contains the [Source] we (Kernel) should
-		// send to [Decode], if we set our [current] to it.
-		let option = match insert {
-			InsertMethod::Back => {
-				let option = if w.queue.is_empty() && w.current.is_none() {
-					Some(s.source.clone())
-				} else {
-					None
-				};
+// 		// [option] contains the [Source] we (Kernel) should
+// 		// send to [Decode], if we set our [current] to it.
+// 		let option = match insert {
+// 			InsertMethod::Back => {
+// 				let option = if w.queue.is_empty() && w.current.is_none() {
+// 					Some(s.source.clone())
+// 				} else {
+// 					None
+// 				};
 
-				w.queue.push_back(s.source.clone());
+// 				w.queue.push_back(s.source.clone());
 
-				option
-			},
+// 				option
+// 			},
 
-			InsertMethod::Front => {
-				let option = if w.current.is_none() {
-					Some(s.source.clone())
-				} else {
-					None
-				};
+// 			InsertMethod::Front => {
+// 				let option = if w.current.is_none() {
+// 					Some(s.source.clone())
+// 				} else {
+// 					None
+// 				};
 
-				w.queue.push_front(s.source.clone());
+// 				w.queue.push_front(s.source.clone());
 
-				option
-			},
+// 				option
+// 			},
 
-			InsertMethod::Index(i) => {
-				debug_assert!(i > 0);
-				debug_assert!(i != w.queue.len());
+// 			InsertMethod::Index(i) => {
+// 				debug_assert!(i > 0);
+// 				debug_assert!(i != w.queue.len());
 
-				w.queue.insert(i, s.source.clone());
+// 				w.queue.insert(i, s.source.clone());
 
-				None
-			},
-		};
+// 				None
+// 			},
+// 		};
 
-		if s.play {
-			w.playing = true;
-		}
+// 		if s.play {
+// 			w.playing = true;
+// 		}
 
-		Ok(option)
-	}
-}
+// 		Ok(option)
+// 	}
+// }
 
 //---------------------------------------------------------------------------------------------------- AddError
 /// TODO
@@ -128,81 +127,81 @@ where
 	pub play: bool,
 }
 
-impl<Data: ValidData> ApplyReturn<Signal<Data>, AddMany<Data>, Result<Option<Source<Data>>, AddManyError>> for AudioState<Data> {
-	fn apply_return(s: &mut AddMany<Data>, w: &mut Self, _: &Self) -> Result<Option<Source<Data>>, AddManyError> {
-		// INVARIANT:
-		//
-		// [Engine] does 1 check:
-		// - If the [Vec<Source>] is empty.
-		//
-		// So we can assume the [Vec] length is at least 1.
-		//
-		// Other safety checks are not done, we must check those.
+// impl<Data: ValidData> ApplyReturn<Signal<Data>, AddMany<Data>, Result<Option<Source<Data>>, AddManyError>> for AudioState<Data> {
+// 	fn apply_return(s: &mut AddMany<Data>, w: &mut Self, _: &Self) -> Result<Option<Source<Data>>, AddManyError> {
+// 		// INVARIANT:
+// 		//
+// 		// [Engine] does 1 check:
+// 		// - If the [Vec<Source>] is empty.
+// 		//
+// 		// So we can assume the [Vec] length is at least 1.
+// 		//
+// 		// Other safety checks are not done, we must check those.
 
-		if s.clear {
-			w.queue.clear();
-		}
+// 		if s.clear {
+// 			w.queue.clear();
+// 		}
 
-		// Re-route certain [Index] flavors into
-		// [Back/Front] and do safety checks.
-		let insert = match s.insert {
-			InsertMethod::Index(i) if i == 0             => { InsertMethod::Front },
-			InsertMethod::Index(i) if i == w.queue.len() => { InsertMethod::Back },
-			InsertMethod::Index(i) if i > w.queue.len()  => { return Err(AddManyError::OutOfBounds); },
-			_ => s.insert,
-		};
+// 		// Re-route certain [Index] flavors into
+// 		// [Back/Front] and do safety checks.
+// 		let insert = match s.insert {
+// 			InsertMethod::Index(i) if i == 0             => { InsertMethod::Front },
+// 			InsertMethod::Index(i) if i == w.queue.len() => { InsertMethod::Back },
+// 			InsertMethod::Index(i) if i > w.queue.len()  => { return Err(AddManyError::OutOfBounds); },
+// 			_ => s.insert,
+// 		};
 
-		// [option] contains the [Source] we (Kernel) should
-		// send to [Decode], if we set our [current] to it.
-		let option = match insert {
-			InsertMethod::Back => {
-				let option = if s.play && w.queue.is_empty() && w.current.is_none() {
-					Some(s.sources[0].clone())
-				} else {
-					None
-				};
+// 		// [option] contains the [Source] we (Kernel) should
+// 		// send to [Decode], if we set our [current] to it.
+// 		let option = match insert {
+// 			InsertMethod::Back => {
+// 				let option = if s.play && w.queue.is_empty() && w.current.is_none() {
+// 					Some(s.sources[0].clone())
+// 				} else {
+// 					None
+// 				};
 
-				s.sources
-					.iter()
-					.for_each(|source| w.queue.push_back(source.clone()));
+// 				s.sources
+// 					.iter()
+// 					.for_each(|source| w.queue.push_back(source.clone()));
 
-				option
-			},
+// 				option
+// 			},
 
-			InsertMethod::Front => {
-				let option = if s.play && w.current.is_none() {
-					Some(s.sources[0].clone())
-				} else {
-					None
-				};
+// 			InsertMethod::Front => {
+// 				let option = if s.play && w.current.is_none() {
+// 					Some(s.sources[0].clone())
+// 				} else {
+// 					None
+// 				};
 
-				s.sources
-					.iter()
-					.for_each(|source| w.queue.push_front(source.clone()));
+// 				s.sources
+// 					.iter()
+// 					.for_each(|source| w.queue.push_front(source.clone()));
 
-				option
-			},
+// 				option
+// 			},
 
-			InsertMethod::Index(index) => {
-				debug_assert!(index > 0);
-				debug_assert!(index != w.queue.len());
+// 			InsertMethod::Index(index) => {
+// 				debug_assert!(index > 0);
+// 				debug_assert!(index != w.queue.len());
 
-				s.sources
-					.iter()
-					.enumerate()
-					.for_each(|(i, source)| w.queue.insert(i + index, source.clone()));
+// 				s.sources
+// 					.iter()
+// 					.enumerate()
+// 					.for_each(|(i, source)| w.queue.insert(i + index, source.clone()));
 
-				None
-			},
-		};
+// 				None
+// 			},
+// 		};
 
-		if s.play {
-			w.playing = true;
-		}
+// 		if s.play {
+// 			w.playing = true;
+// 		}
 
-		Ok(option)
-	}
-}
+// 		Ok(option)
+// 	}
+// }
 
 //---------------------------------------------------------------------------------------------------- AddManyError
 /// TODO
