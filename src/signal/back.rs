@@ -53,5 +53,5 @@ pub enum BackError {
 	/// TODO
 	OutOfBounds,
 	/// TODO
-	Seek(SeekError),
+	EmptyQueueNoSource,
 }

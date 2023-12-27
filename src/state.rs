@@ -52,6 +52,9 @@ where
 	/// Current volume level.
 	pub volume: Volume,
 
+	/// The previous track threshold.
+	pub previous_threshold: f64,
+
 	/// The currently playing index in the queue.
 	pub current: Option<Current<Data>>,
 }
@@ -67,6 +70,7 @@ where
 		playing: false,
 		repeat:  Repeat::Off,
 		volume:  Volume::DEFAULT,
+		previous_threshold: 3.0,
 		current: None,
 	};
 }

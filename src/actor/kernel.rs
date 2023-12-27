@@ -260,7 +260,7 @@ where
 				12 => self.add_many    ( select_recv!(c.recv_add_many), &c.to_audio, &c.to_decode, &c.send_add_many),
 				13 => self.seek        ( select_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),
 				14 => self.skip        ( select_recv!(c.recv_skip), &c.to_audio, &c.to_decode, &c.send_skip),
-				15 => self.back        ( select_recv!(c.recv_back), &c.send_back, &c.to_decode, &c.from_decode_seek),
+				15 => self.back        ( select_recv!(c.recv_back), &c.send_back, &c.to_audio, &c.to_decode),
 				16 => self.set_index   ( select_recv!(c.recv_set_index), &c.send_set_index),
 				17 => self.remove      ( select_recv!(c.recv_remove), &c.send_remove),
 				18 => self.remove_range( select_recv!(c.recv_remove_range), &c.send_remove_range),
@@ -692,11 +692,17 @@ where
 		let (_, source, _) = self.w.add_commit_push(|w, _| {
 			// If there is no track selected,
 			// default to the 0th track.
-			let previous_index = match w.current.as_ref() {
-				Some(c) => c.index.saturating_sub(1),
-				None => 0,
+			let Some(current) = w.current.as_ref() else {
+				return w.queue[0].clone();
 			};
-			w.queue[previous_index].clone()
+
+			// If we're less than the config threshold then
+			// the track should restart instead of going back.
+			if current.elapsed < w.previous_threshold {
+				current.source.clone()
+			} else {
+				w.queue[current.index.saturating_sub(1)].clone()
+			}
 		});
 
 		self.new_source(to_audio, to_decode, source);
@@ -986,10 +992,11 @@ where
 		&mut self,
 		mut back: Back,
 		to_engine: &Sender<Result<AudioStateSnapshot<Data>, BackError>>,
+		to_audio: &Sender<DiscardCurrentAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
-		from_decode_seek: &Receiver<Result<SeekedTime, SeekError>>,
 	) {
-		if self.queue_empty() {
+		if self.queue_empty() && !self.source_is_some() {
+			try_send!(to_engine, Err(BackError::EmptyQueueNoSource));
 			return;
 		}
 
@@ -997,33 +1004,37 @@ where
 		// have gone into negative indices.
 		back.back = std::cmp::min(self.w.queue.len(), back.back);
 
-		// If the [current] has not passed the
-		// threshold, just seek to the beginning.
-		if back.threshold.is_some_and(|t| self.less_than_threshold(t)) {
-			// Tell [Decode] to seek, return error if it errors.
-			try_send!(to_decode, KernelToDecode::Seek(Seek::Absolute(0.0)));
-			match recv!(from_decode_seek) {
-				Ok(seeked_time) => {
-					self.w.add_commit_push(|w, _| {
-						// INVARIANT:
-						// We checked the `Source` is loaded
-						// so this shouldn't panic.
-						w.current.as_mut().unwrap().elapsed = seeked_time;
-					});
-					try_send!(to_engine, Ok(self.audio_state_snapshot()));
-				},
-				Err(e) => try_send!(to_engine, Err(BackError::Seek(e))),
-			}
-			return;
-		}
+		let less_than_threshold = match back.threshold {
+			Some(t) => self.less_than_threshold(t),
+			// No manual back threshold was passed,
+			// use the global audio state one.
+			None => self.less_than_threshold(self.w.previous_threshold),
+		};
 
-		self.w.add_commit_push(|w, _| {
-			w.current = Some(Current {
-				source: w.queue[back.back].clone(),
+		// If the `Current` has not passed the threshold, restart.
+		// If there is no `Current`, default to the 0th track.
+		if less_than_threshold || self.w.current.is_none() {
+			// INVARIANT: non-empty checked above.
+			let source = self.w.queue[0].clone();
+			self.new_source(to_audio, to_decode, source.clone());
+			let current = Some(Current {
+				source,
 				index: 0,
 				elapsed: 0.0,
 			});
-		});
+			self.w.add_commit_push(|w, _| {
+				w.current = current.clone();
+			});
+		} else {
+			self.w.add_commit_push(|w, _| {
+				w.current = Some(Current {
+					source: w.queue[back.back].clone(),
+					index: 0,
+					elapsed: 0.0,
+				});
+			});
+		};
+
 		try_send!(to_engine, Ok(self.audio_state_snapshot()));
 	}
 
