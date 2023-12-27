@@ -260,8 +260,8 @@ where
 				12 => self.add_many    ( select_recv!(c.recv_add_many), &c.to_audio, &c.to_decode, &c.send_add_many),
 				13 => self.seek        ( select_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),
 				14 => self.skip        ( select_recv!(c.recv_skip), &c.to_audio, &c.to_decode, &c.send_skip),
-				15 => self.back        ( select_recv!(c.recv_back), &c.send_back, &c.to_audio, &c.to_decode),
-				16 => self.set_index   ( select_recv!(c.recv_set_index), &c.send_set_index),
+				15 => self.back        ( select_recv!(c.recv_back), &c.to_audio, &c.to_decode, &c.send_back),
+				16 => self.set_index   ( select_recv!(c.recv_set_index), &c.to_audio, &c.to_decode, &c.send_set_index),
 				17 => self.remove      ( select_recv!(c.recv_remove), &c.send_remove),
 				18 => self.remove_range( select_recv!(c.recv_remove_range), &c.send_remove_range),
 
@@ -991,9 +991,9 @@ where
 	fn back(
 		&mut self,
 		mut back: Back,
-		to_engine: &Sender<Result<AudioStateSnapshot<Data>, BackError>>,
 		to_audio: &Sender<DiscardCurrentAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
+		to_engine: &Sender<Result<AudioStateSnapshot<Data>, BackError>>,
 	) {
 		if self.queue_empty() && !self.source_is_some() {
 			try_send!(to_engine, Err(BackError::EmptyQueueNoSource));
@@ -1039,8 +1039,34 @@ where
 	}
 
 	/// TODO
-	fn set_index(&mut self, set_index: SetIndex, to_engine: &Sender<Result<AudioStateSnapshot<Data>, SetIndexError>>) {
-		todo!();
+	fn set_index(
+		&mut self,
+		set_index: SetIndex,
+		to_audio: &Sender<DiscardCurrentAudio>,
+		to_decode: &Sender<KernelToDecode<Data>>,
+		to_engine: &Sender<Result<AudioStateSnapshot<Data>, SetIndexError>>,
+	) {
+		if self.queue_empty() {
+			try_send!(to_engine, Err(SetIndexError::QueueEmpty));
+			return;
+		}
+
+		let Some(source) = self.w.queue.get(set_index.index) else {
+			try_send!(to_engine, Err(SetIndexError::OutOfBounds));
+			return;
+		};
+		let source = source.clone();
+
+		self.new_source(to_audio, to_decode, source.clone());
+
+		self.w.add_commit_push(|w, _| {
+			w.current = Some(Current {
+				source: source.clone(),
+				index: set_index.index,
+				elapsed: 0.0,
+			});
+		});
+
 		try_send!(to_engine, Ok(self.audio_state_snapshot()));
 	}
 
