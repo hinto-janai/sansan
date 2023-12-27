@@ -23,6 +23,7 @@ exclude = [
 	"examples",
 	"DESIGN.md",
 	"deny.toml",
+	"Cargo.lock",
 ]
 
 [package.metadata.docs.rs]
