@@ -253,7 +253,7 @@ where
 				4  =>                  { select_recv!(c.recv_next); self.next() },
 				5  =>                  { select_recv!(c.recv_previous); self.previous() },
 				6  => self.clear       ( select_recv!(c.recv_clear)),
-				7  => self.shuffle     ( select_recv!(c.recv_shuffle), &c.to_audio, &c.to_decode),
+				7  => self.shuffle     ( select_recv!(c.recv_shuffle), &c.to_audio, &c.to_decode, &c.from_decode_seek, &c.send_seek),
 				8  => self.repeat      ( select_recv!(c.recv_repeat)),
 				9  => self.volume      ( select_recv!(c.recv_volume)),
 				10 => self.restore     ( select_recv!(c.recv_restore)),
@@ -419,9 +419,9 @@ where
 	/// TODO
 	fn play(&mut self) {
 		if !self.playing() && self.source_is_some() {
-			self.w.add_commit_push(|w, _| {
-				debug_assert!(w.current.is_some());
-				debug_assert!(!w.playing);
+			self.w.add(|w, _| {
+				assert!(w.current.is_some());
+				assert!(!w.playing);
 				w.playing = true;
 			});
 			// TODO: tell audio/decode to start.
@@ -431,9 +431,9 @@ where
 	/// TODO
 	fn pause(&mut self) {
 		if self.playing() && self.source_is_some() {
-			self.w.add_commit_push(|w, _| {
-				debug_assert!(w.current.is_some());
-				debug_assert!(w.playing);
+			self.w.add(|w, _| {
+				assert!(w.current.is_some());
+				assert!(w.playing);
 				w.playing = false;
 			});
 		}
@@ -443,7 +443,7 @@ where
 	fn stop(&mut self) {
 		if self.source_is_some() || !self.queue_empty() {
 			self.w.add_commit(|w, _| {
-				debug_assert!(w.current.is_some() || !w.queue.is_empty());
+				assert!(w.current.is_some() || !w.queue.is_empty());
 				w.queue.clear();
 				w.current = None;
 			});
@@ -462,11 +462,11 @@ where
 		self.w.add_commit_push(|w, _| {
 			match clear {
 				Clear::Queue => {
-					debug_assert!(!w.queue.is_empty());
+					assert!(!w.queue.is_empty());
 					w.queue.clear();
 				},
 				Clear::Source => {
-					debug_assert!(w.current.is_some());
+					assert!(w.current.is_some());
 					w.current = None;
 				},
 			}
@@ -484,20 +484,100 @@ where
 		shuffle: Shuffle,
 		to_audio: &Sender<DiscardCurrentAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
+		from_decode_seek: &Receiver<Result<SetTime, SeekError>>,
+		to_engine: &Sender<Result<AudioStateSnapshot<Data>, SeekError>>,
 	) {
-		if self.w.queue.len() > 1 {
-			// INVARIANT: must be [push_clone()], see
-			// [crate::signal::signal.rs]'s [Apply]
-			// implementation for more info.
-			//
-			// This shuffle might be [Shuffle::Reset] which _may_
-			// set our [current] to queue[0], so we must forward
-			// it to [Decode].
-			if let Some(source) = self.w.commit_return(shuffle) {
-				self.new_source(to_audio, to_decode, source);
-			}
-			self.w.push_clone();
+		let queue_len = self.w.queue.len();
+		if queue_len == 0 {
+			return;
 		}
+
+		// The behavior for shuffle on 1
+		// element is to restart the track
+		// (using seek behavior).
+		if queue_len == 1 {
+			self.seek(Seek::Absolute(0.0), to_decode, from_decode_seek, to_engine);
+			return;
+		}
+
+		// Start shuffling.
+		//
+		// This returns an `Option<Source>` when the shuffle
+		// operation has made it such that we are setting our
+		// [current] to the returned [Source].
+		//
+		// We must forward this [Source] to [Decode].
+		let source = self.w.add_commit(|w, _| {
+			use rand::prelude::{Rng,SliceRandom};
+			let mut rng = rand::thread_rng();
+
+			let queue = w.queue.make_contiguous();
+			assert!(queue.len() >= 2);
+
+			match shuffle {
+				Shuffle::Queue => {
+					let index = w.current.as_ref().map(|t| t.index);
+
+					let Some(i) = index else {
+						queue.shuffle(&mut rng);
+						return None;
+					};
+
+					// Leaves the current index intact,
+					// while shuffling everything else, e.g:
+					//
+					// [0, 1, 2, 3, 4]
+					//        ^
+					//   current (i)
+					//
+					// queue[ .. 2] == [0, 1]
+					// queue[2+1..] == [3, 4]
+					queue[..i].shuffle(&mut rng);
+					// If [i] is the last element, then
+					// we will panic on [i+1], so only
+					// shuffle again if there are more
+					// elements after [i].
+					//
+					// [0, 1, 2, 3, 4]
+					//              ^
+					//         current (i)
+					//
+					// queue.len() == 5
+					// queue[..4]  == [0, 1, 2, 3] (range exclusive)
+					// (4+1) < 5   == false (so don't index)
+					if i + 1 < queue.len() {
+						queue[i + 1..].shuffle(&mut rng);
+					}
+
+					None
+				},
+
+				Shuffle::Reset => {
+					queue.shuffle(&mut rng);
+
+					// Return the new 0th `Track` if we had one before.
+					if let Some(current) = w.current.as_mut() {
+						// Make sure the current index
+						// reflects the new 0th element.
+						current.index = 0;
+						Some(w.queue[0].clone())
+					} else {
+						None
+					}
+				},
+			}
+		});
+
+		// INVARIANT: must be [`push_clone()`]
+		// since `Shuffle` is non-deterministic.
+		//
+		// This shuffle might be [Shuffle::Reset] which _may_
+		// set our [current] to queue[0], so we must forward
+		// it to [Decode].
+		if let Some(source) = source {
+			self.new_source(to_audio, to_decode, source);
+		}
+		self.w.push_clone();
 	}
 
 	/// TODO
