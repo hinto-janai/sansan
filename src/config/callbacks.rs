@@ -74,6 +74,7 @@ where
 	Msg: Send + 'static,
 	Call: SansanSender<Msg>,
 {
+	#[allow(clippy::panic_in_result_fn)]
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::Dynamic(_)   => write!(f, "Callback::Dynamic"),

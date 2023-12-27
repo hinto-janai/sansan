@@ -112,6 +112,9 @@
 	clippy::needless_pass_by_value,
 	clippy::inline_always,
 	clippy::if_then_some_else_none,
+	clippy::drop_copy,
+	clippy::integer_arithmetic,
+	clippy::float_cmp,
 )]
 
 #![cfg_attr(debug_assertions, allow(clippy::todo))]

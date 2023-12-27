@@ -406,6 +406,7 @@ impl SourceDecode {
 
 		/// TODO
 		struct DummyReader;
+		#[allow(clippy::panic_in_result_fn)]
 		impl FormatReader for DummyReader {
 			#[cold] #[inline(never)]
 			fn try_new(source: MediaSourceStream, options: &FormatOptions) -> Result<Self> { unreachable!() }
@@ -425,6 +426,7 @@ impl SourceDecode {
 
 		/// TODO
 		struct DummyDecoder;
+		#[allow(clippy::panic_in_result_fn)]
 		impl Decoder for DummyDecoder {
 			#[cold] #[inline(never)]
 			fn try_new(params: &symphonia::core::codecs::CodecParameters, options: &DecoderOptions) -> Result<Self> { unreachable!() }

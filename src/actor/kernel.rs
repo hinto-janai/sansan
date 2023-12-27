@@ -271,7 +271,6 @@ where
 
 					// Tell all actors to shutdown.
 					for actor in c.shutdown_actor.iter() {
-						#[allow(dropping_copy_types)]
 						drop(actor.try_send(()));
 					}
 
@@ -290,13 +289,11 @@ where
 					debug2!("Kernel - shutting down (hang)");
 
 					for actor in c.shutdown_actor.iter() {
-						#[allow(dropping_copy_types)]
 						drop(actor.try_send(()));
 					}
 
 					debug2!("Kernel - waiting on others...");
 					self.shutdown_wait.wait();
-					#[allow(dropping_copy_types)]
 					drop(c.shutdown_done.try_send(()));
 
 					return;

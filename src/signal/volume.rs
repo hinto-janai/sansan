@@ -298,7 +298,7 @@ impl std::fmt::Debug for AtomicVolume {
 
 //---------------------------------------------------------------------------------------------------- TESTS
 #[cfg(test)]
-#[allow(clippy::borrow_interior_mutable_const, clippy::float_cmp)]
+#[allow(clippy::borrow_interior_mutable_const)]
 mod tests {
 	use super::*;
 
