@@ -746,7 +746,7 @@ where
 	/// TODO
 	fn skip(&mut self, skip: Skip, to_engine: &Sender<Result<AudioStateSnapshot<Data>, SkipError>>) {
 		todo!();
-		try_send!(to_engine, Ok(self.commit_push_get()));
+		try_send!(to_engine, Ok(self.audio_state_snapshot()));
 	}
 
 	/// TODO
@@ -774,7 +774,7 @@ where
 				match recv!(from_decode_seek) {
 					Ok(set_time) => {
 						self.add_commit_push(set_time);
-						try_send!(to_engine, Ok(self.commit_push_get()));
+						try_send!(to_engine, Ok(self.audio_state_snapshot()));
 					},
 					Err(e) => try_send!(to_engine, Err(BackError::Seek(e))),
 				}
@@ -783,7 +783,7 @@ where
 		}
 
 		match self.add_commit_push(back) {
-			Ok(())  => try_send!(to_engine, Ok(self.commit_push_get())),
+			Ok(())  => try_send!(to_engine, Ok(self.audio_state_snapshot())),
 			Err(e) => try_send!(to_engine, Err(e)),
 		}
 	}
@@ -791,18 +791,18 @@ where
 	/// TODO
 	fn set_index(&mut self, set_index: SetIndex, to_engine: &Sender<Result<AudioStateSnapshot<Data>, SetIndexError>>) {
 		todo!();
-		try_send!(to_engine, Ok(self.commit_push_get()));
+		try_send!(to_engine, Ok(self.audio_state_snapshot()));
 	}
 
 	/// TODO
 	fn remove(&mut self, remove: Remove, to_engine: &Sender<Result<AudioStateSnapshot<Data>, RemoveError>>) {
 		todo!();
-		try_send!(to_engine, Ok(self.commit_push_get()));
+		try_send!(to_engine, Ok(self.audio_state_snapshot()));
 	}
 
 	/// TODO
 	fn remove_range(&mut self, remove_range: RemoveRange, to_engine: &Sender<Result<AudioStateSnapshot<Data>, RemoveRangeError>>) {
 		todo!();
-		try_send!(to_engine, Ok(self.commit_push_get()));
+		try_send!(to_engine, Ok(self.audio_state_snapshot()));
 	}
 }
