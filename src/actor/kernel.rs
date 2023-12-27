@@ -18,7 +18,6 @@ use crate::{
 		audio::AudioToKernel,
 	},
 	signal::{
-		Signal,
 		Play,
 		Toggle,
 		Pause,

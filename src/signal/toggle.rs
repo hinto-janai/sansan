@@ -1,5 +1,6 @@
+//! TODO
+
 //---------------------------------------------------------------------------------------------------- use
-use crate::signal::Signal;
 use crate::state::{AudioState,ValidData};
 
 //---------------------------------------------------------------------------------------------------- Toggle
@@ -7,7 +8,7 @@ use crate::state::{AudioState,ValidData};
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Copy,Clone,Debug,PartialEq,PartialOrd,Eq,Ord,Hash)]
-pub struct Toggle;
+pub(crate) struct Toggle;
 
 //---------------------------------------------------------------------------------------------------- someday::Apply
 // impl<Data: ValidData> someday::ApplyReturn<Signal<Data>, Toggle, ()> for AudioState<Data> {

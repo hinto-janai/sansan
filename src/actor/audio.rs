@@ -8,7 +8,6 @@ use crate::{
 	channel,
 	state::AudioState,
 	config::ErrorBehavior,
-	signal::Signal,
 };
 use symphonia::core::{audio::AudioBuffer, units::Time};
 use std::sync::{

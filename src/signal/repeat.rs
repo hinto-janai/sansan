@@ -1,3 +1,5 @@
+//! TODO
+
 //---------------------------------------------------------------------------------------------------- use
 use std::sync::atomic::{
 	AtomicU8,Ordering
@@ -39,6 +41,7 @@ impl Repeat {
 		}
 	}
 
+	/// Convert `self` to [`u8`].
 	pub(crate) const fn to_u8(self) -> u8 {
 		match self {
 			Self::Off     => 0,
@@ -49,27 +52,34 @@ impl Repeat {
 }
 
 //---------------------------------------------------------------------------------------------------- AtomicRepeat
+/// TODO
 pub(crate) struct AtomicRepeat(AtomicU8);
 
 impl AtomicRepeat {
+	#[allow(clippy::declare_interior_mutable_const)]
+	/// TODO
 	pub(crate) const DEFAULT: Self = Self(AtomicU8::new(Repeat::DEFAULT.to_u8()));
 
 	#[inline]
+	/// TODO
 	pub(crate) fn load(&self, ordering: Ordering) -> Repeat {
 		Repeat::from_u8(self.0.load(ordering))
 	}
 
 	#[inline]
+	/// TODO
 	pub(crate) fn store(&self, repeat: Repeat, ordering: Ordering) {
-		self.0.store(repeat.to_u8(), ordering)
+		self.0.store(repeat.to_u8(), ordering);
 	}
 
 	#[inline]
+	/// TODO
 	pub(crate) fn set(&self, repeat: Repeat) {
 		self.store(repeat, Ordering::Release);
 	}
 
 	#[inline]
+	/// TODO
 	pub(crate) fn get(&self) -> Repeat {
 		self.load(Ordering::Acquire)
 	}

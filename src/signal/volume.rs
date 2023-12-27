@@ -1,6 +1,7 @@
+//! TODO
+
 //---------------------------------------------------------------------------------------------------- use
 use crate::state::{AudioState,ValidData};
-use crate::signal::Signal;
 use crate::atomic::AtomicF32;
 use std::sync::atomic::Ordering;
 #[allow(unused_imports)] // docs
@@ -22,6 +23,7 @@ use crate::engine::Engine;
 #[cfg_attr(feature = "serde", serde(transparent))]
 pub struct Volume(f32);
 
+/// TODO
 macro_rules! impl_const {
 	($num:tt) => {
 		paste::paste! {
@@ -49,6 +51,7 @@ impl Volume {
 	pub const DEFAULT: Self = Self(0.25);
 
 	#[inline]
+	#[must_use]
 	/// Create a new [`Volume`] from a [`f32`].
 	///
 	/// This constructor uses the same rules as [`Self::fix`],
@@ -58,6 +61,7 @@ impl Volume {
 	}
 
 	#[inline]
+	#[must_use]
 	/// Create a new [`Volume`] from a [`f32`] without checking for correctness
 	///
 	/// This takes _any_ [`f32`] and will create a [`Volume`].
@@ -82,6 +86,7 @@ impl Volume {
 	}
 
 	#[inline]
+	#[must_use]
 	/// Checks a [`Volume`] for correctness and fixes it
 	///
 	/// # Saturating
@@ -124,8 +129,6 @@ impl Volume {
 					Self(self.0)
 				}
 			},
-			F::Zero => Self::MIN,
-			F::Nan => Self::MIN,
 			F::Infinite => {
 				if self.0.is_sign_positive() {
 					Self::MAX
@@ -133,11 +136,12 @@ impl Volume {
 					Self::MIN
 				}
 			},
-			F::Subnormal => Self::MIN,
+			F::Zero | F::Nan | F::Subnormal => Self::MIN,
 		}
 	}
 
 	#[inline]
+	#[must_use]
 	/// Returns the inner [`f32`]
 	pub const fn inner(&self) -> f32 {
 		self.0
@@ -244,33 +248,41 @@ impl From<f32> for Volume {
 // }
 
 //---------------------------------------------------------------------------------------------------- AtomicVolume
+/// TODO
 pub(crate) struct AtomicVolume(AtomicF32);
 
 impl AtomicVolume {
+	/// TODO
+	#[allow(clippy::declare_interior_mutable_const)]
 	pub(crate) const DEFAULT: Self = Self(AtomicF32::SELF_0_25);
 
 	#[cold]
 	#[inline(never)]
+	/// TODO
 	pub(crate) fn new(volume: Volume) -> Self {
 		Self(AtomicF32::new(volume.inner()))
 	}
 
 	#[inline]
+	/// TODO
 	pub(crate) fn store(&self, volume: Volume, ordering: Ordering) {
 		self.0.store(volume.inner(), ordering);
 	}
 
 	#[inline]
+	/// TODO
 	pub(crate) fn load(&self, ordering: Ordering) -> Volume {
 		Volume(self.0.load(ordering))
 	}
 
 	#[inline]
+	/// TODO
 	pub(crate) fn set(&self, volume: Volume) {
 		self.store(volume, Ordering::Release);
 	}
 
 	#[inline]
+	/// TODO
 	pub(crate) fn get(&self) -> Volume {
 		self.load(Ordering::Acquire)
 	}
@@ -286,6 +298,7 @@ impl std::fmt::Debug for AtomicVolume {
 
 //---------------------------------------------------------------------------------------------------- TESTS
 #[cfg(test)]
+#[allow(clippy::borrow_interior_mutable_const, clippy::float_cmp)]
 mod tests {
 	use super::*;
 

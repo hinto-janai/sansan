@@ -49,9 +49,6 @@ pub use skip::{Skip,SkipError};
 mod stop;
 pub(crate) use stop::Stop;
 
-mod signal;
-pub(crate) use signal::Signal;
-
 mod toggle;
 pub(crate) use toggle::Toggle;
 

@@ -1,3 +1,5 @@
+//! TODO
+
 //---------------------------------------------------------------------------------------------------- use
 use crate::source::Source;
 use strum::{
@@ -5,7 +7,6 @@ use strum::{
 	EnumString,EnumVariantNames,IntoStaticStr,
 };
 use crate::state::{AudioState,ValidData,Current};
-use crate::signal::Signal;
 
 //---------------------------------------------------------------------------------------------------- Add
 /// TODO
@@ -98,7 +99,7 @@ where
 /// TODO
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
-#[derive(Copy,Clone,Debug,PartialEq,PartialOrd)]
+#[derive(Copy,Clone,Debug,PartialEq,PartialOrd,Eq,Ord)]
 #[derive(AsRefStr,Display,EnumCount,EnumIter,EnumString,EnumVariantNames,IntoStaticStr)]
 #[strum(serialize_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
