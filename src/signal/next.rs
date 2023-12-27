@@ -14,7 +14,10 @@ use strum::{
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Copy,Clone,Debug,PartialEq,PartialOrd,Eq,Ord,Hash)]
-pub(crate) struct Next(pub(crate) Repeat);
+pub(crate) struct Next {
+	/// TODO
+	pub(crate) repeat: Repeat,
+}
 
 // // This function returns an `Option<Source>`.
 // //

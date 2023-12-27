@@ -249,7 +249,7 @@ where
 				1  =>                  { select_recv!(c.recv_play); self.play() },
 				2  =>                  { select_recv!(c.recv_pause); self.pause() },
 				3  =>                  { select_recv!(c.recv_stop); self.stop() },
-				4  =>                  { select_recv!(c.recv_next); self.next() },
+				4  =>                  { select_recv!(c.recv_next); self.next(&c.to_audio, &c.to_decode) },
 				5  =>                  { select_recv!(c.recv_previous); self.previous() },
 				6  => self.clear       ( select_recv!(c.recv_clear)),
 				7  => self.shuffle     ( select_recv!(c.recv_shuffle), &c.to_audio, &c.to_decode, &c.from_decode_seek, &c.send_seek),
@@ -620,16 +620,54 @@ where
 	}
 
 	/// TODO
-	fn next(&mut self) {
+	fn next(
+		&mut self,
+		to_audio: &Sender<DiscardCurrentAudio>,
+		to_decode: &Sender<KernelToDecode<Data>>,
+	) {
+		if !self.source_is_some() || self.queue_empty() {
+			return;
+		}
+
 		// INVARIANT:
-		// Applying [Next] returns an `Option<Source>`.
+		// The queue may or may not have
+		// any more [Source]'s left.
+		//
+		// We must check for [Repeat] as well.
+		//
+		// This returns an `Option<Source>`.
 		//
 		// `None` means our queue is done, and [Kernel]
 		// must clean the audio state up, and tell everyone else.
 		//
 		// `Some(Source)` means there is a new source to play.
+		let (_, maybe_source, _) = self.w.add_commit_push(|w, _| {
+			let maybe_source_index = w.current.as_ref().and_then(|c| {
+				// If we are currently playing something...
+				// And there's 1 track after it...
+				let next_index = c.index + 1;
+				if next_index < w.queue.len() {
+					// Return that index
+					Some(next_index)
+				} else {
+					// Else, check for repeat modes...
+					match w.repeat {
+						Repeat::Off => None,              // Our queue is finished, nothing left to play
+						Repeat::Current => Some(c.index), // User wants to repeat current song, return the current index
+						Repeat::Queue => Some(0),         // User wants to repeat the queue, return the 0th index
+					}
+				}
+			});
 
-		todo!();
+			maybe_source_index.map(|index| w.queue[index].clone())
+		});
+
+		// This [Next] might set our [current],
+		// it will return a [Some(source)] if so.
+		// We must forward it to [Decode].
+		if let Some(source) = maybe_source {
+			self.new_source(to_audio, to_decode, source);
+		}
 	}
 
 	/// TODO
