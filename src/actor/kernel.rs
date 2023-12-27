@@ -710,7 +710,7 @@ where
 	/// TODO
 	fn add_many(&mut self, add_many: AddMany<Data>, to_engine: &Sender<Result<AudioStateSnapshot<Data>, AddManyError>>) {
 		todo!();
-		try_send!(to_engine, Ok(self.commit_push_get()));
+		try_send!(to_engine, Ok(self.audio_state_snapshot()));
 	}
 
 	/// TODO
