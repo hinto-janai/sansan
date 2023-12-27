@@ -377,17 +377,13 @@ where
 	// 	output
 	// }
 
+	#[inline]
 	/// TODO
 	fn audio_state_snapshot(&self) -> AudioStateSnapshot<Data> {
 		AudioStateSnapshot(self.w.head_remote_ref())
 	}
 
 	#[inline]
-	/// TODO
-	fn get(&self) -> AudioStateSnapshot<Data> {
-		AudioStateSnapshot(self.w.head_remote_ref())
-	}
-
 	/// TODO
 	fn less_than_threshold(&self, threshold: f64) -> bool {
 		if let Some(current) = &self.w.current {
@@ -405,6 +401,9 @@ where
 
 	/// TODO
 	fn toggle(&mut self) {
+		// INVARIANT:
+		// Both `pause()` and `play()`
+		// will `add_commit_push()`.
 		if self.playing() {
 			self.pause();
 		} else {
@@ -415,7 +414,7 @@ where
 	/// TODO
 	fn play(&mut self) {
 		if !self.playing() && self.source_is_some() {
-			self.w.add(|w, _| {
+			self.w.add_commit_push(|w, _| {
 				assert!(w.current.is_some());
 				assert!(!w.playing);
 				w.playing = true;
@@ -427,7 +426,7 @@ where
 	/// TODO
 	fn pause(&mut self) {
 		if self.playing() && self.source_is_some() {
-			self.w.add(|w, _| {
+			self.w.add_commit_push(|w, _| {
 				assert!(w.current.is_some());
 				assert!(w.playing);
 				w.playing = false;
@@ -503,14 +502,19 @@ where
 		// [current] to the returned [Source].
 		//
 		// We must forward this [Source] to [Decode].
-		let source = self.w.add_commit(move |w, _| {
+		let maybe_source = self.w.add_commit(move |w, _| {
 			use rand::prelude::{Rng,SliceRandom};
 			let mut rng = rand::thread_rng();
 
 			let queue = w.queue.make_contiguous();
-			assert!(queue.len() >= 2);
+			assert!(
+				queue.len() >= 2,
+				"queue should have reset (seek to 0.0) behavior on 1 element"
+			);
 
 			match shuffle {
+				// Only shuffle the queue, leaving the
+				// currently playing Track (index) intact.
 				Shuffle::Queue => {
 					let index = w.current.as_ref().map(|t| t.index);
 
@@ -548,6 +552,8 @@ where
 					None
 				},
 
+				// Shuffle the entire queue,
+				// then reset to the 0th `Track`.
 				Shuffle::Reset => {
 					queue.shuffle(&mut rng);
 
@@ -564,15 +570,14 @@ where
 			}
 		});
 
-		// INVARIANT: must be [`push_clone()`]
-		// since `Shuffle` is non-deterministic.
-		//
 		// This shuffle might be [Shuffle::Reset] which _may_
 		// set our [current] to queue[0], so we must forward
 		// it to [Decode].
-		if let Some(source) = source {
+		if let Some(source) = maybe_source {
 			self.new_source(to_audio, to_decode, source);
 		}
+		// INVARIANT: must be [`push_clone()`]
+		// since `Shuffle` is non-deterministic.
 		self.w.push_clone();
 	}
 
