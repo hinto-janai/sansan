@@ -45,25 +45,25 @@ default = ["serde", "cubeb"]
 
 [dev-dependencies]
 bincode = { version = "2.0.0-rc.3", features = ["derive"]  }
-serde   = { version = "1.0.192", features = ["derive", "rc"] }
+serde   = { version = "1.0.193", features = ["derive", "rc"] }
 log     = { version = "0.4.20", features = ["serde"] }
 
 [dependencies]
 ### Personal libraries.
-someday  = { version = "0.0.4" }
+someday  = { version = "0.2.0" }
 lpt      = { version = "1.0.0" }
 
 ## Optional libraries.
 bincode      = { version = "2.0.0-rc.3", features = ["derive"], optional = true }
-serde        = { version = "1.0.192", features = ["derive", "rc"], optional = true }
+serde        = { version = "1.0.193", features = ["derive", "rc"], optional = true }
 log          = { version = "0.4.20", features = ["serde"], optional = true }
 
 ### Regular libraries.
 arrayvec     = { version = "0.7.4" }
-crossbeam    = { version = "0.8.2", features = ["crossbeam-channel"] }
+crossbeam    = { version = "0.8.3", features = ["crossbeam-channel"] }
 #once_cell    = { version = "1.18.0" }
 rand         = { version = "0.8.5" }
-thiserror    = { version = "1.0.50" }
+thiserror    = { version = "1.0.52" }
 seq-macro    = { version = "0.3.5" }
 strum        = { version = "0.25.0", features = ["derive", "phf"] }
 paste        = { version = "1.0.14" }
@@ -76,14 +76,14 @@ rubato                = { version = "0.14.1" }
 rb                    = { version = "0.4.1" }
 
 ### Optional Audio libraries.
-cubeb = { version = "0.10.3", optional = true }
+cubeb = { version = "0.10.7", optional = true }
 # TODO: eventually as another backend
 #cpal  = { version = "0.15.2", optional = true }
 
 ## Windows.
 [target.'cfg(windows)'.dependencies]
 # Needed for souvlaki.
-windows = { version = "0.51", features = [
+windows = { version = "0.52", features = [
 	"Win32_Foundation",
 	"Win32_Graphics_Gdi",
 	"Win32_UI_WindowsAndMessaging",
