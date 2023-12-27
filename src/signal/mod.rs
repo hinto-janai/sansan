@@ -35,7 +35,7 @@ pub(crate) use repeat::AtomicRepeat;
 
 mod seek;
 pub use seek::{Seek,SeekError};
-pub(crate) use seek::SetTime;
+pub(crate) use seek::SeekedTime;
 
 mod set_index;
 pub use set_index::{SetIndex,SetIndexError};

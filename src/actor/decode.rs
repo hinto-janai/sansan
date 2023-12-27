@@ -5,7 +5,7 @@ use std::{thread::JoinHandle, marker::PhantomData};
 use crossbeam::channel::{Receiver, Select, Sender};
 use crate::{
 	channel,
-	signal::{self,SeekError,Signal,SetTime},
+	signal::{self,SeekError,Signal,SeekedTime},
 	source::{Source, SourceDecode},
 	state::{AudioState, ValidData},
 	actor::audio::TookAudioBuffer,
@@ -70,7 +70,7 @@ struct Channels<Data: ValidData> {
 	to_gc:            Sender<DecodeToGc>,
 	to_audio:         Sender<ToAudio>,
 	from_audio:       Receiver<TookAudioBuffer>,
-	to_kernel_seek:   Sender<Result<SetTime, SeekError>>,
+	to_kernel_seek:   Sender<Result<SeekedTime, SeekError>>,
 	to_kernel_source: Sender<Result<(), SourceError>>,
 	from_kernel:      Receiver<KernelToDecode<Data>>,
 }
@@ -113,7 +113,7 @@ pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) from_pool:           Receiver<VecDeque<ToAudio>>,
 	pub(crate) to_audio:            Sender<ToAudio>,
 	pub(crate) from_audio:          Receiver<TookAudioBuffer>,
-	pub(crate) to_kernel_seek:      Sender<Result<SetTime, SeekError>>,
+	pub(crate) to_kernel_seek:      Sender<Result<SeekedTime, SeekError>>,
 	pub(crate) to_kernel_source:    Sender<Result<(), SourceError>>,
 	pub(crate) from_kernel:         Receiver<KernelToDecode<Data>>,
 	pub(crate) eb_seek:             ErrorBehavior,
@@ -334,7 +334,7 @@ impl<Data: ValidData> Decode<Data> {
 
 	#[inline]
 	/// TODO
-	fn seek(&mut self, seek: signal::Seek, to_kernel_seek: &Sender<Result<SetTime, SeekError>>) {
+	fn seek(&mut self, seek: signal::Seek, to_kernel_seek: &Sender<Result<SeekedTime, SeekError>>) {
 		use signal::Seek as S;
 
 		// Get the absolute timestamp of where we'll be seeking.
@@ -385,7 +385,7 @@ impl<Data: ValidData> Decode<Data> {
 			SeekMode::Coarse,
 			SeekTo::Time { time, track_id: None },
 		) {
-			Ok(_)  => try_send!(to_kernel_seek, Ok(SetTime(time.seconds as f64 + time.frac))),
+			Ok(_)  => try_send!(to_kernel_seek, Ok(time.seconds as f64 + time.frac)),
 			Err(e) => self.handle_error(e, self.eb_seek, "seek"),
 		}
 	}

@@ -34,8 +34,9 @@ pub enum Seek {
 	Backward(f64),
 }
 
-#[derive(Copy,Clone,Debug,PartialEq,PartialOrd)]
-pub(crate) struct SetTime(pub(crate) f64);
+/// The (second) timestamp `Decode` successfully
+/// set the time to after a seek operation.
+pub(crate) type SeekedTime = f64;
 
 //---------------------------------------------------------------------------------------------------- SeekError
 /// TODO

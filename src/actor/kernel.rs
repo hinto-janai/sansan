@@ -33,7 +33,7 @@ use crate::{
 		AddError,
 		InsertMethod,
 		Seek,
-		SetTime,
+		SeekedTime,
 		SeekError,
 		Next,
 		Previous,
@@ -119,7 +119,7 @@ pub(crate) struct Channels<Data: ValidData> {
 
 	// [Decode]
 	pub(crate) to_decode:          Sender<KernelToDecode<Data>>,
-	pub(crate) from_decode_seek:   Receiver<Result<SetTime, SeekError>>,
+	pub(crate) from_decode_seek:   Receiver<Result<SeekedTime, SeekError>>,
 	pub(crate) from_decode_source: Receiver<Result<(), SourceError>>,
 
 	// Signals that input/output `()`
@@ -484,7 +484,7 @@ where
 		shuffle: Shuffle,
 		to_audio: &Sender<DiscardCurrentAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
-		from_decode_seek: &Receiver<Result<SetTime, SeekError>>,
+		from_decode_seek: &Receiver<Result<SeekedTime, SeekError>>,
 		to_engine: &Sender<Result<AudioStateSnapshot<Data>, SeekError>>,
 	) {
 		let queue_len = self.w.queue.len();
@@ -718,7 +718,7 @@ where
 		&mut self,
 		seek: Seek,
 		to_decode: &Sender<KernelToDecode<Data>>,
-		from_decode_seek: &Receiver<Result<SetTime, SeekError>>,
+		from_decode_seek: &Receiver<Result<SeekedTime, SeekError>>,
 		to_engine: &Sender<Result<AudioStateSnapshot<Data>, SeekError>>,
 	) {
 		// Return error to [Engine] if we don't have a [Source] loaded.
@@ -730,9 +730,14 @@ where
 		// Tell [Decode] to seek, return error if it errors.
 		try_send!(to_decode, KernelToDecode::Seek(seek));
 		match recv!(from_decode_seek) {
-			Ok(set_time) => {
-				self.add_commit_push(set_time);
-				try_send!(to_engine, Ok(self.commit_push_get()));
+			Ok(seeked_time) => {
+				self.w.add_commit_push(|w, _| {
+					// INVARIANT:
+					// We checked the `Source` is loaded
+					// so this shouldn't panic.
+					w.current.as_mut().unwrap().elapsed = seeked_time;
+				});
+				try_send!(to_engine, Ok(self.audio_state_snapshot()));
 			},
 			Err(e) => try_send!(to_engine, Err(e)),
 		}
@@ -750,7 +755,7 @@ where
 		mut back: Back,
 		to_engine: &Sender<Result<AudioStateSnapshot<Data>, BackError>>,
 		to_decode: &Sender<KernelToDecode<Data>>,
-		from_decode_seek: &Receiver<Result<SetTime, SeekError>>,
+		from_decode_seek: &Receiver<Result<SeekedTime, SeekError>>,
 	) {
 		if self.queue_empty() {
 			return;
