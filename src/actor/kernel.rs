@@ -582,15 +582,19 @@ where
 
 	/// TODO
 	fn repeat(&mut self, repeat: Repeat) {
-		if self.w.repeat != repeat {
-			self.atomic_state.repeat.set(repeat);
-			self.add_commit_push(repeat);
+		if self.w.repeat == repeat {
+			return;
 		}
+
+		self.atomic_state.repeat.set(repeat);
+		self.w.add_commit_push(|w, _| {
+			todo!();
+		});
 	}
 
 	/// TODO
 	fn volume(&mut self, volume: Volume) {
-		if self.w.volume != volume {
+		if self.w.volume == volume {
 			self.atomic_state.volume.set(volume);
 			self.add_commit_push(volume);
 		}
