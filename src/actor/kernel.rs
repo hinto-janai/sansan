@@ -507,7 +507,7 @@ where
 		// [current] to the returned [Source].
 		//
 		// We must forward this [Source] to [Decode].
-		let source = self.w.add_commit(|w, _| {
+		let source = self.w.add_commit(move |w, _| {
 			use rand::prelude::{Rng,SliceRandom};
 			let mut rng = rand::thread_rng();
 
@@ -643,10 +643,11 @@ where
 			// Map certain [Index] flavors into
 			// [Back/Front] and do safety checks.
 			let insert = match add.insert {
-				InsertMethod::Index(i) if i == 0 => { InsertMethod::Front },
+				InsertMethod::Index(0) => { InsertMethod::Front },
 				InsertMethod::Index(i) if i == w.queue.len() => { InsertMethod::Back },
 				InsertMethod::Index(i) if i > w.queue.len() => { return Err(AddError::OutOfBounds); },
-				_ => add.insert,
+				// _ =>
+				InsertMethod::Back | InsertMethod::Front | InsertMethod::Index(_) => add.insert,
 			};
 
 			// [option] contains the [Source] we should send
@@ -787,11 +788,14 @@ where
 			}
 		}
 
-		// TODO
-		// match self.add_commit_push(back) {
-			// Ok(())  => try_send!(to_engine, Ok(self.audio_state_snapshot())),
-			// Err(e) => try_send!(to_engine, Err(e)),
-		// }
+		self.w.add_commit_push(|w, _| {
+			w.current = Some(Current {
+				source: w.queue[back.back].clone(),
+				index: 0,
+				elapsed: 0.0,
+			});
+		});
+		try_send!(to_engine, Ok(self.audio_state_snapshot()));
 	}
 
 	/// TODO
