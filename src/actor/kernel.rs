@@ -459,7 +459,18 @@ where
 			Clear::Queue => if self.queue_empty() { return },
 			Clear::Source => if !self.source_is_some() { return },
 		}
-		self.add_commit_push(clear);
+		self.w.add_commit_push(|w, _| {
+			match clear {
+				Clear::Queue => {
+					debug_assert!(!w.queue.is_empty());
+					w.queue.clear();
+				},
+				Clear::Source => {
+					debug_assert!(w.current.is_some());
+					w.current = None;
+				},
+			}
+		});
 	}
 
 	/// TODO
