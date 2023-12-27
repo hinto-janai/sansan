@@ -595,9 +595,13 @@ where
 	/// TODO
 	fn volume(&mut self, volume: Volume) {
 		if self.w.volume == volume {
-			self.atomic_state.volume.set(volume);
-			self.add_commit_push(volume);
+			return;
 		}
+
+		self.atomic_state.volume.set(volume);
+		self.w.add_commit_push(|w, _| {
+			todo!();
+		});
 	}
 
 	/// TODO
