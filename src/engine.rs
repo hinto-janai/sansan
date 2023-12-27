@@ -64,7 +64,7 @@ where
 	_p: PhantomData<(Call, Error)>,
 
 	/// Data and objects.
-	audio:  AudioStateReader<Data>,
+	audio: AudioStateReader<Data>,
 
 	/// Signal to [Kernel] to tell all of our internal
 	/// actors (threads) to start shutting down.
@@ -526,6 +526,17 @@ where
 	//
 	// Just in case [Kernel] panicked, we [unwrap()] as all
 	// bets are off since [Kernel] shouldn't be panicking.
+
+	// There are some local checks we can do here (as the `Engine`)
+	// so we don't have to go through the Request -> Response channel
+	// stuff, for example: if `repeat()` is called, but our current
+	// `Repeat` is the same, we can return here instead of sending
+	// a channel message to `Kernel`, however...
+	//
+	// We don't have free access to the `AudioState`, we must get
+	// a `head()` of the current `Reader`'s state which is probably
+	// as expensive as just sending a message, so...
+	// INVARIANT: `Kernel` must not assume all Requests are actionable.
 
 	/// TODO
 	pub fn toggle(&mut self) {
