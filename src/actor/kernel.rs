@@ -772,8 +772,13 @@ where
 				// Tell [Decode] to seek, return error if it errors.
 				try_send!(to_decode, KernelToDecode::Seek(Seek::Absolute(0.0)));
 				match recv!(from_decode_seek) {
-					Ok(set_time) => {
-						self.add_commit_push(set_time);
+					Ok(seeked_time) => {
+						self.w.add_commit_push(|w, _| {
+							// INVARIANT:
+							// We checked the `Source` is loaded
+							// so this shouldn't panic.
+							w.current.as_mut().unwrap().elapsed = seeked_time;
+						});
 						try_send!(to_engine, Ok(self.audio_state_snapshot()));
 					},
 					Err(e) => try_send!(to_engine, Err(BackError::Seek(e))),
@@ -782,10 +787,11 @@ where
 			}
 		}
 
-		match self.add_commit_push(back) {
-			Ok(())  => try_send!(to_engine, Ok(self.audio_state_snapshot())),
-			Err(e) => try_send!(to_engine, Err(e)),
-		}
+		// TODO
+		// match self.add_commit_push(back) {
+			// Ok(())  => try_send!(to_engine, Ok(self.audio_state_snapshot())),
+			// Err(e) => try_send!(to_engine, Err(e)),
+		// }
 	}
 
 	/// TODO
