@@ -442,10 +442,13 @@ where
 	/// TODO
 	fn stop(&mut self) {
 		if self.source_is_some() || !self.queue_empty() {
-			// INVARIANT: must be [push_clone()], see
-			// [crate::signal::signal.rs]'s [Apply]
-			// implementation for more info.
-			self.w.commit_return(Stop);
+			self.w.add_commit(|w, _| {
+				debug_assert!(w.current.is_some() || !w.queue.is_empty());
+				w.queue.clear();
+				w.current = None;
+			});
+			// The queue is empty, no need to re-apply,
+			// just clone the empty state.
 			self.w.push_clone();
 		}
 	}
