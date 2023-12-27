@@ -431,7 +431,11 @@ where
 	/// TODO
 	fn pause(&mut self) {
 		if self.playing() && self.source_is_some() {
-			self.add_commit_push(Pause);
+			self.w.add_commit_push(|w, _| {
+				debug_assert!(w.current.is_some());
+				debug_assert!(w.playing);
+				w.playing = false;
+			});
 		}
 	}
 
