@@ -55,6 +55,9 @@ where
 	/// The previous track threshold.
 	pub previous_threshold: f64,
 
+	/// TODO
+	pub queue_end_clear: bool,
+
 	/// The currently playing index in the queue.
 	pub current: Option<Current<Data>>,
 }
@@ -66,12 +69,13 @@ where
 {
 	/// TODO
 	pub const DUMMY: Self = Self {
-		queue:   VecDeque::new(),
-		playing: false,
-		repeat:  Repeat::Off,
-		volume:  Volume::DEFAULT,
+		queue:              VecDeque::new(),
+		playing:            false,
+		repeat:             Repeat::Off,
+		volume:             Volume::DEFAULT,
 		previous_threshold: 3.0,
-		current: None,
+		queue_end_clear:    true,
+		current:            None,
 	};
 }
 
