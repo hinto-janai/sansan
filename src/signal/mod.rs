@@ -24,7 +24,8 @@ mod previous;
 pub use previous::{Previous,PreviousError};
 
 mod remove_range;
-pub use remove_range::{RemoveRange,RemoveRangeError};
+pub(crate) use remove_range::RemoveRange;
+// pub use remove_range::RemoveRangeError;
 
 mod remove;
 pub use remove::{Remove,RemoveError};

@@ -20,8 +20,7 @@ use crate::{
 		Add,AddMany,Back,Clear,Previous,RemoveRange,Remove,
 		Repeat,Seek,SetIndex,Shuffle,Skip,Volume,InsertMethod,
 		AddError,SeekError,Next,PreviousError,SkipError,
-		BackError,SetIndexError,RemoveError,RemoveRangeError,
-		AddManyError,
+		BackError,SetIndexError,RemoveError,AddManyError,
 	}
 };
 use crossbeam::channel::{bounded,unbounded};
@@ -107,7 +106,7 @@ where
 	send_remove:       S<Remove>,
 	recv_remove:       R<Result<AudioStateSnapshot<Data>, RemoveError>>,
 	send_remove_range: S<RemoveRange>,
-	recv_remove_range: R<Result<AudioStateSnapshot<Data>, RemoveRangeError>>,
+	recv_remove_range: R<Result<AudioStateSnapshot<Data>, RemoveError>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Engine Impl
@@ -659,7 +658,12 @@ where
 	///
 	/// # Errors
 	/// TODO
-	pub fn remove_range(&mut self, remove_range: RemoveRange) -> Result<AudioStateSnapshot<Data>, RemoveRangeError> {
+	pub fn remove_range(&mut self, remove_range: impl std::ops::RangeBounds<usize>) -> Result<AudioStateSnapshot<Data>, RemoveError> {
+		let remove_range = RemoveRange {
+			start_bound: remove_range.start_bound().cloned(),
+			end_bound: remove_range.end_bound().cloned(),
+		};
+
 		try_send!(self.send_remove_range, remove_range);
 		recv!(self.recv_remove_range)
 	} // defines what happens on included remove song, other errors, etc

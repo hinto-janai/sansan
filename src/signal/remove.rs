@@ -33,5 +33,5 @@ pub enum RemoveError {
 	/// TODO
 	QueueEmpty,
 	/// TODO
-	OutOfBounds,
+	BadIndex,
 }
