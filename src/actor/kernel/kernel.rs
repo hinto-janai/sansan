@@ -269,7 +269,7 @@ where
 				7  => self.shuffle     ( select_recv!(c.recv_shuffle), &c.to_audio, &c.to_decode, &c.from_decode_seek, &c.send_seek),
 				8  => self.repeat      ( select_recv!(c.recv_repeat)),
 				9  => self.volume      ( select_recv!(c.recv_volume)),
-				10 => self.restore     ( select_recv!(c.recv_restore)),
+				10 => self.restore     ( select_recv!(c.recv_restore), &c.to_audio, &c.to_decode),
 				11 => self.add         ( select_recv!(c.recv_add), &c.to_audio, &c.to_decode, &c.send_add),
 				12 => self.add_many    ( select_recv!(c.recv_add_many), &c.to_audio, &c.to_decode, &c.send_add_many),
 				13 => self.seek        ( select_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),

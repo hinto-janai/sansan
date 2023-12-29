@@ -50,7 +50,7 @@ log     = { version = "0.4.20", features = ["serde"] }
 
 [dependencies]
 ### Personal libraries.
-someday  = { version = "0.2.0" }
+someday  = { git = "https://github.com/hinto-janai/someday" } # TODO: set version on release
 lpt      = { version = "1.0.0" }
 
 ## Optional libraries.

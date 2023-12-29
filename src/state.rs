@@ -21,6 +21,9 @@ use std::{
 /// the generic [Data] the user provides is large.
 pub(crate) const QUEUE_LEN: usize = 256;
 
+/// TODO
+pub const PREVIOUS_THRESHOLD: f64 = 3.0;
+
 //---------------------------------------------------------------------------------------------------- AudioStateReader
 /// TODO
 #[derive(Clone,Debug)]
@@ -81,7 +84,7 @@ where
 		playing:            false,
 		repeat:             Repeat::Off,
 		volume:             Volume::DEFAULT,
-		previous_threshold: 3.0,
+		previous_threshold: PREVIOUS_THRESHOLD,
 		queue_end_clear:    true,
 		current:            None,
 	};

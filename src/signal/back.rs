@@ -51,7 +51,7 @@ pub struct Back {
 #[derive(thiserror::Error)]
 pub enum BackError {
 	/// TODO
-	OutOfBounds,
+	BackZero,
 	/// TODO
 	EmptyQueueNoSource,
 }

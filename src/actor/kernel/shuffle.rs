@@ -41,7 +41,7 @@ impl<Data: ValidData> Kernel<Data> {
 		// [current] to the returned [Source].
 		//
 		// We must forward this [Source] to [Decode].
-		let maybe_source = self.w.add_commit(move |w, _| {
+		let (_, maybe_source) = self.w.add_commit(move |w, _| {
 			use rand::prelude::{Rng,SliceRandom};
 			let mut rng = rand::thread_rng();
 

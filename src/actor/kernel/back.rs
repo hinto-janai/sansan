@@ -64,6 +64,38 @@ impl<Data: ValidData> Kernel<Data> {
 }
 
 //---------------------------------------------------------------------------------------------------- Tests
-#[cfg(test)]
-mod tests {
-}
+// #[cfg(test)]
+// #[allow(clippy::bool_assert_comparison, clippy::cognitive_complexity)]
+// mod tests {
+// 	use super::*;
+// 	use crate::{
+// 		engine::Engine,
+// 		signal::{repeat::Repeat,volume::Volume,back::Back},
+// 		state::PREVIOUS_THRESHOLD,
+// 	};
+
+// 	#[test]
+// 	// Error should be returned on `back: 0`.
+// 	fn back_zero() {
+// 		let (mut engine, _) = crate::tests::init_test();
+// 		assert!(engine.reader().get().queue.is_empty());
+// 		let back = Back {
+// 			back: 0,
+// 			threshold: None,
+// 		};
+// 		let resp = engine.back(back);
+// 		assert_eq!(resp, Err(BackError::BackZero));
+// 	}
+
+// 	#[test]
+// 	// Error should be returned on empty queue.
+// 	fn queue_empty() {
+// 		let (mut engine, _) = crate::tests::init_test();
+// 		assert!(engine.reader().get().queue.is_empty());
+// 		let back = Back {
+// 			back: 0,
+// 			threshold: None,
+// 		};
+// 		let resp = engine.back(back);
+// 	}
+// }
