@@ -2,57 +2,57 @@
 #[allow(unused_imports)] // docs
 use crate::Engine;
 
-mod add;
+pub(crate) mod add;
 pub use add::{Add,AddError,AddMany,AddManyError,InsertMethod};
 
-mod back;
+pub(crate) mod back;
 pub use back::{Back,BackError};
 
-mod clear;
+pub(crate) mod clear;
 pub use clear::Clear;
 
-mod next;
+pub(crate) mod next;
 pub(crate) use next::Next;
 
-mod pause;
+pub(crate) mod pause;
 pub(crate) use pause::Pause;
 
-mod play;
+pub(crate) mod play;
 pub(crate) use play::Play;
 
-mod previous;
+pub(crate) mod previous;
 pub use previous::{Previous,PreviousError};
 
-mod remove_range;
+pub(crate) mod remove_range;
 pub(crate) use remove_range::RemoveRange;
 // pub use remove_range::RemoveRangeError;
 
-mod remove;
+pub(crate) mod remove;
 pub use remove::{Remove,RemoveError};
 
-mod repeat;
+pub(crate) mod repeat;
 pub use repeat::Repeat;
 pub(crate) use repeat::AtomicRepeat;
 
-mod seek;
+pub(crate) mod seek;
 pub use seek::{Seek,SeekError};
 pub(crate) use seek::SeekedTime;
 
-mod set_index;
+pub(crate) mod set_index;
 pub use set_index::{SetIndex,SetIndexError};
 
-mod shuffle;
+pub(crate) mod shuffle;
 pub use shuffle::Shuffle;
 
-mod skip;
+pub(crate) mod skip;
 pub use skip::{Skip,SkipError};
 
-mod stop;
+pub(crate) mod stop;
 pub(crate) use stop::Stop;
 
-mod toggle;
+pub(crate) mod toggle;
 pub(crate) use toggle::Toggle;
 
-mod volume;
+pub(crate) mod volume;
 pub use volume::Volume;
 pub(crate) use volume::AtomicVolume;

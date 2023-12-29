@@ -8,7 +8,7 @@ use crate::{
 	signal::{self,SeekError,SeekedTime},
 	source::{Source, SourceDecode},
 	state::{AudioState, ValidData},
-	actor::audio::TookAudioBuffer,
+	actor::{audio::TookAudioBuffer,kernel::KernelToDecode},
 	macros::{recv,send,try_send,try_recv,debug2,select_recv},
 	config::ErrorBehavior,
 	error::SourceError,
@@ -76,22 +76,6 @@ struct Channels<Data: ValidData> {
 }
 
 //---------------------------------------------------------------------------------------------------- (Actual) Messages
-/// TODO
-pub(crate) enum KernelToDecode<Data: ValidData> {
-	/// Convert this [Source] into a real
-	/// [SourceDecode] and start decoding it.
-	///
-	/// This also implicitly also means we
-	/// should drop our old audio buffers.
-	NewSource(Source<Data>),
-	/// Seek to this timestamp in the currently
-	/// playing track and start decoding from there
-	Seek(signal::Seek),
-	/// Clear all audio buffers, the current source,
-	/// and stop decoding.
-	DiscardAudioAndStop,
-}
-
 /// TODO
 pub(crate) enum DecodeToGc {
 	/// TODO

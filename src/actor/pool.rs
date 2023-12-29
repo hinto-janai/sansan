@@ -6,10 +6,9 @@ use crossbeam::channel::{Receiver, Select, Sender};
 use crate::{
 	signal,
 	source::Source,
-	state::{Current,ValidData},
+	state::{Current,ValidData,QUEUE_LEN},
 	actor::audio::TookAudioBuffer,
 	actor::decode::DECODE_BUFFER_LEN,
-	actor::kernel::QUEUE_LEN,
 	macros::{recv,send,try_send,try_recv,debug2,select_recv},
 };
 use symphonia::core::{audio::AudioBuffer, units::Time};
