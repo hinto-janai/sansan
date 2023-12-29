@@ -705,35 +705,4 @@ pub enum EngineInitError {
 
 //---------------------------------------------------------------------------------------------------- Tests
 #[cfg(test)]
-mod tests {
-	use super::*;
-
-	#[cfg(test)]
-	pub(crate) fn init_test() -> (
-		Engine::<usize, (), ()>,
-		Vec<Source<usize>>,
-	) {
-		let engine = Engine::<usize, (), ()>::init(Config::DEFAULT).unwrap();
-		let source = std::path::Path::new("assets/audio/dialog-information.oga");
-		let vec = vec![
-			Source::from((source, 1)), Source::from((source, 2)),
-			Source::from((source, 3)), Source::from((source, 4)),
-			Source::from((source, 5)), Source::from((source, 6)),
-			Source::from((source, 7)), Source::from((source, 8)),
-			Source::from((source, 9)), Source::from((source, 10)),
-		];
-		(engine, vec)
-	}
-
-	#[cfg(test)]
-	pub(crate) fn sources_21_to_30() -> Vec<Source<usize>> {
-		let source = std::path::Path::new("assets/audio/dialog-information.oga");
-		vec![
-			Source::from((source, 21)), Source::from((source, 32)),
-			Source::from((source, 23)), Source::from((source, 34)),
-			Source::from((source, 25)), Source::from((source, 36)),
-			Source::from((source, 27)), Source::from((source, 38)),
-			Source::from((source, 29)), Source::from((source, 30)),
-		]
-	}
-}
+mod tests {}

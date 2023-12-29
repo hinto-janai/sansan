@@ -115,6 +115,8 @@
 	clippy::drop_copy,
 	clippy::integer_arithmetic,
 	clippy::float_cmp,
+	clippy::items_after_statements,
+	clippy::use_debug,
 )]
 
 #![cfg_attr(debug_assertions, allow(clippy::todo))]

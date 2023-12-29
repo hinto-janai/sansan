@@ -36,12 +36,27 @@ pub(crate) fn sources_10_20_30() -> Vec<Source<usize>> {
 	vec![source(10), source(20), source(30)]
 }
 
+// Return 3 `Source`'s with `11, 22, 33` as the `Data`.
+pub(crate) fn sources_11_22_33() -> Vec<Source<usize>> {
+	vec![source(11), source(22), source(33)]
+}
+
 // Return 3 `Source`'s with `40, 50, 60` as the `Data`.
 pub(crate) fn sources_40_50_60() -> Vec<Source<usize>> {
 	vec![source(40), source(50), source(60)]
 }
 
+// Return 3 `Source`'s with `44, 55, 66` as the `Data`.
+pub(crate) fn sources_44_55_66() -> Vec<Source<usize>> {
+	vec![source(44), source(55), source(66)]
+}
+
 // Return 3 `Source`'s with `70, 80, 90` as the `Data`.
 pub(crate) fn sources_70_80_90() -> Vec<Source<usize>> {
 	vec![source(70), source(80), source(90)]
+}
+
+// Return 3 `Source`'s with `77, 88, 99` as the `Data`.
+pub(crate) fn sources_77_88_99() -> Vec<Source<usize>> {
+	vec![source(77), source(88), source(99)]
 }
