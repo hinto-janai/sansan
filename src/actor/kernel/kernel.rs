@@ -25,8 +25,6 @@ use crate::{
 		Volume,
 		Add,
 		AddMany,
-		AddManyError,
-		AddError,
 		InsertMethod,
 		Seek,
 		SeekedTime,
@@ -136,6 +134,10 @@ pub(crate) struct Channels<Data: ValidData> {
 	pub(crate) recv_stop:     Receiver<()>,
 
 	// Signals that have input and output `()`
+	pub(crate) send_add:      Sender<AudioStateSnapshot<Data>>,
+	pub(crate) recv_add:      Receiver<Add<Data>>,
+	pub(crate) send_add_many: Sender<AudioStateSnapshot<Data>>,
+	pub(crate) recv_add_many: Receiver<AddMany<Data>>,
 	pub(crate) recv_clear:    Receiver<Clear>,
 	pub(crate) recv_repeat:   Receiver<Repeat>,
 	pub(crate) recv_volume:   Receiver<Volume>,
@@ -143,10 +145,6 @@ pub(crate) struct Channels<Data: ValidData> {
 	pub(crate) recv_restore:  Receiver<AudioState<Data>>,
 
 	// Signals that return `Result<T, E>`
-	pub(crate) send_add:          Sender<Result<AudioStateSnapshot<Data>, AddError>>,
-	pub(crate) recv_add:          Receiver<Add<Data>>,
-	pub(crate) send_add_many:     Sender<Result<AudioStateSnapshot<Data>, AddManyError>>,
-	pub(crate) recv_add_many:     Receiver<AddMany<Data>>,
 	pub(crate) send_seek:         Sender<Result<AudioStateSnapshot<Data>, SeekError>>,
 	pub(crate) recv_seek:         Receiver<Seek>,
 	pub(crate) send_skip:         Sender<Result<AudioStateSnapshot<Data>, SkipError>>,

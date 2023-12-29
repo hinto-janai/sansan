@@ -4,7 +4,7 @@
 use crate::{
 	actor::kernel::kernel::{Kernel,DiscardCurrentAudio,KernelToDecode},
 	state::{AudioStateSnapshot,ValidData},
-	signal::add::{Add,AddError,InsertMethod},
+	signal::add::{Add,InsertMethod},
 	macros::try_send,
 };
 use crossbeam::channel::{Sender,Receiver};
@@ -17,7 +17,7 @@ impl<Data: ValidData> Kernel<Data> {
 		add: Add<Data>,
 		to_audio: &Sender<DiscardCurrentAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
-		to_engine: &Sender<Result<AudioStateSnapshot<Data>, AddError>>
+		to_engine: &Sender<AudioStateSnapshot<Data>>
 	) {
 		// This function returns an `Option<Source>` when the add
 		// operation has made it such that we are setting our [current]
@@ -33,8 +33,7 @@ impl<Data: ValidData> Kernel<Data> {
 			// [Back/Front] and do safety checks.
 			let insert = match add.insert {
 				InsertMethod::Index(0) => { InsertMethod::Front },
-				InsertMethod::Index(i) if i == w.queue.len() => { InsertMethod::Back },
-				InsertMethod::Index(i) if i > w.queue.len() => { return Err(AddError::OutOfBounds); },
+				InsertMethod::Index(i) if i >= w.queue.len() => { InsertMethod::Back },
 				// _ =>
 				InsertMethod::Back | InsertMethod::Front | InsertMethod::Index(_) => add.insert,
 			};
@@ -80,21 +79,16 @@ impl<Data: ValidData> Kernel<Data> {
 				w.playing = true;
 			}
 
-			Ok(option)
+			option
 		});
 
 		// This [Add] might set our [current],
 		// it will return a [Some(source)] if so.
 		// We must forward it to [Decode].
-		match maybe_source {
-			Ok(o) => {
-				if let Some(source) = o {
-					self.new_source(to_audio, to_decode, source);
-				}
-				try_send!(to_engine, Ok(self.audio_state_snapshot()));
-			},
-			Err(e) => try_send!(to_engine, Err(e)),
+		if let Some(source) = maybe_source {
+			self.new_source(to_audio, to_decode, source);
 		}
+		try_send!(to_engine, self.audio_state_snapshot());
 	}
 }
 
@@ -122,7 +116,7 @@ mod tests {
 		) {
 			// Send `Add` signal to the `Engine`
 			// and get back the `AudioStateSnapshot`.
-			let a = engine.add(add).unwrap();
+			let a = engine.add(add);
 
 			// Debug print.
 			println!("a: {a:#?}");
@@ -152,14 +146,14 @@ mod tests {
 		}
 
 		//---------------------------------- Set up state.
-		let sources_len = sources.len();
+		let sources_len = sources.as_slice().len();
 		let add_many = AddMany {
 			sources,
 			insert:  InsertMethod::Back,
 			clear:   false,
 			play:    false,
 		};
-		assert_eq!(engine.add_many(add_many).unwrap().queue.len(), sources_len);
+		assert_eq!(engine.add_many(add_many).queue.len(), sources_len);
 
 		//---------------------------------- Append to the back.
 		let add = Add {
@@ -211,15 +205,15 @@ mod tests {
 		//                                                                  v
 		assert(engine, add, &[40, 20, 0, 1, 2, 3, 30, 4, 5, 6, 7, 8, 9, 10, 50]);
 
-		//---------------------------------- Insert at out-of-bounds index
+		//---------------------------------- Insert at out-of-bounds index (re-map to Insert::Back).
 		let queue_len = engine.reader().get().queue.len();
 		let add = Add {
 			source:  crate::tests::source(60),
-			insert:  InsertMethod::Index(queue_len + 1),
+			insert:  InsertMethod::Index(queue_len),
 			clear:   false,
 			play:    false,
 		};
-		assert_eq!(engine.add(add), Err(AddError::OutOfBounds));
-		assert_eq!(engine.reader().get().queue.len(), queue_len);
+		//                                                                      v
+		assert(engine, add, &[40, 20, 0, 1, 2, 3, 30, 4, 5, 6, 7, 8, 9, 10, 50, 60]);
 	}
 }

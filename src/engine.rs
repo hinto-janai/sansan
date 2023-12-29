@@ -19,8 +19,8 @@ use crate::{
 	signal::{
 		Add,AddMany,Back,Clear,Previous,RemoveRange,Remove,
 		Repeat,Seek,SetIndex,Shuffle,Skip,Volume,InsertMethod,
-		AddError,SeekError,Next,PreviousError,SkipError,
-		BackError,SetIndexError,RemoveError,AddManyError,
+		SeekError,Next,PreviousError,SkipError,
+		BackError,SetIndexError,RemoveError,
 	}
 };
 use crossbeam::channel::{bounded,unbounded};
@@ -76,25 +76,25 @@ where
 	shutdown_blocking: bool,
 
 	/// Signals that input/output `()`
-	send_toggle:       S<()>,
-	send_play:         S<()>,
-	send_pause:        S<()>,
-	send_next:         S<()>,
-	send_previous:     S<()>,
-	send_stop:         S<()>,
+	send_toggle:   S<()>,
+	send_play:     S<()>,
+	send_pause:    S<()>,
+	send_next:     S<()>,
+	send_previous: S<()>,
+	send_stop:     S<()>,
 
 	/// Signals that have input and output `()`
-	send_clear:        S<Clear>,
-	send_restore:      S<AudioState<Data>>,
-	send_repeat:       S<Repeat>,
-	send_volume:       S<Volume>,
-	send_shuffle:      S<Shuffle>,
+	send_add:      S<Add<Data>>,
+	recv_add:      R<AudioStateSnapshot<Data>>,
+	send_add_many: S<AddMany<Data>>,
+	recv_add_many: R<AudioStateSnapshot<Data>>,
+	send_clear:    S<Clear>,
+	send_restore:  S<AudioState<Data>>,
+	send_repeat:   S<Repeat>,
+	send_volume:   S<Volume>,
+	send_shuffle:  S<Shuffle>,
 
 	/// Signals that return `Result<T, E>`
-	send_add:          S<Add<Data>>,
-	recv_add:          R<Result<AudioStateSnapshot<Data>, AddError>>,
-	send_add_many:     S<AddMany<Data>>,
-	recv_add_many:     R<Result<AudioStateSnapshot<Data>, AddManyError>>,
 	send_seek:         S<Seek>,
 	recv_seek:         R<Result<AudioStateSnapshot<Data>, SeekError>>,
 	send_skip:         S<Skip>,
@@ -591,6 +591,24 @@ where
 	///
 	/// # Errors
 	/// TODO
+	pub fn add(&mut self, add: Add<Data>) -> AudioStateSnapshot<Data> {
+		try_send!(self.send_add, add);
+		recv!(self.recv_add)
+	}
+
+	/// TODO
+	///
+	/// # Errors
+	/// TODO
+	pub fn add_many(&mut self, add_many: AddMany<Data>) -> AudioStateSnapshot<Data> {
+		try_send!(self.send_add_many, add_many);
+		recv!(self.recv_add_many)
+	}
+
+	/// TODO
+	///
+	/// # Errors
+	/// TODO
 	pub fn seek(&mut self, seek: Seek) -> Result<AudioStateSnapshot<Data>, SeekError> {
 		try_send!(self.send_seek, seek);
 		recv!(self.recv_seek)
@@ -612,28 +630,6 @@ where
 	pub fn back(&mut self, back: Back) -> Result<AudioStateSnapshot<Data>, BackError> {
 		try_send!(self.send_back, back);
 		recv!(self.recv_back)
-	}
-
-	/// TODO
-	///
-	/// # Errors
-	/// TODO
-	pub fn add(&mut self, add: Add<Data>) -> Result<AudioStateSnapshot<Data>, AddError> {
-		try_send!(self.send_add, add);
-		recv!(self.recv_add)
-	}
-
-	/// TODO
-	///
-	/// # Errors
-	/// TODO
-	pub fn add_many(&mut self, add_many: AddMany<Data>) -> Result<AudioStateSnapshot<Data>, AddManyError> {
-		if add_many.sources.is_empty() {
-			return Err(AddManyError::NoSources);
-		}
-
-		try_send!(self.send_add_many, add_many);
-		recv!(self.recv_add_many)
 	}
 
 	/// TODO

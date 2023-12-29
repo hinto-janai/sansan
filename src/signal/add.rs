@@ -1,7 +1,7 @@
 //! TODO
 
 //---------------------------------------------------------------------------------------------------- use
-use crate::source::Source;
+use crate::source::{Source,Sources};
 use strum::{
 	AsRefStr,Display,EnumCount,EnumIter,
 	EnumString,EnumVariantNames,IntoStaticStr,
@@ -95,19 +95,19 @@ where
 // 	}
 // }
 
-//---------------------------------------------------------------------------------------------------- AddError
-/// TODO
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
-#[derive(Copy,Clone,Debug,PartialEq,PartialOrd,Eq,Ord)]
-#[derive(AsRefStr,Display,EnumCount,EnumIter,EnumString,EnumVariantNames,IntoStaticStr)]
-#[strum(serialize_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
-#[derive(thiserror::Error)]
-pub enum AddError {
-	/// TODO
-	OutOfBounds,
-}
+// //---------------------------------------------------------------------------------------------------- AddError
+// /// TODO
+// #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+// #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
+// #[derive(Copy,Clone,Debug,PartialEq,PartialOrd,Eq,Ord)]
+// #[derive(AsRefStr,Display,EnumCount,EnumIter,EnumString,EnumVariantNames,IntoStaticStr)]
+// #[strum(serialize_all = "snake_case")]
+// #[serde(rename_all = "snake_case")]
+// #[derive(thiserror::Error)]
+// pub enum AddError {
+// 	/// TODO
+// 	OutOfBounds,
+// }
 
 //---------------------------------------------------------------------------------------------------- AddMany
 /// TODO
@@ -118,8 +118,8 @@ pub struct AddMany<Data>
 where
 	Data: ValidData
 {
-	/// The [`Source`](s) to add to the queue
-	pub sources: Vec<Source<Data>>,
+	/// The [`Sources`] to add to the queue
+	pub sources: Sources<Data>,
 	/// How should we add these [`Source`](s) to the queue?
 	pub insert: InsertMethod,
 	/// Should we clear the queue before adding?
@@ -204,21 +204,21 @@ where
 // 	}
 // }
 
-//---------------------------------------------------------------------------------------------------- AddManyError
-/// TODO
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
-#[derive(Copy,Clone,Debug,PartialEq,PartialOrd,Eq,Ord,Hash)]
-#[derive(AsRefStr,Display,EnumCount,EnumIter,EnumString,EnumVariantNames,IntoStaticStr)]
-#[strum(serialize_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
-#[derive(thiserror::Error)]
-pub enum AddManyError {
-	/// TODO
-	NoSources,
-	/// TODO
-	OutOfBounds,
-}
+// //---------------------------------------------------------------------------------------------------- AddManyError
+// /// TODO
+// #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+// #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
+// #[derive(Copy,Clone,Debug,PartialEq,PartialOrd,Eq,Ord,Hash)]
+// #[derive(AsRefStr,Display,EnumCount,EnumIter,EnumString,EnumVariantNames,IntoStaticStr)]
+// #[strum(serialize_all = "snake_case")]
+// #[serde(rename_all = "snake_case")]
+// #[derive(thiserror::Error)]
+// pub enum AddManyError {
+// 	/// TODO
+// 	NoSources,
+// 	/// TODO
+// 	OutOfBounds,
+// }
 
 //---------------------------------------------------------------------------------------------------- AddMany
 /// TODO

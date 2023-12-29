@@ -4,7 +4,7 @@
 use crate::{
 	actor::kernel::kernel::{Kernel,DiscardCurrentAudio,KernelToDecode},
 	state::{AudioStateSnapshot,ValidData},
-	signal::add::{AddMany,AddManyError,InsertMethod},
+	signal::add::{AddMany,InsertMethod},
 	macros::try_send,
 };
 use crossbeam::channel::{Sender,Receiver};
@@ -17,16 +17,14 @@ impl<Data: ValidData> Kernel<Data> {
 		add_many: AddMany<Data>,
 		to_audio: &Sender<DiscardCurrentAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
-		to_engine: &Sender<Result<AudioStateSnapshot<Data>, AddManyError>>
+		to_engine: &Sender<AudioStateSnapshot<Data>>
 	) {
-		if add_many.sources.is_empty() {
-			try_send!(to_engine, Err(AddManyError::NoSources));
-			return;
-		}
+		let add_many_sources = add_many.sources.as_slice();
+		assert!(!add_many_sources.is_empty());
 
 		// INVARIANT:
-		// So we can assume the `add_many.sources` [Vec]
-		// length is at least 1 due to the above check.
+		// We can assume the `add_many.sources` [Vec]
+		// length is at least 1 due to `Sources` invariants.
 
 		// This function returns an `Option<Source>` when the add
 		// operation has made it such that we are setting our [current]
@@ -42,9 +40,7 @@ impl<Data: ValidData> Kernel<Data> {
 			// [Back/Front] and do safety checks.
 			let insert = match add_many.insert {
 				InsertMethod::Index(0) => { InsertMethod::Front },
-				InsertMethod::Index(i) if i == w.queue.len() => { InsertMethod::Back },
-				InsertMethod::Index(i) if i > w.queue.len()  => { return Err(AddManyError::OutOfBounds); },
-				// _ =>
+				InsertMethod::Index(i) if i >= w.queue.len() => { InsertMethod::Back },
 				InsertMethod::Back | InsertMethod::Front | InsertMethod::Index(_) => add_many.insert,
 			};
 
@@ -53,12 +49,12 @@ impl<Data: ValidData> Kernel<Data> {
 			let option = match insert {
 				InsertMethod::Back => {
 					let option = if add_many.play && w.queue.is_empty() && w.current.is_none() {
-						Some(add_many.sources[0].clone())
+						Some(add_many_sources[0].clone())
 					} else {
 						None
 					};
 
-					for source in &add_many.sources {
+					for source in add_many_sources {
 						w.queue.push_back(source.clone());
 					}
 
@@ -67,7 +63,7 @@ impl<Data: ValidData> Kernel<Data> {
 
 				InsertMethod::Front => {
 					let option = if add_many.play && w.current.is_none() {
-						Some(add_many.sources[0].clone())
+						Some(add_many_sources[0].clone())
 					} else {
 						None
 					};
@@ -81,7 +77,7 @@ impl<Data: ValidData> Kernel<Data> {
 					// `a` gets pushed the front _last_, so it ends up being:
 					//   [a, b, c, 0, 1, 2]
 					// which is what we want.
-					for source in add_many.sources.iter().rev() {
+					for source in add_many_sources.iter().rev() {
 						w.queue.push_front(source.clone());
 					}
 
@@ -93,7 +89,7 @@ impl<Data: ValidData> Kernel<Data> {
 					assert!(index > 0);
 					assert!(index != w.queue.len());
 
-					for (i, source) in add_many.sources.iter().enumerate() {
+					for (i, source) in add_many_sources.iter().enumerate() {
 						w.queue.insert(i + index, source.clone());
 					}
 
@@ -105,21 +101,16 @@ impl<Data: ValidData> Kernel<Data> {
 				w.playing = true;
 			}
 
-			Ok(option)
+			option
 		});
 
 		// This [Add] might set our [current],
 		// it will return a [Some(source)] if so.
 		// We must forward it to [Decode].
-		match maybe_source {
-			Ok(o) => {
-				if let Some(source) = o {
-					self.new_source(to_audio, to_decode, source);
-				}
-				try_send!(to_engine, Ok(self.audio_state_snapshot()));
-			},
-			Err(e) => try_send!(to_engine, Err(e)),
+		if let Some(source) = maybe_source {
+			self.new_source(to_audio, to_decode, source);
 		}
+		try_send!(to_engine, self.audio_state_snapshot());
 	}
 }
 
@@ -147,11 +138,11 @@ mod tests {
 		) {
 			// Send `AddMany` signal to the `Engine`
 			// and get back the `AudioStateSnapshot`.
-			let a = engine.add_many(add_many).unwrap();
+			let a = engine.add_many(add_many);
 
 			// Debug print.
 			println!("a: {a:#?}");
-			println!("adding: {data:?}\n");
+			println!("data: {data:?}\n");
 
 			// Assert the `Source`'s in our state match the list of `Data` given, e.g:
 			//
@@ -226,15 +217,15 @@ mod tests {
 		//                                                                                           v
 		assert(engine, add_many, &[11, 22, 33, 10, 20, 30, 0, 1, 40, 50, 60, 2, 3, 4, 5, 6, 7, 8, 9, 44, 55, 66]);
 
-		//---------------------------------- Insert at out-of-bounds index
+		//---------------------------------- Insert at out-of-bounds index (re-map to Insert::Back)
 		let queue_len = engine.reader().get().queue.len();
 		let add_many = AddMany {
 			sources: crate::tests::sources_77_88_99(),
-			insert:  InsertMethod::Index(queue_len + 1),
+			insert:  InsertMethod::Index(queue_len),
 			clear:   false,
 			play:    false,
 		};
-		assert_eq!(engine.add_many(add_many), Err(AddManyError::OutOfBounds));
-		assert_eq!(engine.reader().get().queue.len(), queue_len);
+		//                                                                                                       v
+		assert(engine, add_many, &[11, 22, 33, 10, 20, 30, 0, 1, 40, 50, 60, 2, 3, 4, 5, 6, 7, 8, 9, 44, 55, 66, 77, 88, 99]);
 	}
 }
