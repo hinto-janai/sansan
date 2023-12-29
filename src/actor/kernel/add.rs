@@ -100,5 +100,126 @@ impl<Data: ValidData> Kernel<Data> {
 
 //---------------------------------------------------------------------------------------------------- Tests
 #[cfg(test)]
+#[allow(clippy::bool_assert_comparison, clippy::cognitive_complexity)]
 mod tests {
+	use super::*;
+	use crate::{
+		engine::Engine,
+		signal::{repeat::Repeat,volume::Volume,add::AddMany},
+	};
+
+	#[test]
+	fn add() {
+		let (mut e, sources) = crate::tests::init_test();
+		let engine = &mut e;
+		assert!(engine.reader().get().queue.is_empty());
+
+		// Testing function used after each operation.
+		fn assert(
+			engine: &mut Engine<usize, (), ()>,
+			add: Add<usize>,
+			data: &[usize],
+		) {
+			// Send `Add` signal to the `Engine`
+			// and get back the `AudioStateSnapshot`.
+			let a = engine.add(add).unwrap();
+
+			// Debug print.
+			println!("a: {a:#?}");
+			println!("data: {data:?}\n");
+
+			// Assert the `Source`'s in our state match the list of `Data` given, e.g:
+			//
+			// data:    [0, 1, 2]
+			// sources: [(source_1, 0), (source_2, 1), (source_3), 2]
+			//
+			// This would be OK.
+			let mut i = 0;
+			for data in data {
+				assert_eq!(a.queue[i].data(), data);
+				i += 1;
+			}
+
+			// Assert the other parts of the data are sane as well.
+			assert_eq!(a.queue.len(),        i);
+			assert_eq!(a.queue.get(i),       None);
+			assert_eq!(a.playing,            false);
+			assert_eq!(a.repeat,             Repeat::Off);
+			assert_eq!(a.volume,             Volume::DEFAULT);
+			assert_eq!(a.previous_threshold, 3.0);
+			assert_eq!(a.queue_end_clear,    true);
+			assert_eq!(a.current,            None);
+		}
+
+		//---------------------------------- Set up state.
+		let sources_len = sources.len();
+		let add_many = AddMany {
+			sources,
+			insert:  InsertMethod::Back,
+			clear:   false,
+			play:    false,
+		};
+		assert_eq!(engine.add_many(add_many).unwrap().queue.len(), sources_len);
+
+		//---------------------------------- Append to the back.
+		let add = Add {
+			source: crate::tests::source(10),
+			insert: InsertMethod::Back,
+			clear:  false,
+			play:   false,
+		};
+		//                                                  v
+		assert(engine, add, &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+		//---------------------------------- Insert in the front.
+		let add = Add {
+			source:  crate::tests::source(20),
+			insert:  InsertMethod::Front,
+			clear:   false,
+			play:    false,
+		};
+		//                    v
+		assert(engine, add, &[20, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+		//---------------------------------- Insert in the middle.
+		let add = Add {
+			source:  crate::tests::source(30),
+			insert:  InsertMethod::Index(5),
+			clear:   false,
+			play:    false,
+		};
+		//                                    v
+		assert(engine, add, &[20, 0, 1, 2, 3, 30, 4, 5, 6, 7, 8, 9, 10]);
+
+		//---------------------------------- Insert at index 0 (re-map to Insert::Front).
+		let add = Add {
+			source:  crate::tests::source(40),
+			insert:  InsertMethod::Index(0),
+			clear:   false,
+			play:    false,
+		};
+		//                    v
+		assert(engine, add, &[40, 20, 0, 1, 2, 3, 30, 4, 5, 6, 7, 8, 9, 10]);
+
+		//---------------------------------- Insert at last index (re-map to Insert::Back).
+		let add = Add {
+			source:  crate::tests::source(50),
+			insert:  InsertMethod::Index(engine.reader().get().queue.len()),
+			clear:   false,
+			play:    false,
+		};
+		//                                                                  v
+		assert(engine, add, &[40, 20, 0, 1, 2, 3, 30, 4, 5, 6, 7, 8, 9, 10, 50]);
+
+		//---------------------------------- Insert at out-of-bounds index
+		let queue_len = engine.reader().get().queue.len();
+		let add = Add {
+			source:  crate::tests::source(60),
+			insert:  InsertMethod::Index(queue_len + 1),
+			clear:   false,
+			play:    false,
+		};
+		assert_eq!(engine.add(add), Err(AddError::OutOfBounds));
+		assert_eq!(engine.reader().get().queue.len(), queue_len);
+	}
 }

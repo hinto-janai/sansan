@@ -130,9 +130,7 @@ mod tests {
 	use super::*;
 	use crate::{
 		engine::Engine,
-		source::Source,
 		signal::{repeat::Repeat,volume::Volume},
-		state::AudioStateSnapshot,
 	};
 
 	#[test]
