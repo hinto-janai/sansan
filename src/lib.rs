@@ -155,4 +155,7 @@ mod macros;
 
 mod atomic;
 
-//----------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------- Test Init Helpers
+// These are helper functions used for testing throughout the codebase.
+#[cfg(test)]
+pub(crate) mod tests;

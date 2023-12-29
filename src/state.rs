@@ -76,7 +76,7 @@ where
 	Data: ValidData,
 {
 	/// TODO
-	pub const DUMMY: Self = Self {
+	pub const DEFAULT: Self = Self {
 		queue:              VecDeque::new(),
 		playing:            false,
 		repeat:             Repeat::Off,
@@ -85,6 +85,12 @@ where
 		queue_end_clear:    true,
 		current:            None,
 	};
+}
+
+impl<Data: ValidData> Default for AudioState<Data> {
+	fn default() -> Self {
+		Self::DEFAULT
+	}
 }
 
 //---------------------------------------------------------------------------------------------------- AtomicAudioState
