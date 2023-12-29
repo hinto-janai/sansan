@@ -202,6 +202,11 @@ where
 		}
 	}
 
+	/// TODO
+	pub fn iter(&self) -> impl Iterator<Item = &Source<Data>> {
+		self.as_slice().iter()
+	}
+
 	#[must_use]
 	#[allow(clippy::should_implement_trait)]
 	/// TODO

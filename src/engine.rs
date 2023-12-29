@@ -568,8 +568,8 @@ where
 	}
 
 	/// TODO
-	pub fn restore(&mut self, restore: AudioState<Data>) {
-		try_send!(self.send_restore, restore);
+	pub fn restore(&mut self, audio_state: AudioState<Data>) {
+		try_send!(self.send_restore, audio_state);
 	}
 
 	/// TODO
