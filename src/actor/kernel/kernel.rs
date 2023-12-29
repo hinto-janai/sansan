@@ -247,9 +247,19 @@ where
 		assert_eq!(19, select.recv(&c.shutdown));
 		assert_eq!(20, select.recv(&c.shutdown_hang));
 
-		// Loop, receiving signals and routing them
-		// to their appropriate handler function.
 		loop {
+			// 1. Receive a signal
+			// 2. Map signal to some handler function
+			// 3. Loop.
+			//
+			// Each handler function is defined in
+			// its own file in the `kernel/` module.
+			//
+			// INVARIANT:
+			// The `Engine` does not check the validity of it's request
+			// (e.g: `repeat()` is called, but our current `Repeat` is the same)
+			// so `Kernel` must check all requests and return early (or with
+			// and error) if invalid.
 			match select.ready() {
 				0  =>                  { select_recv!(c.recv_toggle); self.toggle() },
 				1  =>                  { select_recv!(c.recv_play); self.play() },
@@ -311,6 +321,9 @@ where
 	}
 
 	//---------------------------------------------------------------------------------------------------- Misc Functions
+	// These are helper functions mostly used throughout
+	// the various signal handlers in the `kernel/` module.
+
 	/// TODO
 	pub(super) fn new_source(
 		&self,
@@ -398,16 +411,4 @@ where
 			false
 		}
 	}
-
-	//---------------------------------------------------------------------------------------------------- Signal Handlers
-	// Function Handlers.
-	//
-	// These are the functions invoked in response
-	// to exact messages/signals from the other actors.
-	//
-	// INVARIANT:
-	// The `Engine` does not check the validity of it's request
-	// (e.g: `repeat()` is called, but our current `Repeat` is the same)
-	// so `Kernel` must check all requests and return early (or with
-	// and error) if invalid.
 }
