@@ -170,8 +170,158 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="intro"><a class="header" href="#intro">Intro</a></h1>
-<p><a href="https://github.com/hinto-janai/sansan"><code>sansan</code></a> is a cross-platform (Windows/macOS/Linux) audio playback library.</p>
+                        <div align="center">
+<p><img src="https://github.com/hinto-janai/sansan/actions/workflows/ci.yml/badge.svg" alt="CI" /> <a href="https://crates.io/crates/sansan"><img src="https://img.shields.io/crates/v/sansan.svg" alt="crates.io" /></a> <a href="https://docs.rs/sansan"><img src="https://docs.rs/sansan/badge.svg" alt="docs.rs" /></a></p>
+<img src="https://github.com/hinto-janai/sansan/assets/101352116/5c77d0aa-2f9b-4579-8d3c-b9e00e225179" width="60%"/>
+</div>
+<h2 id="about"><a class="header" href="#about">About</a></h2>
+<p><code>sansan</code> is for:</p>
+<ul>
+<li>Queue-based, real-time music playback</li>
+<li>Live queue reading/writing without blocking</li>
+<li>Audio metadata reading (<code>ID3/Vorbis</code> tags)</li>
+<li>OS media control integration</li>
+</ul>
+<p><code>sansan</code> is not:</p>
+<ul>
+<li>A general purpose audio playback library</li>
+</ul>
+<p><code>sansan</code> is built with music players in-mind - it is meant to be the part
+of the system that handles the real-time audio decoding/playback,
+while exposing an audio state read/write API that is non-blocking.</p>
+<p>Other nice to haves are also included, such as OS media control integration and metadata tag reading.</p>
+<p>Although <code>sansan</code> <em>can</em> be used for general purpose audio playback,
+it does not include general purpose audio APIs like mixing, filters, multiple tracks, etc.</p>
+<h2 id="documentation"><a class="header" href="#documentation">Documentation</a></h2>
+<p>The book at <a href="https://sansan.cat"><code>https://sansan.cat</code></a> is the main user documentation. It holds all the information needed to get started with <code>sansan</code> - what things there are, what they do, how to use them.</p>
+<p>The library documentation at <a href="https://docs.rs/sansan"><code>https://docs.rs/sansan</code></a> is the API reference, documenting inputs and outputs and other note-worthy things about the API, although, it does not contain detailed commentary on usage, how things work together, etc.</p>
+<h2 id="example"><a class="header" href="#example">Example</a></h2>
+<p>For more example usage of <code>sansan</code>, see <a href="examples"><code>examples/</code></a>.</p>
+<p>This example shows some basic usage of <code>sansan</code>:</p>
+<ul>
+<li>Creating the <code>Engine</code></li>
+<li>Adding music to the queue</li>
+<li>Sending signals to the <code>Engine</code> (play, next)</li>
+<li>Reading live audio state without blocking</li>
+</ul>
+<pre><code class="language-rust ignore">use sansan::{*, signal::*};
+
+// Our music data (Paths and/or raw bytes)
+let track_1: &amp;Path = &quot;/path/to/audio.mp3&quot;;
+let track_2: &amp;[u8] = include_bytes!(&quot;/path/to/audio.flac&quot;);
+
+// Create a music engine with default settings
+let mut engine = Engine::init(Config::DEFAULT);
+
+// Add the music to the back of the queue.
+engine.signal().add(Add { source: track_1.into() }).unwrap();
+engine.signal().add(Add { source: track_2.into() }).unwrap();
+
+// Start playing (this does not block the caller!)
+engine.signal().play();
+
+// Our music is now playing
+// on the default audio device.
+//
+// We can mutate/view the queue
+// and adjust settings freely without
+// blocking the real-time audio thread,
+// or us, the caller.
+
+// For example, let's take a look at the current audio state.
+//
+// We can hold onto this data for all of eternity
+// and it will not block [sansan] from progressing.
+let reader: AudioStateReader&lt;()&gt; = engine.audio_state_reader()
+let audio_state:  AudioState&lt;()&gt; = reader.get();
+assert_eq!(audio_state.playing, true);
+assert_eq!(audio_state.queue.len(), 2);
+
+// We can view live playback information.
+std::thread::sleep(std::time::Duration::from_secs(1));
+assert_eq!(
+	audio_state.current.unwrap().elapsed.as_pad(),
+	&quot;00:00:01&quot;
+);
+
+// We can mutate the queue - without blocking anyone.
+//
+// Let's remove the 2nd track in the queue.
+engine.signal().remove(Remove { index: 1 }).unwrap();
+
+// Re-acquire the &quot;latest&quot; audio state.
+let audio_state: AudioState&lt;()&gt; = reader.get();
+
+// Now the queue is only 1 length.
+assert_eq!(audio_state.queue.len(), 1);
+
+// Skip to the next song.
+engine.signal().next().unwrap();
+
+// Since there was only 1 track left,
+// and no repeat mode was on, the [Engine]
+// has stopped playing.
+let audio_state: AudioState&lt;()&gt; = reader.get();
+assert_eq!(audio_state.playing, false);
+assert_eq!(audio_state.queue.len(), 0);</code></pre>
+<h2 id="design"><a class="header" href="#design">Design</a></h2>
+<p><code>sansan</code>'s abstract design is documented in <a href="DESIGN.html"><code>DESIGN.md</code></a>.</p>
+<p>This purpose of <code>DESIGN.md</code> is to act as a reference to allow for easier changes in the future.</p>
+<p>Although, it mostly covers the system-wide view and does not include implementation details. For example, the real-time audio sample buffer - how big should it be?</p>
+<p>These types of things are loosely defined in the code instead (with comments and reasoning) instead and within <a href="src/README.html"><code>src/README.md</code></a> - this document gives a more practical view on how <code>sansan</code> is organized, what files do what, where things are, why things do <code>x</code> instead of <code>y</code>, etc.</p>
+<h2 id="audio-dependencies"><a class="header" href="#audio-dependencies">Audio Dependencies</a></h2>
+<p>This table summarizes the <strong>audio-specific</strong> libraries used by <code>sansan</code> and their purpose.</p>
+<div class="table-wrapper"><table><thead><tr><th>Dependency</th><th>Version</th><th>Owner</th><th>Purpose</th></tr></thead><tbody>
+<tr><td><code>audio_thread_priority</code></td><td><code>0.27.1</code></td><td><a href="https://github.com/mozilla/audio_thread_priority">Mozilla</a></td><td>Real-time audio thread promotion</td></tr>
+<tr><td><code>cubeb</code></td><td><code>0.10.3</code></td><td><a href="https://github.com/mozilla/cubeb-rs">Mozilla</a></td><td>Audio device input/output</td></tr>
+<tr><td><code>souvlaki</code></td><td><code>0.6.1</code></td><td><a href="https://github.com/Sinono3/souvlaki">Sinono3</a></td><td>OS media control interface</td></tr>
+<tr><td><code>symphonia</code></td><td><code>0.5.3</code></td><td><a href="https://github.com/pdeljanov/Symphonia">Pdeljanov</a></td><td>Audio demuxing/decoding/metadata</td></tr>
+<tr><td><code>rubato</code></td><td><code>0.14.1</code></td><td><a href="https://github.com/HEnquist/rubato">HEnquist</a></td><td>Audio resampling</td></tr>
+</tbody></table>
+</div>
+<h2 id="supported-targets"><a class="header" href="#supported-targets">Supported Targets</a></h2>
+<p>Only 64-bit targets (<code>x86_64</code>, <code>ARM64</code>, etc) are supported.</p>
+<p>32-bit targets may work but are not tested on.</p>
+<ul>
+<li>Windows (WASAPI)</li>
+<li>macOS (CoreAudio)</li>
+<li>Linux (PulseAudio)</li>
+</ul>
+<h2 id="supported-audio"><a class="header" href="#supported-audio">Supported Audio</a></h2>
+<p><code>sansan</code> uses <a href="https://github.com/pdeljanov/Symphonia"><code>symphonia</code></a> for audio decoding &amp; metadata.</p>
+<p>The supported audio codecs are:</p>
+<ul>
+<li><code>AAC-LC</code></li>
+<li><code>ADPCM</code></li>
+<li><code>ALAC</code></li>
+<li><code>FLAC</code></li>
+<li><code>MP1/MP2/MP3</code></li>
+<li><code>Vorbis</code></li>
+<li><code>Opus</code></li>
+<li><code>WavPack</code></li>
+</ul>
+<p>The supported audio metadata formats are:</p>
+<ul>
+<li><code>ID3v1</code></li>
+<li><code>ID3v2</code></li>
+<li><code>ISO/MP4</code></li>
+<li><code>RIFF</code></li>
+<li><code>Vorbis comment</code> (FLAC &amp; OGG)</li>
+</ul>
+<h2 id="msrv"><a class="header" href="#msrv">MSRV</a></h2>
+<p>The <code>Minimum Supported Rust Version</code> is <code>1.70.0</code>.</p>
+<h2 id="license"><a class="header" href="#license">License</a></h2>
+<p><code>sansan</code> is licensed under the <a href="https://github.com/hinto-janai/sansan/blob/main/LICENSE">MIT License</a>.</p>
+<p>As of <code>v0.0.0</code>, <code>sansan</code>'s dependency tree includes the following licenses:</p>
+<ul>
+<li><code>Apache-2.0</code></li>
+<li><code>BSD-2-Clause</code></li>
+<li><code>BSD-3-Clause</code></li>
+<li><code>ISC</code></li>
+<li><code>MIT</code></li>
+<li><code>MPL-2.0</code></li>
+<li><code>Unicode-DFS-2016</code></li>
+</ul>
 
                     </main>
 
