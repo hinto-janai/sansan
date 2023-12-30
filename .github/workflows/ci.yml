@@ -17,7 +17,8 @@ jobs:
 
     strategy:
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        msrv: [1.70.0]
+        os: [windows-2019, macos-11, ubuntu-20.04]
 
     steps:
     - name: Checkout
@@ -40,7 +41,7 @@ jobs:
           sudo apt update
           sudo apt install -y libasound2-dev libpulse-dev libdbus-1-dev
         fi
-        rustup toolchain add 1.70.0 --profile default
+        rustup toolchain add ${{ matrix.msrv }} --profile default
         cargo install cargo-deny
         cargo install cargo-audit
 
@@ -51,12 +52,12 @@ jobs:
       shell: bash
       run: |
         rm -rf ~/.cargo/advisory-db
-        cargo audit
+        cargo +${{ matrix.msrv }} audit
 
     - name: Clippy
       shell: bash
-      run: cargo +1.70.0 clippy
+      run: cargo +${{ matrix.msrv }} clippy
 
     - name: Test
       shell: bash
-      run: cargo +1.70.0 test
+      run: cargo +${{ matrix.msrv }} test
