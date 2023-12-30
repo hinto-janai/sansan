@@ -70,6 +70,10 @@ where
 	pub queue_end_clear: bool,
 
 	/// The currently playing index in the queue.
+	///
+	/// INVARIANT TODO:
+	/// If this is `Some`, the queue _MUST_ be non-empty
+	/// and must contain the Source.
 	pub current: Option<Current<Data>>,
 }
 

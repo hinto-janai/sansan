@@ -306,7 +306,7 @@ where
 
 		// TODO: tell [Kernel] we just wrote
 		// an audio buffer with [time] timestamp.
-		todo!();
+		// todo!();
 	}
 
 	#[inline]
