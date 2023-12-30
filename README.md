@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/hinto-janai/sansan/actions/workflows/ci.yml/badge.svg) [![crates.io](https://img.shields.io/crates/v/sansan.svg)](https://crates.io/crates/sansan) [![docs.rs](https://docs.rs/sansan/badge.svg)](https://docs.rs/sansan)
 
-<img src="assets/img/banner_1280_377.png" width="60%"/>
+<img src="https://github.com/hinto-janai/sansan/assets/101352116/5c77d0aa-2f9b-4579-8d3c-b9e00e225179" width="60%"/>
 
 </div>
 
