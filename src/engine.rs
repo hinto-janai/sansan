@@ -219,63 +219,6 @@ where
 		// wrapped in `atomic::Atomic<T>`.
 		let atomic_state = Arc::new(AtomicAudioState::DEFAULT);
 
-		// Initialize all the channels between [Kernel] <-> [Signal].
-		//
-		// Variables are prefix/suffixed accordingly:
-		// - [Signal] == [s]
-		// - [Kernel] == [k]
-		//
-		// Since most of the channels are "full-duplex", as in:
-		//
-		//     [Signal] ---request---> [Kernel] ---response---> [Signal]
-		//
-		// there must be 2 pairs of send/recv channel set up.
-		//
-		// The variables are prefixed with [k_*] or [s_*] depending
-		// on if they are for [Kernel] or [Signal].
-		//
-		// In the case where we don't need or a response, or rather
-		// the return value is [()], e.g [toggle()], then there
-		// is no need for a [Kernel] ---response---> [Signal] channel,
-		// meaning Signal only owns a S, and Kernel only owns a R.
-		//
-		// These are those "no-response-needed" channels.
-		// They are [unbounded()] to allow for immediate return.
-		//  |
-		//  v
-		let (send_toggle,   recv_toggle)   = unbounded();
-		let (send_play,     recv_play)     = unbounded();
-		let (send_pause,    recv_pause)    = unbounded();
-		let (send_stop,     recv_stop)     = unbounded();
-		let (send_clear,    recv_clear)    = unbounded();
-		let (send_restore,  recv_restore)  = unbounded();
-		let (send_repeat,   recv_repeat)   = unbounded();
-		let (send_shuffle,  recv_shuffle)  = unbounded();
-		let (send_volume,   recv_volume)   = unbounded();
-		let (send_next,     recv_next)     = unbounded();
-		let (send_previous, recv_previous) = unbounded();
-		// These must be labeled.
-		// Although semantically [bounded(0)] makes sense since [Kernel]
-		// and [Signal] must meet up, [bounded(1)] is faster.
-		//  |
-		//  v
-		let (s_send_add,          k_recv_add)          = bounded(1);
-		let (k_send_add,          s_recv_add)          = bounded(1);
-		let (s_send_add_many,     k_recv_add_many)     = bounded(1);
-		let (k_send_add_many,     s_recv_add_many)     = bounded(1);
-		let (s_send_seek,         k_recv_seek)         = bounded(1);
-		let (k_send_seek,         s_recv_seek)         = bounded(1);
-		let (s_send_skip,         k_recv_skip)         = bounded(1);
-		let (k_send_skip,         s_recv_skip)         = bounded(1);
-		let (s_send_back,         k_recv_back)         = bounded(1);
-		let (k_send_back,         s_recv_back)         = bounded(1);
-		let (s_send_set_index,    k_recv_set_index)    = bounded(1);
-		let (k_send_set_index,    s_recv_set_index)    = bounded(1);
-		let (s_send_remove,       k_recv_remove)       = bounded(1);
-		let (k_send_remove,       s_recv_remove)       = bounded(1);
-		let (s_send_remove_range, k_recv_remove_range) = bounded(1);
-		let (k_send_remove_range, s_recv_remove_range) = bounded(1);
-
 		//-------------------------------------------------------------- Spawn [Caller]
 		// FIXME:
 		// Only spawn [Caller] is callbacks exist,
@@ -406,6 +349,63 @@ where
 			from_pool:   gc_from_p,
 		}).expect("sansan [Engine] - could not spawn [Gc] thread");
 
+		// Initialize all the channels between [Kernel] <-> [Engine].
+		//
+		// Variables are prefix/suffixed accordingly:
+		// - [Engine] == [e]
+		// - [Kernel] == [k]
+		//
+		// Since most of the channels are "full-duplex", as in:
+		//
+		//     [Engine] ---request---> [Kernel] ---response---> [Engine]
+		//
+		// there must be 2 pairs of send/recv channel set up.
+		//
+		// The variables are prefixed with [k_*] or [e_*] depending
+		// on if they are for [Kernel] or [Engine].
+		//
+		// In the case where we don't need or a response, or rather
+		// the return value is [()], e.g [toggle()], then there
+		// is no need for a [Kernel] ---response---> [Engine] channel,
+		// meaning Engine only owns a S, and Kernel only owns a R.
+		//
+		// These are those "no-response-needed" channels.
+		// They are [unbounded()] to allow for immediate return.
+		//  |
+		//  v
+		let (send_toggle,   recv_toggle)   = unbounded();
+		let (send_play,     recv_play)     = unbounded();
+		let (send_pause,    recv_pause)    = unbounded();
+		let (send_stop,     recv_stop)     = unbounded();
+		let (send_clear,    recv_clear)    = unbounded();
+		let (send_restore,  recv_restore)  = unbounded();
+		let (send_repeat,   recv_repeat)   = unbounded();
+		let (send_shuffle,  recv_shuffle)  = unbounded();
+		let (send_volume,   recv_volume)   = unbounded();
+		let (send_next,     recv_next)     = unbounded();
+		let (send_previous, recv_previous) = unbounded();
+		// These must be labeled.
+		// Although semantically [bounded(0)] makes sense since [Kernel]
+		// and [Signal] must meet up, [bounded(1)] is faster.
+		//  |
+		//  v
+		let (e_send_add,          k_recv_add)          = bounded(1);
+		let (k_send_add,          e_recv_add)          = bounded(1);
+		let (e_send_add_many,     k_recv_add_many)     = bounded(1);
+		let (k_send_add_many,     e_recv_add_many)     = bounded(1);
+		let (e_send_seek,         k_recv_seek)         = bounded(1);
+		let (k_send_seek,         e_recv_seek)         = bounded(1);
+		let (e_send_skip,         k_recv_skip)         = bounded(1);
+		let (k_send_skip,         e_recv_skip)         = bounded(1);
+		let (e_send_back,         k_recv_back)         = bounded(1);
+		let (k_send_back,         e_recv_back)         = bounded(1);
+		let (e_send_set_index,    k_recv_set_index)    = bounded(1);
+		let (k_send_set_index,    e_recv_set_index)    = bounded(1);
+		let (e_send_remove,       k_recv_remove)       = bounded(1);
+		let (k_send_remove,       e_recv_remove)       = bounded(1);
+		let (e_send_remove_range, k_recv_remove_range) = bounded(1);
+		let (k_send_remove_range, e_recv_remove_range) = bounded(1);
+
 		//-------------------------------------------------------------- Spawn [Kernel]
 		let (shutdown, k_shutdown)           = bounded(1);
 		let (shutdown_hang, k_shutdown_hang) = bounded(1);
@@ -483,22 +483,22 @@ where
 			send_volume,
 			send_next,
 			send_previous,
-			send_add:          s_send_add,
-			send_add_many:     s_send_add_many,
-			recv_add_many:     s_recv_add_many,
-			recv_add:          s_recv_add,
-			send_seek:         s_send_seek,
-			recv_seek:         s_recv_seek,
-			send_skip:         s_send_skip,
-			recv_skip:         s_recv_skip,
-			send_back:         s_send_back,
-			recv_back:         s_recv_back,
-			send_set_index:    s_send_set_index,
-			recv_set_index:    s_recv_set_index,
-			send_remove:       s_send_remove,
-			recv_remove:       s_recv_remove,
-			send_remove_range: s_send_remove_range,
-			recv_remove_range: s_recv_remove_range,
+			send_add:          e_send_add,
+			send_add_many:     e_send_add_many,
+			recv_add_many:     e_recv_add_many,
+			recv_add:          e_recv_add,
+			send_seek:         e_send_seek,
+			recv_seek:         e_recv_seek,
+			send_skip:         e_send_skip,
+			recv_skip:         e_recv_skip,
+			send_back:         e_send_back,
+			recv_back:         e_recv_back,
+			send_set_index:    e_send_set_index,
+			recv_set_index:    e_recv_set_index,
+			send_remove:       e_send_remove,
+			recv_remove:       e_recv_remove,
+			send_remove_range: e_send_remove_range,
+			recv_remove_range: e_recv_remove_range,
 		})
 	}
 
