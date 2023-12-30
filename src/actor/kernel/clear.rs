@@ -31,11 +31,7 @@ impl<Data: ValidData> Kernel<Data> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::{
-		state::{AudioState,Current},
-		engine::Engine,
-		signal::{repeat::Repeat,volume::Volume,add::AddMany},
-	};
+	use crate::state::{AudioState,Current};
 	use pretty_assertions::assert_eq;
 
 	#[test]

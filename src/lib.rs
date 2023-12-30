@@ -117,6 +117,7 @@
 	clippy::float_cmp,
 	clippy::items_after_statements,
 	clippy::use_debug,
+	clippy::mem_forget,
 )]
 
 #![cfg_attr(debug_assertions, allow(clippy::todo))]

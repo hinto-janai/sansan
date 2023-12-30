@@ -219,6 +219,29 @@ where
 		// wrapped in `atomic::Atomic<T>`.
 		let atomic_state = Arc::new(AtomicAudioState::DEFAULT);
 
+		/// Macro used to spawn all actor's in this function.
+		macro_rules! spawn_actor {
+			(
+				$actor_name:literal, // `&'static str` of the actor's name
+				$init_args:expr,     // InitArgs type for the actor
+				$($spawn_fn:tt)*     // Function to init the actor
+			) => {
+				// To prevent side-effects from other actors during tests
+				// (in `kernel/$SIGNAL.rs`), don't spawn the actors during
+				// test mode, although, forget the init_arg such that channel
+				// sends from `Kernel` still work and don't panic.
+				if cfg!(test) {
+					std::mem::forget($init_args);
+				} else {
+					$($spawn_fn)*($init_args).expect(concat!(
+						"sansan [Engine] - could not spawn [",
+						$actor_name,
+						"] thread",
+					));
+				}
+			};
+		}
+
 		//-------------------------------------------------------------- Spawn [Caller]
 		// FIXME:
 		// Only spawn [Caller] is callbacks exist,
@@ -250,21 +273,25 @@ where
 		if callbacks.all_none() {
 			drop((callbacks, shutdown, next, queue_end, repeat, elapsed));
 		} else {
-			Caller::<Data, Call>::init(crate::actor::caller::InitArgs {
-				init_barrier:  init_barrier.clone(), // Option<Arc<_>>,
-				cb_next:       callbacks.next,
-				cb_queue_end:  callbacks.queue_end,
-				cb_repeat:     callbacks.repeat,
-				cb_elapsed:    callbacks.elapsed.map(|(cb, _)| cb),
-				low_priority:  config.callback_low_priority,
-				audio_state:   AudioStateReader::clone(&audio_state_reader),
-				shutdown_wait: Arc::clone(&shutdown_wait),
-				shutdown,
-				next,
-				queue_end,
-				repeat,
-				elapsed,
-			}).expect("sansan [Engine] - could not spawn [Caller] thread");
+			spawn_actor!(
+				"Caller",
+				crate::actor::caller::InitArgs {
+					init_barrier:  init_barrier.clone(), // Option<Arc<_>>,
+					cb_next:       callbacks.next,
+					cb_queue_end:  callbacks.queue_end,
+					cb_repeat:     callbacks.repeat,
+					cb_elapsed:    callbacks.elapsed.map(|(cb, _)| cb),
+					low_priority:  config.callback_low_priority,
+					audio_state:   AudioStateReader::clone(&audio_state_reader),
+					shutdown_wait: Arc::clone(&shutdown_wait),
+					shutdown,
+					next,
+					queue_end,
+					repeat,
+					elapsed,
+				},
+				Caller::<Data, Call>::init
+			);
 		}
 
 		//-------------------------------------------------------------- Spawn [Audio]
@@ -283,20 +310,24 @@ where
 
 		let (a_shutdown, shutdown) = bounded(1);
 		let (a_to_gc, gc_from_a)   = unbounded();
-		Audio::<Cubeb<Rubato>>::init(crate::actor::audio::InitArgs {
-			init_barrier:      init_barrier.clone(), // Option<Arc<_>>,
-			shutdown,
-			atomic_state:      Arc::clone(&atomic_state),
-			ready_to_recv:     Arc::clone(&audio_ready_to_recv),
-			shutdown_wait:     Arc::clone(&shutdown_wait),
-			to_gc:             a_to_gc,
-			to_caller_elapsed,
-			to_decode:         a_to_d,
-			from_decode:       a_from_d,
-			to_kernel:         a_to_k,
-			from_kernel:       a_from_k,
-			eb_output:         config.error_behavior_output,
-		}).expect("sansan [Engine] - could not spawn [Audio] thread");
+		spawn_actor!(
+			"Audio",
+			crate::actor::audio::InitArgs {
+				init_barrier:      init_barrier.clone(), // Option<Arc<_>>,
+				shutdown,
+				atomic_state:      Arc::clone(&atomic_state),
+				ready_to_recv:     Arc::clone(&audio_ready_to_recv),
+				shutdown_wait:     Arc::clone(&shutdown_wait),
+				to_gc:             a_to_gc,
+				to_caller_elapsed,
+				to_decode:         a_to_d,
+				from_decode:       a_from_d,
+				to_kernel:         a_to_k,
+				from_kernel:       a_from_k,
+				eb_output:         config.error_behavior_output,
+			},
+			Audio::<Cubeb<Rubato>>::init
+		);
 
 		//-------------------------------------------------------------- Spawn [Decode]
 		let (d_to_k_seek,   k_from_d_seek)   = bounded(1);
@@ -306,51 +337,62 @@ where
 		let (d_shutdown,    shutdown)        = bounded(1);
 		let (d_to_p,        p_from_d)        = bounded(1);
 		let (p_to_d,        d_from_p)        = bounded(1);
-		Decode::init(crate::actor::decode::InitArgs {
-			init_barrier:        init_barrier.clone(), // Option<Arc<_>>,
-			audio_ready_to_recv: Arc::clone(&audio_ready_to_recv),
-			shutdown_wait:       Arc::clone(&shutdown_wait),
-			shutdown,
-			to_gc:               d_to_gc,
-			to_pool:             d_to_p,
-			from_pool:           d_from_p,
-			to_audio:            d_to_a,
-			from_audio:          d_from_a,
-			to_kernel_seek:      d_to_k_seek,
-			to_kernel_source:    d_to_k_source,
-			from_kernel:         d_from_k,
-			eb_seek:             config.error_behavior_seek,
-			eb_decode:           config.error_behavior_decode,
-			eb_source:           config.error_behavior_source,
-		}).expect("sansan [Engine] - could not spawn [Decode] thread");
+		spawn_actor!(
+			"Decode",
+			crate::actor::decode::InitArgs {
+				init_barrier:        init_barrier.clone(), // Option<Arc<_>>,
+				audio_ready_to_recv: Arc::clone(&audio_ready_to_recv),
+				shutdown_wait:       Arc::clone(&shutdown_wait),
+				shutdown,
+				to_gc:               d_to_gc,
+				to_pool:             d_to_p,
+				from_pool:           d_from_p,
+				to_audio:            d_to_a,
+				from_audio:          d_from_a,
+				to_kernel_seek:      d_to_k_seek,
+				to_kernel_source:    d_to_k_source,
+				from_kernel:         d_from_k,
+				eb_seek:             config.error_behavior_seek,
+				eb_decode:           config.error_behavior_decode,
+				eb_source:           config.error_behavior_source,
+			},
+			Decode::init
+		);
 
 		//-------------------------------------------------------------- Spawn [Pool]
 		let (p_shutdown, shutdown) = bounded(1);
 		let (p_to_gc, gc_from_p) = unbounded();
-		Pool::<Data>::init(crate::actor::pool::InitArgs {
-			init_barrier:  init_barrier.clone(), // Option<Arc<_>>,
-			shutdown_wait: Arc::clone(&shutdown_wait),
-			shutdown,
-			to_decode:   p_to_d,
-			from_decode: p_from_d,
-			to_gc:       p_to_gc,
-		}).expect("sansan [Engine] - could not spawn [Pool] thread");
+		spawn_actor!(
+			"Pool",
+			crate::actor::pool::InitArgs {
+				init_barrier:  init_barrier.clone(), // Option<Arc<_>>,
+				shutdown_wait: Arc::clone(&shutdown_wait),
+				shutdown,
+				to_decode:   p_to_d,
+				from_decode: p_from_d,
+				to_gc:       p_to_gc,
+			},
+			Pool::<Data>::init
+		);
 
 		//-------------------------------------------------------------- Spawn [Gc]
 		let (gc_shutdown, shutdown)  = bounded(1);
 		let (k_to_gc,     gc_from_k) = unbounded();
-		Gc::<Data>::init(crate::actor::gc::Gc {
-			init_barrier:  init_barrier.clone(), // Option<Arc<_>>,
-			shutdown_wait: Arc::clone(&shutdown_wait),
-			shutdown,
-			from_audio:  gc_from_a,
-			from_decode: gc_from_d,
-			from_kernel: gc_from_k,
-			from_pool:   gc_from_p,
-		}).expect("sansan [Engine] - could not spawn [Gc] thread");
+		spawn_actor!(
+			"Gc",
+			crate::actor::gc::Gc {
+				init_barrier:  init_barrier.clone(), // Option<Arc<_>>,
+				shutdown_wait: Arc::clone(&shutdown_wait),
+				shutdown,
+				from_audio:  gc_from_a,
+				from_decode: gc_from_d,
+				from_kernel: gc_from_k,
+				from_pool:   gc_from_p,
+			},
+			Gc::<Data>::init
+		);
 
-		// Initialize all the channels between [Kernel] <-> [Engine].
-		//
+		//-------------------------------------------------------------- Initialize [Kernel] <-> [Engine] channels
 		// Variables are prefix/suffixed accordingly:
 		// - [Engine] == [e]
 		// - [Kernel] == [k]
@@ -454,6 +496,7 @@ where
 			send_remove_range: k_send_remove_range,
 			recv_remove_range: k_recv_remove_range,
 		};
+		// Don't use `spawn_actor!()`, we need `Kernel` alive for testing.
 		Kernel::<Data>::init(crate::actor::kernel::InitArgs {
 			init_barrier,
 			atomic_state,
