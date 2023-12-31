@@ -122,7 +122,7 @@ where
 	///
 	/// # Panics
 	/// TODO
-	pub fn init(config: Config<Data>) -> Result<Self, EngineInitError> {
+	pub fn init(mut config: Config<Data>) -> Result<Self, EngineInitError> {
 		// Some initial assertions that must be upheld.
 		// These may or may not have been already checked
 		// by other constructors, but we will check again here.
@@ -482,6 +482,14 @@ where
 				name: "Kernel",
 				error,
 			});
+		}
+
+		// TODO: hand until ready before returning.
+		//
+		// If we had `AudioState` to restore, load it first
+		// so `Kernel` immediately restores it upon spawn.
+		if let Some(audio_state) = config.restore.take() {
+			try_send!(send_restore, audio_state);
 		}
 
 		//-------------------------------------------------------------- Return
