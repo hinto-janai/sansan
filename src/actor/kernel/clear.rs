@@ -36,7 +36,7 @@ mod tests {
 
 	#[test]
 	fn clear() {
-		let (mut engine, _) = crate::tests::init_test();
+		let mut engine = crate::tests::init();
 		let reader = engine.reader();
 		assert!(reader.get().queue.is_empty());
 

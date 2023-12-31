@@ -68,7 +68,8 @@ mod tests {
 
 	#[test]
 	fn restore() {
-		let (mut engine, sources) = crate::tests::init_test();
+		let mut engine = crate::tests::init();
+		let sources = crate::tests::sources();
 		assert_eq!(*engine.reader().get(), AudioState::DEFAULT);
 
 		// Set-up the new `AudioState` we'll be restoring.

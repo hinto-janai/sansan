@@ -126,7 +126,8 @@ mod tests {
 
 	#[test]
 	fn add_many() {
-		let (mut e, sources) = crate::tests::init_test();
+		let mut e = crate::tests::init();
+		let sources = crate::tests::sources();
 		let engine = &mut e;
 		assert!(engine.reader().get().queue.is_empty());
 

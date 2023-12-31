@@ -70,7 +70,19 @@ impl<Data: ValidData> Kernel<Data> {
 	}
 }
 
-//---------------------------------------------------------------------------------------------------- Tests
-#[cfg(test)]
-mod tests {
-}
+// //---------------------------------------------------------------------------------------------------- Tests
+// #[cfg(test)]
+// mod tests {
+// 	use super::*;
+// 	use crate::state::{AudioState,Current};
+// 	use pretty_assertions::assert_eq;
+
+// 	#[test]
+// 	fn next() {
+// 		let (mut engine, _) = crate::tests::init_test();
+// 		let reader = engine.reader();
+// 		assert!(reader.get().queue.is_empty());
+
+
+// 	}
+// }

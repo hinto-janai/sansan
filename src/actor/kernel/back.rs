@@ -80,7 +80,7 @@ mod tests {
 	#[test]
 	// Error should be returned on `back: 0`.
 	fn back() {
-		let (mut engine, _) = crate::tests::init_test();
+		let mut engine = crate::tests::init();
 		assert_eq!(engine.reader().get().queue.len(), 0);
 
 		// The baseline queue index we reset to.
