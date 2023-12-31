@@ -24,15 +24,13 @@ use strum::{
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug)]
 /// TODO
-pub struct Config<Data, Call, Error>
+pub struct Config<Data>
 where
 	Data: ValidData,
-	Call: SansanSender<()>,
-	Error: SansanSender<SansanError>,
 {
 	//------------------------------------------ Engine
 	/// TODO
-	pub callbacks: Callbacks<Data, Call, Error>,
+	pub callbacks: Callbacks<Data>,
 	/// TODO
 	pub callback_low_priority: bool,
 	/// TODO
@@ -143,11 +141,9 @@ impl Default for ErrorBehavior {
 }
 
 //---------------------------------------------------------------------------------------------------- Config Impl
-impl<Data, Call, Error> Config<Data, Call, Error>
+impl<Data> Config<Data>
 where
 	Data: ValidData,
-	Call: SansanSender<()>,
-	Error: SansanSender<SansanError>,
 {
 	/// Return a reasonable default [`Config`].
 	///
@@ -195,12 +191,7 @@ where
 	};
 }
 
-impl<Data, Call, Error> Default for Config<Data, Call, Error>
-where
-	Data: ValidData,
-	Call: SansanSender<()>,
-	Error: SansanSender<SansanError>,
-{
+impl<Data: ValidData> Default for Config<Data> {
 	fn default() -> Self {
 		Self::DEFAULT
 	}

@@ -53,15 +53,10 @@ pub(crate) const ACTOR_COUNT: usize = 7;
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
 #[derive(Debug)]
-pub struct Engine<Data, Call, Error>
+pub struct Engine<Data>
 where
 	Data: ValidData,
-	Call: SansanSender<()>,
-	Error: SansanSender<SansanError>,
 {
-	/// Trait bound.
-	_p: PhantomData<(Call, Error)>,
-
 	/// Data and objects.
 	audio: AudioStateReader<Data>,
 
@@ -110,11 +105,9 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- Engine Impl
-impl<Data, Call, Error> Engine<Data, Call, Error>
+impl<Data> Engine<Data>
 where
 	Data: ValidData,
-	Call: SansanSender<()>,
-	Error: SansanSender<SansanError>,
 {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
@@ -129,7 +122,7 @@ where
 	///
 	/// # Panics
 	/// TODO
-	pub fn init(config: Config<Data, Call, Error>) -> Result<Self, EngineInitError> {
+	pub fn init(config: Config<Data>) -> Result<Self, EngineInitError> {
 		// Some initial assertions that must be upheld.
 		// These may or may not have been already checked
 		// by other constructors, but we will check again here.
@@ -145,29 +138,6 @@ where
 				"[config.previous_threshold] was not a normal float: {}",
 				config.previous_threshold,
 			);
-
-			#[allow(clippy::items_after_statements)]
-			/// Check all callbacks aren't the illegal [__Phantom] variant.
-			static CALLBACK_ERROR_MSG: &str =
-				"__Phantom is used for the generic <Msg> bounds. It is not a real variant, do not use it.";
-			/// TODO
-			macro_rules! callback_check {
-				($callback:ident) => {
-					if let Some(callback) = &config.callbacks.$callback {
-						let s = stringify!($callback);
-						assert!(!matches!(callback, Callback::__Phantom(_)), "{s}: {CALLBACK_ERROR_MSG}");
-					}
-				};
-			}
-			callback_check!(next);
-			callback_check!(queue_end);
-			callback_check!(repeat);
-			callback_check!(error);
-
-			// Special callback with tuple, same check.
-			if let Some((callback, _)) = &config.callbacks.elapsed {
-				assert!(!matches!(callback, Callback::__Phantom(_)), "elapsed: {CALLBACK_ERROR_MSG}");
-			}
 		}
 
 		// If [config.init_blocking] is true, make a [Some(barrier)]
@@ -290,7 +260,7 @@ where
 					repeat,
 					elapsed,
 				},
-				Caller::<Data, Call>::init
+				Caller::<Data>::init
 			);
 		}
 
@@ -509,7 +479,6 @@ where
 
 		//-------------------------------------------------------------- Return
 		Ok(Self {
-			_p: PhantomData,
 			audio: audio_state_reader,
 			shutdown,
 			shutdown_hang,
@@ -709,12 +678,7 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- Drop
-impl<Data, Call, Error> Drop for Engine<Data, Call, Error>
-where
-	Data: ValidData,
-	Call: SansanSender<()>,
-	Error: SansanSender<SansanError>,
-{
+impl<Data: ValidData> Drop for Engine<Data> {
 	#[cold]
 	#[inline(never)]
 	fn drop(&mut self) {

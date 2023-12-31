@@ -8,6 +8,7 @@ use crate::{
 	signal::SeekError,
 };
 use std::{
+	fmt,
 	marker::PhantomData,
 	time::Duration,
 };
@@ -16,77 +17,10 @@ use std::{
 use crate::Engine; // docs
 
 //---------------------------------------------------------------------------------------------------- Callback
-/// TODO
-pub enum Callback<Data, Call, Msg>
-where
-	Data: ValidData,
-	Msg: Send + 'static,
-	Call: SansanSender<Msg>,
-{
-	/// Dynamically dispatched function
-	Dynamic(Box<dyn FnMut(&AudioState<Data>) + Send + Sync + 'static>),
-	/// Channel message
-	Channel(Call),
-	/// Function pointer
-	Pointer(fn(&AudioState<Data>)),
-
-	// Hello, reading the source code are you?
-	//
-	// Do _not_ construct this variant.
-	// It is only used due to limitations
-	// on the generic <Msg> trait bounds.
-	//
-	// [Engine] will panic if it is
-	// constructed with one of these.
-	#[doc(hidden)]
-	__Phantom(std::marker::PhantomData<Msg>),
-}
-
-//---------------------------------------------------------------------------------------------------- Callback Impl
-impl<Data, Call, Msg> Callback<Data, Call, Msg>
-where
-	Data: ValidData,
-	Msg: Send + 'static,
-	Call: SansanSender<Msg>,
-{
-	#[inline]
-	/// "Call" a [`Callback`]
-	///
-	/// If [`Self`] is [`Callback::Dynamic`] or [`Callback::Pointer`],
-	/// it will execute that function with `audio_state`.
-	///
-	/// If [`Self`] is [`Callback::Channel`], it will send an empty
-	/// message `()`, acting as a notification.
-	pub(crate) fn call(&mut self, audio_state: &AudioState<Data>, msg: Msg) {
-		match self {
-			Self::Dynamic(x)   => { x(audio_state); },
-			Self::Channel(x)   => { drop(x.try_send(msg)); },
-			Self::Pointer(x)   => { x(audio_state); },
-			Self::__Phantom(_) => unreachable!(),
-		}
-	}
-}
-
-//---------------------------------------------------------------------------------------------------- Callback Trait Impl
-impl<Data, Call, Msg> std::fmt::Debug for Callback<Data, Call, Msg>
-where
-	Data: ValidData,
-	Msg: Send + 'static,
-	Call: SansanSender<Msg>,
-{
-	#[allow(clippy::panic_in_result_fn)]
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			Self::Dynamic(_)   => write!(f, "Callback::Dynamic"),
-			Self::Channel(_)   => write!(f, "Callback::Channel"),
-			Self::Pointer(_)   => write!(f, "Callback::Pointer"),
-			Self::__Phantom(_) => unreachable!(),
-		}
-	}
-}
+/// Boxed, dynamically dispatched function with access to the current audio state.
+pub(crate) type Callback<Data> = Box<dyn FnMut(&AudioState<Data>) + Send + Sync + 'static>;
 
 //---------------------------------------------------------------------------------------------------- Callbacks
-#[derive(Debug)]
 /// TODO
 // ```rust
 // # use sansan::*;
@@ -128,30 +62,26 @@ where
 // let duration = std::time::Duration::from_secs(1);
 // callbacks.elapsed(Callback::Channel(elapsed_send), duration);
 // ```
-pub struct Callbacks<Data, Notify, Error>
+pub struct Callbacks<Data>
 where
-	Data:   ValidData,
-	Notify: SansanSender<()>,
-	Error:  SansanSender<SansanError>,
+	Data: ValidData,
 {
 	/// TODO
-	pub(crate) next:      Option<Callback<Data, Notify, ()>>,
+	pub(crate) next:      Option<Callback<Data>>,
 	/// TODO
-	pub(crate) queue_end: Option<Callback<Data, Notify, ()>>,
+	pub(crate) queue_end: Option<Callback<Data>>,
 	/// TODO
-	pub(crate) repeat:    Option<Callback<Data, Notify, ()>>,
+	pub(crate) repeat:    Option<Callback<Data>>,
 	/// TODO
-	pub(crate) elapsed:   Option<(Callback<Data, Notify, ()>, f64)>,
+	pub(crate) elapsed:   Option<(Callback<Data>, f64)>,
 	/// TODO
-	pub(crate) error:     Option<Callback<Data, Error, SansanError>>,
+	pub(crate) error:     Option<Callback<Data>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Callbacks Impl
-impl<Data, Notify, Error> Callbacks<Data, Notify, Error>
+impl<Data> Callbacks<Data>
 where
 	Data:   ValidData,
-	Notify: SansanSender<()>,
-	Error:  SansanSender<SansanError>,
 {
 	/// A fresh [`Self`] with no callbacks, same as [`Self::new()`]
 	pub const DEFAULT: Self = Self::new();
@@ -197,21 +127,21 @@ where
 
 	#[cold]
 	/// TODO
-	pub fn next(&mut self, callback: Callback<Data, Notify, ()>) -> &mut Self {
+	pub fn next(&mut self, callback: Callback<Data>) -> &mut Self {
 		self.next = Some(callback);
 		self
 	}
 
 	#[cold]
 	/// TODO
-	pub fn queue_end(&mut self, callback: Callback<Data, Notify, ()>) -> &mut Self {
+	pub fn queue_end(&mut self, callback: Callback<Data>) -> &mut Self {
 		self.queue_end = Some(callback);
 		self
 	}
 
 	#[cold]
 	/// TODO
-	pub fn repeat(&mut self, callback: Callback<Data, Notify, ()>) -> &mut Self {
+	pub fn repeat(&mut self, callback: Callback<Data>) -> &mut Self {
 		self.repeat = Some(callback);
 		self
 	}
@@ -227,28 +157,39 @@ where
 	/// - Not an abnormal float ([`f64::NAN`], [`f64::INFINITY`], etc)
 	///
 	/// or [`Engine::init`] will panic.
-	pub fn elapsed(&mut self, callback: Callback<Data, Notify, ()>, seconds: f64) -> &mut Self {
+	pub fn elapsed(&mut self, callback: Callback<Data>, seconds: f64) -> &mut Self {
 		self.elapsed = Some((callback, seconds));
 		self
 	}
 
 	#[cold]
 	/// TODO
-	pub fn error(&mut self, callback: Callback<Data, Error, SansanError>) -> &mut Self {
+	pub fn error(&mut self, callback: Callback<Data>) -> &mut Self {
 		self.error = Some(callback);
 		self
 	}
 }
 
 //---------------------------------------------------------------------------------------------------- Callbacks Trait Impl
-impl<Data, Notify, Error> Default for Callbacks<Data, Notify, Error>
-where
-	Data: ValidData,
-	Notify: SansanSender<()>,
-	Error: SansanSender<SansanError>,
-{
+impl<Data: ValidData> Default for Callbacks<Data> {
 	#[inline]
 	fn default() -> Self {
 		Self::DEFAULT
+	}
+}
+
+impl<Data: ValidData> fmt::Debug for Callbacks<Data> {
+	#[allow(clippy::missing_docs_in_private_items)]
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		const SOME: &str = "Some";
+		const NONE: &str = "None";
+
+		f.debug_struct("Callbacks")
+			.field("next",      if self.next.is_some()      { &SOME } else { &NONE })
+			.field("queue_end", if self.queue_end.is_some() { &SOME } else { &NONE })
+			.field("repeat",    if self.repeat.is_some()    { &SOME } else { &NONE })
+			.field("elapsed",   if self.elapsed.is_some()   { &SOME } else { &NONE })
+			.field("error",     if self.error.is_some()     { &SOME } else { &NONE })
+			.finish()
 	}
 }

@@ -24,12 +24,12 @@ pub(crate) fn sources() -> Sources<usize> {
 }
 
 /// Init the `Engine` with a default `Config`.
-pub(crate) fn init() -> Engine::<usize, (), ()> {
-	Engine::<usize, (), ()>::init(Config::DEFAULT).unwrap()
+pub(crate) fn init() -> Engine::<usize> {
+	Engine::<usize>::init(Config::DEFAULT).unwrap()
 }
 
 /// Init the `Engine` with 10 sources in the queue and a modified audio state.
-pub(crate) fn init_with_sources() -> Engine::<usize, (), ()> {
+pub(crate) fn init_with_sources() -> Engine::<usize> {
 	let engine = init();
 
 	// Add sources to the queue.

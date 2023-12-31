@@ -16,12 +16,8 @@ impl<Data: ValidData> Kernel<Data> {
 
 		self.w.add_commit_push(|w, _| {
 			match clear {
-				Clear::Queue => {
-					w.queue.clear();
-				},
-				Clear::Current => {
-					w.current = None;
-				},
+				Clear::Queue => w.queue.clear(),
+				Clear::Current => w.current = None,
 			}
 		});
 	}

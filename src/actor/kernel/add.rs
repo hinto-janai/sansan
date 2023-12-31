@@ -111,7 +111,7 @@ mod tests {
 
 		// Testing function used after each operation.
 		fn assert(
-			engine: &mut Engine<usize, (), ()>,
+			engine: &mut Engine<usize>,
 			add: Add<usize>,
 			data: &[usize],
 		) {

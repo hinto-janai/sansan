@@ -21,15 +21,11 @@ use std::sync::{
 //---------------------------------------------------------------------------------------------------- Caller
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
-pub(crate) struct Caller<Data, Call>
-where
-	Data: ValidData,
-	Call: SansanSender<()>,
-{
-	cb_next:       Option<Callback<Data, Call, ()>>,
-	cb_queue_end:  Option<Callback<Data, Call, ()>>,
-	cb_repeat:     Option<Callback<Data, Call, ()>>,
-	cb_elapsed:    Option<Callback<Data, Call, ()>>,
+pub(crate) struct Caller<Data: ValidData> {
+	cb_next:       Option<Callback<Data>>,
+	cb_queue_end:  Option<Callback<Data>>,
+	cb_repeat:     Option<Callback<Data>>,
+	cb_elapsed:    Option<Callback<Data>>,
 	audio_state:   AudioStateReader<Data>,
 	shutdown_wait: Arc<Barrier>,
 }
@@ -48,16 +44,12 @@ struct Channels {
 //---------------------------------------------------------------------------------------------------- Caller Impl
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
-pub(crate) struct InitArgs<Data, Call>
-where
-	Data: ValidData,
-	Call: SansanSender<()>,
-{
+pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) init_barrier:  Option<Arc<Barrier>>,
-	pub(crate) cb_next:       Option<Callback<Data, Call, ()>>,
-	pub(crate) cb_queue_end:  Option<Callback<Data, Call, ()>>,
-	pub(crate) cb_repeat:     Option<Callback<Data, Call, ()>>,
-	pub(crate) cb_elapsed:    Option<Callback<Data, Call, ()>>,
+	pub(crate) cb_next:       Option<Callback<Data>>,
+	pub(crate) cb_queue_end:  Option<Callback<Data>>,
+	pub(crate) cb_repeat:     Option<Callback<Data>>,
+	pub(crate) cb_elapsed:    Option<Callback<Data>>,
 	pub(crate) low_priority:  bool,
 	pub(crate) audio_state:   AudioStateReader<Data>,
 	pub(crate) shutdown_wait: Arc<Barrier>,
@@ -69,16 +61,12 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- Caller Impl
-impl<Data, Call> Caller<Data, Call>
-where
-	Data: ValidData,
-	Call: SansanSender<()>,
-{
+impl<Data: ValidData> Caller<Data> {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]
 	/// Initialize `Caller`.
-	pub(crate) fn init(args: InitArgs<Data, Call>) -> Result<JoinHandle<()>, std::io::Error> {
+	pub(crate) fn init(args: InitArgs<Data>) -> Result<JoinHandle<()>, std::io::Error> {
 		std::thread::Builder::new()
 			.name("Caller".into())
 			.spawn(move || {
@@ -199,10 +187,10 @@ where
 	/// TODO
 	fn call(
 		audio_state: &AudioState<Data>,
-		callback: &mut Option<Callback<Data, Call, ()>>
+		callback: &mut Option<Callback<Data>>
 	) {
 		if let Some(cb) = callback.as_mut() {
-			cb.call(audio_state, ());
+			cb(audio_state);
 		}
 	}
 }

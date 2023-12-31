@@ -133,7 +133,7 @@ mod tests {
 
 		// Testing function used after each operation.
 		fn assert(
-			engine: &mut Engine<usize, (), ()>,
+			engine: &mut Engine<usize>,
 			add_many: AddMany<usize>,
 			data: &[usize],
 		) {
