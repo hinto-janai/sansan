@@ -129,15 +129,15 @@ where
 		{
 			// Callback elapsed seconds must be a normal float.
 			if let Some((_, seconds)) = config.callbacks.elapsed {
-				assert!(seconds.is_normal(), "input seconds was not a normal float: {seconds}");
+				if !seconds.is_normal() {
+					return Err(EngineInitError::CallbackElapsed(seconds));
+				}
 			}
 
 			// Previous threshold must be a normal float.
-			assert!(
-				config.previous_threshold.is_normal(),
-				"[config.previous_threshold] was not a normal float: {}",
-				config.previous_threshold,
-			);
+			if !config.previous_threshold.is_normal() {
+				return Err(EngineInitError::PreviousThreshold(config.previous_threshold));
+			}
 		}
 
 		// If [config.init_blocking] is true, make a [Some(barrier)]
@@ -203,11 +203,12 @@ where
 				if cfg!(test) {
 					std::mem::forget($init_args);
 				} else {
-					$($spawn_fn)*($init_args).expect(concat!(
-						"sansan [Engine] - could not spawn [",
-						$actor_name,
-						"] thread",
-					));
+					if let Err(error) = $($spawn_fn)*($init_args) {
+						return Err(EngineInitError::ThreadSpawn {
+							name: $actor_name,
+							error,
+						});
+					}
 				}
 			};
 		}
@@ -467,7 +468,7 @@ where
 			recv_remove_range: k_recv_remove_range,
 		};
 		// Don't use `spawn_actor!()`, we need `Kernel` alive for testing.
-		Kernel::<Data>::init(crate::actor::kernel::InitArgs {
+		let init_args = crate::actor::kernel::InitArgs {
 			init_barrier,
 			atomic_state,
 			shutdown_wait: Arc::clone(&shutdown_wait),
@@ -475,7 +476,13 @@ where
 			channels,
 			to_gc: k_to_gc,
 			previous_threshold: config.previous_threshold,
-		}).expect("sansan [Engine] - could not spawn [Kernel] thread");
+		};
+		if let Err(error) = Kernel::<Data>::init(init_args) {
+			return Err(EngineInitError::ThreadSpawn {
+				name: "Kernel",
+				error,
+			});
+		}
 
 		//-------------------------------------------------------------- Return
 		Ok(Self {
@@ -701,9 +708,22 @@ impl<Data: ValidData> Drop for Engine<Data> {
 #[derive(Debug)]
 ///
 pub enum EngineInitError {
-	#[error("failed to spawn thread: {0}")]
+	#[error("callback elapsed seconds - found: `{0}`, expected: an `is_normal()` float")]
+	/// Callback elapsed seconds was not an [`f64::is_normal`] float.
+	CallbackElapsed(f64),
+
+	#[error("previous threshold seconds - found: `{0}`, expected: an `is_normal()` float")]
+	/// Previous threshold seconds was not an [`f64::is_normal`] float.
+	PreviousThreshold(f64),
+
+	#[error("failed to spawn thread `{name}`: {error}")]
 	/// Failed to spawn an OS thread
-	ThreadSpawn(#[from] std::io::Error)
+	ThreadSpawn {
+		/// Name of the thread that failed to spawn
+		name: &'static str,
+		/// Associated IO error
+		error: std::io::Error,
+	}
 }
 
 //---------------------------------------------------------------------------------------------------- Tests

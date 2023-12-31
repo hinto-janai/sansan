@@ -84,11 +84,18 @@ where
 	Data:   ValidData,
 {
 	/// A fresh [`Self`] with no callbacks, same as [`Self::new()`]
-	pub const DEFAULT: Self = Self::new();
+	pub const DEFAULT: Self = Self {
+		next:      None,
+		queue_end: None,
+		repeat:    None,
+		elapsed:   None,
+		error:     None,
+	};
+
 
 	#[cold]
 	#[must_use]
-	/// Returns a fresh [`Self`] with no callbacks (all set to [`None`])
+	/// Returns a fresh [`Self`] with no callbacks, same as [`Self::DEFAULT`].
 	///
 	/// ```rust
 	/// # use sansan::*;
@@ -96,13 +103,7 @@ where
 	/// let callbacks: Callbacks<(), (), ()> = Callbacks::new();
 	/// assert!(callbacks.all_none());
 	pub const fn new() -> Self {
-		Self {
-			next:      None,
-			queue_end: None,
-			repeat:    None,
-			elapsed:   None,
-			error:     None,
-		}
+		Self::DEFAULT
 	}
 
 	/// TODO
