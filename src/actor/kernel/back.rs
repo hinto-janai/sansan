@@ -105,13 +105,7 @@ mod tests {
 
 		// Reset the `Engine`'s audio state to the default + 10 sources.
 		// Used in-between `back` test operations.
-		let reset_audio_state = |engine: &mut Engine<usize>| {
-			engine.restore(audio_state.clone());
-
-			while *engine.reader().get() != audio_state {
-				std::thread::sleep(std::time::Duration::from_millis(10));
-			}
-		};
+		let reset_audio_state = |engine: &mut Engine<usize>| engine.restore(audio_state.clone());
 
 		//---------------------------------- Empty queue
 		let back = Back {

@@ -100,9 +100,8 @@ mod tests {
 		assert_eq!(audio_state.repeat, Repeat::Off);
 
 		//---------------------------------- Empty queue, early return
-		engine.next();
-		sleep(Duration::from_secs(1));
-		assert_eq!(audio_state, reader.get());
+		let resp = engine.next();
+		assert_eq!(audio_state, resp);
 
 		//---------------------------------- Insert 10 tracks in the queue, but don't set `Current`.
 		let audio_state = engine.add_many(AddMany {
@@ -115,11 +114,8 @@ mod tests {
 		assert_eq!(audio_state.current, None);
 
 		//---------------------------------- Test for default 0th track if no `Current`
-		engine.next();
-		while reader.get().current.is_none() {
-			sleep(Duration::from_millis(1));
-		}
-		let current = reader.get().current.as_ref().unwrap().clone();
+		let resp = engine.next();
+		let current = resp.current.as_ref().unwrap().clone();
 		assert_eq!(current, Current {
 			source: crate::tests::source(0),
 			index: 0,
@@ -127,9 +123,8 @@ mod tests {
 		});
 
 		//---------------------------------- Test for normal 1 next, current index should be += 1
-		engine.next();
-		sleep(Duration::from_secs(1));
-		let current = reader.get().current.as_ref().unwrap().clone();
+		let resp = engine.next();
+		let current = resp.current.as_ref().unwrap().clone();
 		assert_eq!(current, Current {
 			source: crate::tests::source(1),
 			index: 1,
@@ -139,12 +134,8 @@ mod tests {
 		//---------------------------------- Test `Repeat::Current` behavior (repeat index 1)
 		let repeat = Repeat::Current;
 		engine.repeat(repeat);
-		engine.next();
-		sleep(Duration::from_secs(1));
-		while reader.get().repeat != repeat {
-			sleep(Duration::from_millis(1));
-		}
-		let current = reader.get().current.as_ref().unwrap().clone();
+		let resp = engine.next();
+		let current = resp.current.as_ref().unwrap().clone();
 		assert_eq!(current, Current {
 			source: crate::tests::source(1),
 			index: 1,
@@ -157,7 +148,6 @@ mod tests {
 		for _ in 0..8 {
 			engine.next();
 		}
-		sleep(Duration::from_secs(1));
 		let current = reader.get().current.as_ref().unwrap().clone();
 		assert_eq!(current, Current {
 			source: crate::tests::source(9),
@@ -165,11 +155,8 @@ mod tests {
 			elapsed: 0.0,
 		});
 		// Wrap back around.
-		engine.next();
-		while reader.get().current.as_ref().unwrap().index == 9 {
-			sleep(Duration::from_millis(1));
-		}
-		let current = reader.get().current.as_ref().unwrap().clone();
+		let resp = engine.next();
+		let current = resp.current.as_ref().unwrap().clone();
 		assert_eq!(current, Current {
 			source: crate::tests::source(0),
 			index: 0,
@@ -182,7 +169,6 @@ mod tests {
 		for _ in 0..9 {
 			engine.next();
 		}
-		sleep(Duration::from_secs(1));
 		let current = reader.get().current.as_ref().unwrap().clone();
 		assert_eq!(current, Current {
 			source: crate::tests::source(9),
@@ -190,10 +176,7 @@ mod tests {
 			elapsed: 0.0,
 		});
 		// End the queue.
-		engine.next();
-		while reader.get().current.is_some() {
-			sleep(Duration::from_millis(1));
-		}
-		assert_eq!(reader.get().current, None);
+		let resp = engine.next();
+		assert_eq!(resp.current, None);
 	}
 }

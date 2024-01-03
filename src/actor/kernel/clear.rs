@@ -66,38 +66,26 @@ mod tests {
 			elapsed: 123.123,
 		});
 
-		engine.restore(audio_state.clone());
-		while *reader.get() != audio_state {
-			std::thread::sleep(std::time::Duration::from_millis(10));
-		}
-
-		assert_eq!(reader.get().queue.len(), 10);
-		assert_eq!(reader.get().current.as_ref().unwrap().index, 4);
+		let resp = engine.restore(audio_state.clone());
+		assert_eq!(resp.queue.len(), 10);
+		assert_eq!(resp.current.as_ref().unwrap().index, 4);
 
 		//---------------------------------- Clear `Current`.
-		engine.clear(Clear::Current);
-		while reader.get().current.is_some() {
-			std::thread::sleep(std::time::Duration::from_millis(10));
-		}
-		assert_eq!(reader.get().current.is_none(), true);
+		let resp = engine.clear(Clear::Current);
+		assert_eq!(resp.current.is_none(), true);
 
 		//---------------------------------- Clear queue.
-		engine.clear(Clear::Queue);
-		while !reader.get().queue.is_empty() {
-			std::thread::sleep(std::time::Duration::from_millis(10));
-		}
-		assert_eq!(reader.get().queue.is_empty(), true);
+		let resp = engine.clear(Clear::Queue);
+		assert_eq!(resp.queue.is_empty(), true);
 
 		//---------------------------------- Clear already empty `Current`.
 		let audio_state = reader.get();
 
-		engine.clear(Clear::Current);
-		std::thread::sleep(std::time::Duration::from_secs(1));
-		assert_eq!(reader.get(), audio_state);
+		let resp = engine.clear(Clear::Current);
+		assert_eq!(resp, audio_state);
 
 		//---------------------------------- Clear already empty queue.
-		engine.clear(Clear::Queue);
-		std::thread::sleep(std::time::Duration::from_secs(1));
-		assert_eq!(reader.get(), audio_state);
+		let resp = engine.clear(Clear::Queue);
+		assert_eq!(resp, audio_state);
 	}
 }
