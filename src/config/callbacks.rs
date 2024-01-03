@@ -100,7 +100,7 @@ where
 	/// ```rust
 	/// # use sansan::*;
 	/// # use sansan::config::*;
-	/// let callbacks: Callbacks<(), (), ()> = Callbacks::new();
+	/// let callbacks: Callbacks<()> = Callbacks::new();
 	/// assert!(callbacks.all_none());
 	pub const fn new() -> Self {
 		Self::DEFAULT

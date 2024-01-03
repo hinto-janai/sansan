@@ -162,7 +162,7 @@ where
 	///
 	/// ```rust
 	/// # use sansan::config::*;
-	/// Config::<(), (), ()> {
+	/// Config::<()> {
 	///     callbacks:             Callbacks::DEFAULT,
 	///     callback_low_priority: true,
 	///     init_blocking:         false,
