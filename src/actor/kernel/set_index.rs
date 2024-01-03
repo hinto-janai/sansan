@@ -7,11 +7,8 @@ use crate::{
 	signal::set_index::{SetIndex,SetIndexError},
 	macros::{try_send,recv},
 };
-use crossbeam::channel::{Sender,Receiver};
-use std::{
-	ops::Bound,
-	sync::atomic::Ordering,
-};
+use crossbeam::channel::Sender;
+use std::sync::atomic::Ordering;
 
 //----------------------------------------------------------------------------------------------------
 impl<Data: ValidData> Kernel<Data> {
@@ -36,7 +33,11 @@ impl<Data: ValidData> Kernel<Data> {
 
 		self.new_source(to_audio, to_decode, source.clone());
 
+		let play = set_index.play == Some(true);
+		self.atomic_state.playing.store(play, Ordering::Release);
+
 		self.w.add_commit_push(|w, _| {
+			w.playing = play;
 			w.current = Some(Current {
 				source: source.clone(),
 				index: set_index.index,

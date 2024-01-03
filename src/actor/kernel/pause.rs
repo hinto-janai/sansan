@@ -7,6 +7,7 @@ use crate::{
 	macros::try_send,
 };
 use crossbeam::channel::Sender;
+use std::sync::atomic::Ordering;
 
 //----------------------------------------------------------------------------------------------------
 impl<Data: ValidData> Kernel<Data> {
@@ -20,7 +21,11 @@ impl<Data: ValidData> Kernel<Data> {
 			return;
 		}
 
+		self.atomic_state.playing.store(false, Ordering::Release);
+
 		self.w.add_commit_push(|w, _| {
+			debug_assert!(w.current.is_some());
+			debug_assert!(w.playing);
 			w.playing = false;
 		});
 
