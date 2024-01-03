@@ -125,7 +125,10 @@ pub(crate) struct Channels<Data: ValidData> {
 	pub(crate) from_decode_seek:   Receiver<Result<SeekedTime, SeekError>>,
 	pub(crate) from_decode_source: Receiver<Result<(), SourceError>>,
 
-	// Signals that input/output `()`
+	// Shared common return channel for signals that don't have special output.
+	pub(crate) send_audio_state: Sender<AudioStateSnapshot<Data>>,
+
+	// Signals that have no input and output `AudioStateSnapshot`
 	pub(crate) recv_toggle:   Receiver<()>,
 	pub(crate) recv_play:     Receiver<()>,
 	pub(crate) recv_pause:    Receiver<()>,
@@ -133,10 +136,8 @@ pub(crate) struct Channels<Data: ValidData> {
 	pub(crate) recv_previous: Receiver<()>,
 	pub(crate) recv_stop:     Receiver<()>,
 
-	// Signals that have input and output `()`
-	pub(crate) send_add:      Sender<AudioStateSnapshot<Data>>,
+	// Signals that have input and output `AudioStateSnapshot`
 	pub(crate) recv_add:      Receiver<Add<Data>>,
-	pub(crate) send_add_many: Sender<AudioStateSnapshot<Data>>,
 	pub(crate) recv_add_many: Receiver<AddMany<Data>>,
 	pub(crate) recv_clear:    Receiver<Clear>,
 	pub(crate) recv_repeat:   Receiver<Repeat>,
@@ -266,12 +267,12 @@ where
 				4  =>                  { select_recv!(c.recv_next); self.next(&c.to_audio, &c.to_decode) },
 				5  =>                  { select_recv!(c.recv_previous); self.previous(&c.to_audio, &c.to_decode) },
 				6  => self.clear       ( select_recv!(c.recv_clear)),
-				7  => self.shuffle     ( select_recv!(c.recv_shuffle), &c.to_audio, &c.to_decode, &c.from_decode_seek, &c.send_seek),
+				7  => self.shuffle     ( select_recv!(c.recv_shuffle), &c.to_audio, &c.to_decode, &c.send_audio_state),
 				8  => self.repeat      ( select_recv!(c.recv_repeat)),
 				9  => self.volume      ( select_recv!(c.recv_volume)),
 				10 => self.restore     ( select_recv!(c.recv_restore), &c.to_audio, &c.to_decode),
-				11 => self.add         ( select_recv!(c.recv_add), &c.to_audio, &c.to_decode, &c.send_add),
-				12 => self.add_many    ( select_recv!(c.recv_add_many), &c.to_audio, &c.to_decode, &c.send_add_many),
+				11 => self.add         ( select_recv!(c.recv_add), &c.to_audio, &c.to_decode, &c.send_audio_state),
+				12 => self.add_many    ( select_recv!(c.recv_add_many), &c.to_audio, &c.to_decode, &c.send_audio_state),
 				13 => self.seek        ( select_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),
 				14 => self.skip        ( select_recv!(c.recv_skip), &c.to_audio, &c.to_decode, &c.send_skip),
 				15 => self.back        ( select_recv!(c.recv_back), &c.to_audio, &c.to_decode, &c.send_back),

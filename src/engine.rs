@@ -70,7 +70,11 @@ where
 	shutdown_done: R<()>,
 	shutdown_blocking: bool,
 
-	/// Signals that input/output `()`
+	/// This channel is shared between all signals that don't
+	/// have special output, i.e, they return `AudioStateSnapshot`.
+	recv_audio_state: R<AudioStateSnapshot<Data>>,
+
+	/// Signals that have no input and output `AudioStateSnapshot`
 	send_toggle:   S<()>,
 	send_play:     S<()>,
 	send_pause:    S<()>,
@@ -78,11 +82,9 @@ where
 	send_previous: S<()>,
 	send_stop:     S<()>,
 
-	/// Signals that have input and output `()`
+	/// Signals that have have input and output `AudioStateSnapshot`.
 	send_add:      S<Add<Data>>,
-	recv_add:      R<AudioStateSnapshot<Data>>,
 	send_add_many: S<AddMany<Data>>,
-	recv_add_many: R<AudioStateSnapshot<Data>>,
 	send_clear:    S<Clear>,
 	send_restore:  S<AudioState<Data>>,
 	send_repeat:   S<Repeat>,
@@ -90,6 +92,8 @@ where
 	send_shuffle:  S<Shuffle>,
 
 	/// Signals that return `Result<T, E>`
+	/// These don't use the common `recv_audio_state_snapshot`,
+	/// as they return unique values.
 	send_seek:         S<Seek>,
 	recv_seek:         R<Result<AudioStateSnapshot<Data>, SeekError>>,
 	send_skip:         S<Skip>,
@@ -403,9 +407,7 @@ where
 		//  |
 		//  v
 		let (e_send_add,          k_recv_add)          = bounded(1);
-		let (k_send_add,          e_recv_add)          = bounded(1);
 		let (e_send_add_many,     k_recv_add_many)     = bounded(1);
-		let (k_send_add_many,     e_recv_add_many)     = bounded(1);
 		let (e_send_seek,         k_recv_seek)         = bounded(1);
 		let (k_send_seek,         e_recv_seek)         = bounded(1);
 		let (e_send_skip,         k_recv_skip)         = bounded(1);
@@ -418,6 +420,9 @@ where
 		let (k_send_remove,       e_recv_remove)       = bounded(1);
 		let (e_send_remove_range, k_recv_remove_range) = bounded(1);
 		let (k_send_remove_range, e_recv_remove_range) = bounded(1);
+
+		// The special common "AudioStateSnapshot" return channel.
+		let (send_audio_state, recv_audio_state) = bounded(1);
 
 		//-------------------------------------------------------------- Spawn [Kernel]
 		let (shutdown, k_shutdown)           = bounded(1);
@@ -445,14 +450,13 @@ where
 			to_decode:          k_to_d,
 			from_decode_seek:   k_from_d_seek,
 			from_decode_source: k_from_d_source,
+			send_audio_state,
 			recv_clear,
 			recv_repeat,
 			recv_shuffle,
 			recv_volume,
 			recv_restore,
-			send_add:          k_send_add,
 			recv_add:          k_recv_add,
-			send_add_many:     k_send_add_many,
 			recv_add_many:     k_recv_add_many,
 			send_seek:         k_send_seek,
 			recv_seek:         k_recv_seek,
@@ -499,6 +503,7 @@ where
 			shutdown_hang,
 			shutdown_done,
 			shutdown_blocking: config.shutdown_blocking,
+			recv_audio_state,
 			send_toggle,
 			send_play,
 			send_pause,
@@ -512,8 +517,6 @@ where
 			send_previous,
 			send_add:          e_send_add,
 			send_add_many:     e_send_add_many,
-			recv_add_many:     e_recv_add_many,
-			recv_add:          e_recv_add,
 			send_seek:         e_send_seek,
 			recv_seek:         e_recv_seek,
 			send_skip:         e_send_skip,
@@ -565,53 +568,64 @@ where
 	// INVARIANT: `Kernel` must not assume all Requests are actionable.
 
 	/// TODO
-	pub fn toggle(&mut self) {
+	pub fn toggle(&mut self) -> AudioStateSnapshot<Data> {
 		try_send!(self.send_toggle, ());
+		recv!(self.recv_audio_state)
 	}
 
 	/// TODO
-	pub fn play(&mut self) {
+	pub fn play(&mut self) -> AudioStateSnapshot<Data> {
 		try_send!(self.send_play, ());
+		recv!(self.recv_audio_state)
 	}
 
 	/// TODO
-	pub fn pause(&mut self) {
+	pub fn pause(&mut self) -> AudioStateSnapshot<Data> {
 		try_send!(self.send_pause, ());
+		recv!(self.recv_audio_state)
 	}
 
+	#[allow(clippy::should_implement_trait)]
 	/// TODO
-	pub fn next(&mut self) {
+	pub fn next(&mut self) -> AudioStateSnapshot<Data> {
 		try_send!(self.send_next, ());
+		recv!(self.recv_audio_state)
 	}
 
 	/// TODO
-	pub fn previous(&mut self) {
+	pub fn previous(&mut self) -> AudioStateSnapshot<Data> {
 		try_send!(self.send_previous, ());
+		recv!(self.recv_audio_state)
 	}
 
 	/// TODO
-	pub fn clear(&mut self, clear: Clear) {
+	pub fn clear(&mut self, clear: Clear) -> AudioStateSnapshot<Data> {
 		try_send!(self.send_clear, clear);
+		recv!(self.recv_audio_state)
 	}
 
 	/// TODO
-	pub fn restore(&mut self, audio_state: AudioState<Data>) {
+	pub fn restore(&mut self, audio_state: AudioState<Data>) -> AudioStateSnapshot<Data> {
 		try_send!(self.send_restore, audio_state);
+		recv!(self.recv_audio_state)
 	}
 
 	/// TODO
-	pub fn repeat(&mut self, repeat: Repeat) {
+	pub fn repeat(&mut self, repeat: Repeat) -> AudioStateSnapshot<Data> {
 		try_send!(self.send_repeat, repeat);
+		recv!(self.recv_audio_state)
 	}
 
 	/// TODO
-	pub fn volume(&mut self, volume: Volume) {
+	pub fn volume(&mut self, volume: Volume) -> AudioStateSnapshot<Data> {
 		try_send!(self.send_volume, volume);
+		recv!(self.recv_audio_state)
 	}
 
 	/// TODO
-	pub fn shuffle(&mut self, shuffle: Shuffle) {
+	pub fn shuffle(&mut self, shuffle: Shuffle) -> AudioStateSnapshot<Data> {
 		try_send!(self.send_shuffle, shuffle);
+		recv!(self.recv_audio_state)
 	}
 
 	/// TODO
@@ -620,7 +634,7 @@ where
 	/// TODO
 	pub fn add(&mut self, add: Add<Data>) -> AudioStateSnapshot<Data> {
 		try_send!(self.send_add, add);
-		recv!(self.recv_add)
+		recv!(self.recv_audio_state)
 	}
 
 	/// TODO
@@ -629,7 +643,7 @@ where
 	/// TODO
 	pub fn add_many(&mut self, add_many: AddMany<Data>) -> AudioStateSnapshot<Data> {
 		try_send!(self.send_add_many, add_many);
-		recv!(self.recv_add_many)
+		recv!(self.recv_audio_state)
 	}
 
 	/// TODO
