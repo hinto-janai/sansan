@@ -17,6 +17,11 @@ use std::{
 //----------------------------------------------------------------------------------------------------
 impl<Data: ValidData> Kernel<Data> {
 	/// TODO
+	///
+	/// INVARIANT:
+	/// `remove()` re-uses this function.
+	/// The channels are passed since they have the same types.
+	/// This function should be edited with that in-mind.
 	pub(super) fn remove_range(
 		&mut self,
 		remove_range: RemoveRange,

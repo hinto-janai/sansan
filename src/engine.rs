@@ -706,21 +706,16 @@ where
 	pub fn remove(&mut self, remove: Remove) -> Result<AudioStateSnapshot<Data>, RemoveError> {
 		try_send!(self.send_remove, remove);
 		recv!(self.recv_remove)
-	} // defines what happens on included remove song, other errors, etc
+	}
 
 	/// TODO
 	///
 	/// # Errors
 	/// TODO
 	pub fn remove_range(&mut self, remove_range: impl std::ops::RangeBounds<usize>) -> Result<AudioStateSnapshot<Data>, RemoveError> {
-		let remove_range = RemoveRange {
-			start_bound: remove_range.start_bound().cloned(),
-			end_bound: remove_range.end_bound().cloned(),
-		};
-
-		try_send!(self.send_remove_range, remove_range);
+		try_send!(self.send_remove_range, remove_range.into());
 		recv!(self.recv_remove_range)
-	} // defines what happens on included remove song, other errors, etc
+	}
 }
 
 //---------------------------------------------------------------------------------------------------- Drop
