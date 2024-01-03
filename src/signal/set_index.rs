@@ -20,6 +20,8 @@ use strum::{
 pub struct SetIndex {
 	/// TODO
 	pub index: usize,
+	/// TODO
+	pub play: Option<bool>,
 }
 
 //---------------------------------------------------------------------------------------------------- SetIndexError

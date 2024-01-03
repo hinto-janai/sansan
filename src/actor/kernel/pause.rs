@@ -33,7 +33,7 @@ impl<Data: ValidData> Kernel<Data> {
 mod tests {
 	use super::*;
 	use crate::signal::SetIndex;
-use crate::signal::add::{AddMany,InsertMethod};
+	use crate::signal::add::{AddMany,InsertMethod};
 	use crate::state::{AudioState,Current};
 	use pretty_assertions::assert_eq;
 	use std::thread::sleep;
@@ -63,7 +63,10 @@ use crate::signal::add::{AddMany,InsertMethod};
 		assert_eq!(audio_state, resp);
 
 		//---------------------------------- `Current` exist, but not playing, early return
-		let audio_state = engine.set_index(SetIndex { index: 0 }).unwrap();
+		let audio_state = engine.set_index(SetIndex {
+			index: 0,
+			play: None,
+		}).unwrap();
 		assert_eq!(audio_state.current.as_ref().unwrap().index, 0);
 		let resp = engine.pause();
 		assert_eq!(audio_state, resp);
