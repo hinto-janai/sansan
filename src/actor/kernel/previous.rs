@@ -4,7 +4,7 @@
 use crate::{
 	actor::kernel::kernel::{Kernel,DiscardCurrentAudio,KernelToDecode},
 	state::{AudioStateSnapshot,ValidData,Current},
-	signal::repeat::Repeat,
+	signal::back::Back,
 	macros::try_send,
 };
 use crossbeam::channel::{Sender,Receiver};
@@ -23,35 +23,13 @@ impl<Data: ValidData> Kernel<Data> {
 			return;
 		}
 
-		// Get the previous `Source` index.
-		let index = match self.w.current.as_ref() {
-			Some(current) => {
-				// If we're past the back threshold then the
-				// track should restart instead of going back.
-				if !self.w.back_threshold.is_normal() || current.elapsed > self.w.back_threshold {
-					current.index
-				} else {
-					current.index.saturating_sub(1)
-				}
-			},
-			// If there is no track selected,
-			// default to the 0th track.
-			None => 0,
-		};
-
-		// INVARIANT: The above match returns a good index.
-		let source = self.w.queue[index].clone();
-		let current = Current {
-			source: source.clone(),
-			index,
-			elapsed: 0.0,
-		};
-
-		self.new_source(to_audio, to_decode, source);
-
-		self.w.add_commit_push(|w, _| {
-			w.current = Some(current.clone());
-		});
+		// Re-use `back()`'s inner function.
+		// INVARIANT: `self.queue_empty()` must be handled by us.
+		self.back_inner(
+			Back { back: 1, threshold: None },
+			to_audio,
+			to_decode,
+		);
 
 		try_send!(to_engine, self.audio_state_snapshot());
 	}
@@ -109,12 +87,12 @@ mod tests {
 		assert_eq!(resp.current.as_ref().unwrap().index, 1);
 
 		//---------------------------------- Threshold passed, restart index
-		audio_state.current.as_mut().unwrap().elapsed = f64::INFINITY; // passed threshold
+		audio_state.current.as_mut().unwrap().elapsed = 123.123; // passed threshold
 		audio_state.current.as_mut().unwrap().index = 1;
 		let resp = engine.restore(audio_state);
 		let current = resp.current.as_ref().unwrap();
 		assert_eq!(current.index, 1);
-		assert_eq!(current.elapsed, f64::INFINITY);
+		assert_eq!(current.elapsed, 123.123);
 
 		let resp = engine.previous();
 		let current = resp.current.as_ref().unwrap();

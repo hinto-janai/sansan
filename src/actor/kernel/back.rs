@@ -24,45 +24,53 @@ impl<Data: ValidData> Kernel<Data> {
 			return;
 		}
 
-		// TODO: fix this, uses wrong value
-		let less_than_threshold = match back.threshold {
-			Some(t) => self.less_than_threshold(t.seconds),
-			// No manual back threshold was passed,
-			// use the global audio state one.
-			None => self.less_than_threshold(self.w.back_threshold),
-		};
-
-		// INVARIANT: if the queue is non-empty,
-		// it means we must have a `Current`.
-		let current_index = self.w.current.as_ref().unwrap().index;
-
-		// The index we're going to.
-		let index = if less_than_threshold {
-			// If the `Current` has not passed the threshold, restart.
-			current_index
-		} else {
-			// Remap 0 to at least 1 back.
-			let back = if back.back == 0 { 1 } else { back.back };
-			// Saturate to make sure we aren't
-			// going into negative indices.
-			current_index.saturating_sub(back)
-		};
-
-		// Get the `Source` at the index, and tell `Decode/Audio` to start.
-		let source = self.w.queue[index].clone();
-		self.new_source(to_audio, to_decode, source.clone());
-
-		// Set our `Current` to the `Source`.
-		let current = Some(Current {
-			source,
-			index,
-			elapsed: 0.0,
-		});
-		self.w.add_commit_push(|w, _| {
-			w.current = current.clone();
-		});
+		self.back_inner(back, to_audio, to_decode);
 
 		try_send!(to_engine, Ok(self.audio_state_snapshot()));
+	}
+
+	/// The inner part of `back()`, used by `previous()`.
+	pub(super) fn back_inner(
+		&mut self,
+		back: Back,
+		to_audio: &Sender<DiscardCurrentAudio>,
+		to_decode: &Sender<KernelToDecode<Data>>,
+	) {
+		// INVARIANT: `self.queue_empty()` must be handled by the caller.
+
+		// How many indices to go back? Make sure it's at least one.
+		let back = std::cmp::max(1, back.back);
+
+		// Get the previous `Source` index.
+		let index = match self.w.current.as_ref() {
+			Some(current) => {
+				// If we're past the back threshold then the
+				// track should restart instead of going back.
+				if self.w.back_threshold.is_normal() && current.elapsed > self.w.back_threshold {
+					current.index
+				} else {
+					// If the float is not normal (0.0, NaN, inf), then always go back.
+					current.index.saturating_sub(back)
+				}
+			},
+			// If there is no track selected,
+			// default to the 0th track.
+			None => 0,
+		};
+
+		// INVARIANT: The above match returns a good index.
+		let source = self.w.queue[index].clone();
+		let current = Current {
+			source: source.clone(),
+			index,
+			elapsed: 0.0,
+		};
+
+		self.new_source(to_audio, to_decode, source);
+
+		self.w.add_commit_push(|w, _| {
+			w.current = Some(current.clone());
+		});
 	}
 }
 
@@ -82,12 +90,20 @@ mod tests {
 	// Error should be returned on `back: 0`.
 	fn back() {
 		let mut engine = crate::tests::init();
-		assert_eq!(engine.reader().get().queue.len(), 0);
+		let audio_state = engine.reader().get();
+		assert_eq!(audio_state.queue.len(), 0);
 
-		// The baseline queue index we reset to.
-		const INDEX: usize = 4;
+		//---------------------------------- Empty queue
+		let back = Back {
+			back: 1,
+			threshold: Some(BackThreshold { seconds: 0.0 }),
+		};
+		let resp = engine.back(back);
+		assert_eq!(resp, Err(BackError::EmptyQueue));
+		assert_eq!(engine.reader().get(), audio_state); // didn't change
+
 		// Our baseline audio state.
-		let audio_state = {
+		let mut audio_state = {
 			let mut audio_state = AudioState::DEFAULT;
 
 			for i in 0..10 {
@@ -97,54 +113,47 @@ mod tests {
 
 			audio_state.current = Some(Current {
 				source: audio_state.queue[4].clone(),
-				index: INDEX,
-				elapsed: 123.123,
+				index: 4,
+				elapsed: 0.0,
 			});
 
 			audio_state
 		};
-
-		// Reset the `Engine`'s audio state to the default + 10 sources.
-		// Used in-between `back` test operations.
-		let reset_audio_state = |engine: &mut Engine<usize>| engine.restore(audio_state.clone());
-
-		//---------------------------------- Empty queue
-		let back = Back {
-			back: 1,
-			threshold: Some(BackThreshold { seconds: 0.0 }),
-		};
-		let resp = engine.back(back);
-		assert_eq!(resp, Err(BackError::EmptyQueue));
-		assert_eq!(*engine.reader().get(), AudioState::DEFAULT); // didn't change
-		reset_audio_state(&mut engine);
+		let resp = engine.restore(audio_state.clone());
+		assert_eq!(resp.current.as_ref().unwrap().index, 4);
 
 		//---------------------------------- 1 backwards.
 		let back = Back {
 			back: 1,
 			threshold: Some(BackThreshold { seconds: 0.0 }),
 		};
-		let state = engine.back(back).unwrap();
-		let current = state.current.as_ref().unwrap();
-		assert_eq!(current.index, INDEX - 1);
-		reset_audio_state(&mut engine);
+		let resp = engine.back(back).unwrap();
+		let current = resp.current.as_ref().unwrap();
+		assert_eq!(current.index, 3);
 
 		//---------------------------------- 0 back remap to -> 1
 		let back = Back {
 			back: 0,
 			threshold: Some(BackThreshold { seconds: 0.0 }),
 		};
-		let state = engine.back(back).unwrap();
-		let current = state.current.as_ref().unwrap();
-		assert_eq!(current.index, INDEX - 1);
-		reset_audio_state(&mut engine);
+		let resp = engine.back(back).unwrap();
+		let current = resp.current.as_ref().unwrap();
+		assert_eq!(current.index, 2);
 
-		//---------------------------------- Threshold not reached, don't go back
+		//---------------------------------- Threshold passed, restart index
+		audio_state.current.as_mut().unwrap().elapsed = 10.0; // passed threshold
+		audio_state.current.as_mut().unwrap().index = 2;
+		let resp = engine.restore(audio_state);
+		let current = resp.current.as_ref().unwrap();
+		assert_eq!(current.elapsed, 10.0);
+		assert_eq!(current.index, 2);
+
 		let back = Back {
 			back: 1,
-			threshold: Some(BackThreshold { seconds: f64::INFINITY }),
+			threshold: Some(BackThreshold { seconds: 1.0 }),
 		};
-		let state = engine.back(back).unwrap();
-		let current = state.current.as_ref().unwrap();
-		assert_eq!(current.index, INDEX); // same index
+		let resp = engine.back(back).unwrap();
+		let current = resp.current.as_ref().unwrap();
+		assert_eq!(current.index, 2); // same index
 	}
 }
