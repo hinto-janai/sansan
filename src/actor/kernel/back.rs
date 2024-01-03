@@ -24,11 +24,12 @@ impl<Data: ValidData> Kernel<Data> {
 			return;
 		}
 
+		// TODO: fix this, uses wrong value
 		let less_than_threshold = match back.threshold {
-			Some(t) => self.less_than_threshold(t),
+			Some(t) => self.less_than_threshold(t.seconds),
 			// No manual back threshold was passed,
 			// use the global audio state one.
-			None => self.less_than_threshold(self.w.previous_threshold),
+			None => self.less_than_threshold(self.w.back_threshold),
 		};
 
 		// INVARIANT: if the queue is non-empty,
@@ -73,7 +74,7 @@ mod tests {
 	use crate::{
 		state::AudioState,
 		engine::Engine,
-		signal::back::{Back,BackError},
+		signal::back::{Back,BackError,BackThreshold},
 	};
 	use pretty_assertions::assert_eq;
 
@@ -110,7 +111,7 @@ mod tests {
 		//---------------------------------- Empty queue
 		let back = Back {
 			back: 1,
-			threshold: Some(0.0),
+			threshold: Some(BackThreshold { seconds: 0.0 }),
 		};
 		let resp = engine.back(back);
 		assert_eq!(resp, Err(BackError::EmptyQueue));
@@ -120,7 +121,7 @@ mod tests {
 		//---------------------------------- 1 backwards.
 		let back = Back {
 			back: 1,
-			threshold: Some(0.0),
+			threshold: Some(BackThreshold { seconds: 0.0 }),
 		};
 		let state = engine.back(back).unwrap();
 		let current = state.current.as_ref().unwrap();
@@ -130,7 +131,7 @@ mod tests {
 		//---------------------------------- 0 back remap to -> 1
 		let back = Back {
 			back: 0,
-			threshold: Some(0.0),
+			threshold: Some(BackThreshold { seconds: 0.0 }),
 		};
 		let state = engine.back(back).unwrap();
 		let current = state.current.as_ref().unwrap();
@@ -140,7 +141,7 @@ mod tests {
 		//---------------------------------- Threshold not reached, don't go back
 		let back = Back {
 			back: 1,
-			threshold: Some(f64::INFINITY),
+			threshold: Some(BackThreshold { seconds: f64::INFINITY }),
 		};
 		let state = engine.back(back).unwrap();
 		let current = state.current.as_ref().unwrap();

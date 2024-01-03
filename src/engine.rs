@@ -20,7 +20,7 @@ use crate::{
 		Add,AddMany,Back,Clear,Previous,RemoveRange,Remove,
 		Repeat,Seek,SetIndex,Shuffle,Skip,Volume,InsertMethod,
 		SeekError,Next,PreviousError,SkipError,
-		BackError,SetIndexError,RemoveError,
+		BackError,SetIndexError,RemoveError, BackThreshold,
 	}
 };
 use crossbeam::channel::{bounded,unbounded};
@@ -82,14 +82,15 @@ where
 	send_previous: S<()>,
 	send_stop:     S<()>,
 
-	/// Signals that have have input and output `AudioStateSnapshot`.
-	send_add:      S<Add<Data>>,
-	send_add_many: S<AddMany<Data>>,
-	send_clear:    S<Clear>,
-	send_restore:  S<AudioState<Data>>,
-	send_repeat:   S<Repeat>,
-	send_volume:   S<Volume>,
-	send_shuffle:  S<Shuffle>,
+	/// Signals that have input and output `AudioStateSnapshot`.
+	send_add:       S<Add<Data>>,
+	send_add_many:  S<AddMany<Data>>,
+	send_clear:     S<Clear>,
+	send_restore:   S<AudioState<Data>>,
+	send_repeat:    S<Repeat>,
+	send_volume:    S<Volume>,
+	send_shuffle:   S<Shuffle>,
+	send_back_threshold: S<BackThreshold>,
 
 	/// Signals that return `Result<T, E>`
 	/// These don't use the common `recv_audio_state_snapshot`,
@@ -139,8 +140,8 @@ where
 			}
 
 			// Previous threshold must be a normal float.
-			if !config.previous_threshold.is_normal() {
-				return Err(EngineInitError::PreviousThreshold(config.previous_threshold));
+			if !config.back_threshold.is_normal() {
+				return Err(EngineInitError::PreviousThreshold(config.back_threshold));
 			}
 		}
 
@@ -390,17 +391,18 @@ where
 		// They are [unbounded()] to allow for immediate return.
 		//  |
 		//  v
-		let (send_toggle,   recv_toggle)   = unbounded();
-		let (send_play,     recv_play)     = unbounded();
-		let (send_pause,    recv_pause)    = unbounded();
-		let (send_stop,     recv_stop)     = unbounded();
-		let (send_clear,    recv_clear)    = unbounded();
-		let (send_restore,  recv_restore)  = unbounded();
-		let (send_repeat,   recv_repeat)   = unbounded();
-		let (send_shuffle,  recv_shuffle)  = unbounded();
-		let (send_volume,   recv_volume)   = unbounded();
-		let (send_next,     recv_next)     = unbounded();
-		let (send_previous, recv_previous) = unbounded();
+		let (send_toggle,   recv_toggle)               = bounded(1);
+		let (send_play,     recv_play)                 = bounded(1);
+		let (send_pause,    recv_pause)                = bounded(1);
+		let (send_stop,     recv_stop)                 = bounded(1);
+		let (send_clear,    recv_clear)                = bounded(1);
+		let (send_restore,  recv_restore)              = bounded(1);
+		let (send_repeat,   recv_repeat)               = bounded(1);
+		let (send_shuffle,  recv_shuffle)              = bounded(1);
+		let (send_volume,   recv_volume)               = bounded(1);
+		let (send_next,     recv_next)                 = bounded(1);
+		let (send_previous, recv_previous)             = bounded(1);
+		let (send_back_threshold, recv_back_threshold) = bounded(1);
 		// These must be labeled.
 		// Although semantically [bounded(0)] makes sense since [Kernel]
 		// and [Signal] must meet up, [bounded(1)] is faster.
@@ -456,6 +458,7 @@ where
 			recv_shuffle,
 			recv_volume,
 			recv_restore,
+			recv_back_threshold,
 			recv_add:          k_recv_add,
 			recv_add_many:     k_recv_add_many,
 			send_seek:         k_send_seek,
@@ -479,7 +482,7 @@ where
 			w: audio_state_writer,
 			channels,
 			to_gc: k_to_gc,
-			previous_threshold: config.previous_threshold,
+			back_threshold: config.back_threshold,
 		};
 		if let Err(error) = Kernel::<Data>::init(init_args) {
 			return Err(EngineInitError::ThreadSpawn {
@@ -515,6 +518,7 @@ where
 			send_volume,
 			send_next,
 			send_previous,
+			send_back_threshold,
 			send_add:          e_send_add,
 			send_add_many:     e_send_add_many,
 			send_seek:         e_send_seek,
@@ -631,6 +635,13 @@ where
 	/// TODO
 	pub fn shuffle(&mut self, shuffle: Shuffle) -> AudioStateSnapshot<Data> {
 		try_send!(self.send_shuffle, shuffle);
+		recv!(self.recv_audio_state)
+	}
+
+	/// TODO
+	/// Document `!f64::is_normal()` behavior.
+	pub fn back_threshold(&mut self, back_threshold: BackThreshold) -> AudioStateSnapshot<Data> {
+		try_send!(self.send_back_threshold, back_threshold);
 		recv!(self.recv_audio_state)
 	}
 

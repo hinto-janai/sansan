@@ -141,7 +141,7 @@ mod tests {
 			assert_eq!(a.playing,            false);
 			assert_eq!(a.repeat,             Repeat::Off);
 			assert_eq!(a.volume,             Volume::DEFAULT);
-			assert_eq!(a.previous_threshold, 3.0);
+			assert_eq!(a.back_threshold, 3.0);
 			assert_eq!(a.queue_end_clear,    true);
 			assert_eq!(a.current,            None);
 		}

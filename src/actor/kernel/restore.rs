@@ -89,7 +89,7 @@ mod tests {
 			playing: true,
 			repeat: Repeat::Current,
 			volume: Volume::NEW_100,
-			previous_threshold: 1.333,
+			back_threshold: 1.333,
 			queue_end_clear: false,
 		};
 

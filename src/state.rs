@@ -22,7 +22,7 @@ use std::{
 pub(crate) const QUEUE_LEN: usize = 256;
 
 /// TODO
-pub const PREVIOUS_THRESHOLD: f64 = 3.0;
+pub const BACK_THRESHOLD: f64 = 3.0;
 
 //---------------------------------------------------------------------------------------------------- AudioStateReader
 /// TODO
@@ -63,8 +63,8 @@ where
 	/// Current volume level.
 	pub volume: Volume,
 
-	/// The previous track threshold.
-	pub previous_threshold: f64,
+	/// The track threshold when using `back()`/`previous()`.
+	pub back_threshold: f64,
 
 	/// TODO
 	pub queue_end_clear: bool,
@@ -84,13 +84,13 @@ where
 {
 	/// TODO
 	pub const DEFAULT: Self = Self {
-		queue:              VecDeque::new(),
-		playing:            false,
-		repeat:             Repeat::Off,
-		volume:             Volume::DEFAULT,
-		previous_threshold: PREVIOUS_THRESHOLD,
-		queue_end_clear:    true,
-		current:            None,
+		queue:           VecDeque::new(),
+		playing:         false,
+		repeat:          Repeat::Off,
+		volume:          Volume::DEFAULT,
+		back_threshold:  BACK_THRESHOLD,
+		queue_end_clear: true,
+		current:         None,
 	};
 }
 

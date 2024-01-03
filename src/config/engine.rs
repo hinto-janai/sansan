@@ -27,7 +27,7 @@ where
 	/// TODO
 	pub shutdown_blocking: bool,
 	/// TODO
-	pub previous_threshold: f64,
+	pub back_threshold: f64,
 }
 
 //---------------------------------------------------------------------------------------------------- ErrorBehavior
@@ -141,7 +141,7 @@ where
 	///     shutdown_blocking:     true,
 	///     restore:               None,
 	///     audio_state:           AudioStateConfig::DEFAULT,
-	///     previous_threshold:    3.0,
+	///     back_threshold:    3.0,
 	///     error_behavior_output: ErrorBehavior::DEFAULT,
 	///     error_behavior_seek:   ErrorBehavior::DEFAULT,
 	///     error_behavior_decode: ErrorBehavior::DEFAULT,
@@ -154,7 +154,7 @@ where
 		shutdown_blocking:     true,
 		restore:               None,
 		audio_state:           AudioStateConfig::DEFAULT,
-		previous_threshold:    3.0,
+		back_threshold:    3.0,
 		error_behavior_output: ErrorBehavior::DEFAULT,
 		error_behavior_seek:   ErrorBehavior::DEFAULT,
 		error_behavior_decode: ErrorBehavior::DEFAULT,

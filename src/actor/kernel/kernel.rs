@@ -36,6 +36,7 @@ use crate::{
 		SkipError,
 		Back,
 		BackError,
+		BackThreshold,
 		SetIndex,
 		SetIndexError,
 		Remove,
@@ -68,7 +69,7 @@ pub(crate) struct Kernel<Data: ValidData> {
 	pub(super) w:                   someday::Writer<AudioState<Data>>,
 	pub(super) shutdown_wait:       Arc<Barrier>,
 	pub(super) to_gc:               Sender<AudioState<Data>>,
-	pub(super) previous_threshold:  f64,
+	pub(super) back_threshold:  f64,
 }
 
 //---------------------------------------------------------------------------------------------------- Msg
@@ -137,13 +138,14 @@ pub(crate) struct Channels<Data: ValidData> {
 	pub(crate) recv_stop:     Receiver<()>,
 
 	// Signals that have input and output `AudioStateSnapshot`
-	pub(crate) recv_add:      Receiver<Add<Data>>,
-	pub(crate) recv_add_many: Receiver<AddMany<Data>>,
-	pub(crate) recv_clear:    Receiver<Clear>,
-	pub(crate) recv_repeat:   Receiver<Repeat>,
-	pub(crate) recv_volume:   Receiver<Volume>,
-	pub(crate) recv_shuffle:  Receiver<Shuffle>,
-	pub(crate) recv_restore:  Receiver<AudioState<Data>>,
+	pub(crate) recv_add:            Receiver<Add<Data>>,
+	pub(crate) recv_add_many:       Receiver<AddMany<Data>>,
+	pub(crate) recv_clear:          Receiver<Clear>,
+	pub(crate) recv_repeat:         Receiver<Repeat>,
+	pub(crate) recv_volume:         Receiver<Volume>,
+	pub(crate) recv_shuffle:        Receiver<Shuffle>,
+	pub(crate) recv_restore:        Receiver<AudioState<Data>>,
+	pub(crate) recv_back_threshold: Receiver<BackThreshold>,
 
 	// Signals that return `Result<T, E>`
 	pub(crate) send_seek:         Sender<Result<AudioStateSnapshot<Data>, SeekError>>,
@@ -169,7 +171,7 @@ pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) w:                   someday::Writer<AudioState<Data>>,
 	pub(crate) channels:            Channels<Data>,
 	pub(crate) to_gc:               Sender<AudioState<Data>>,
-	pub(crate) previous_threshold:  f64,
+	pub(crate) back_threshold:  f64,
 }
 
 //---------------------------------------------------------------------------------------------------- Kernel Impl
@@ -192,7 +194,7 @@ where
 					w,
 					channels,
 					to_gc,
-					previous_threshold,
+					back_threshold,
 				} = args;
 
 				let this = Self {
@@ -200,7 +202,7 @@ where
 					w,
 					shutdown_wait,
 					to_gc,
-					previous_threshold,
+					back_threshold,
 				};
 
 				if let Some(init_barrier) = init_barrier {

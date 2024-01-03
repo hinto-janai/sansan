@@ -6,7 +6,7 @@ pub(crate) mod add;
 pub use add::{Add,AddMany,InsertMethod};
 
 pub(crate) mod back;
-pub use back::{Back,BackError};
+pub use back::{Back,BackError,BackThreshold};
 
 pub(crate) mod clear;
 pub use clear::Clear;

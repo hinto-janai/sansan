@@ -42,7 +42,7 @@ where
 	/// TODO
 	pub restore: Option<AudioState<Data>>,
 	/// TODO
-	pub previous_threshold: f64,
+	pub back_threshold: f64,
 
 	//------------------------------------------ Media Controls
 	/// TODO
@@ -168,7 +168,7 @@ where
 	///     init_blocking:         false,
 	///     shutdown_blocking:     false,
 	///     restore:               None,
-	///     previous_threshold:    3.0,
+	///     back_threshold:    3.0,
 	///     media_controls:        false,
 	///     error_behavior_output: ErrorBehavior::DEFAULT,
 	///     error_behavior_seek:   ErrorBehavior::DEFAULT,
@@ -182,7 +182,7 @@ where
 		init_blocking:         false,
 		shutdown_blocking:     false,
 		restore:               None,
-		previous_threshold:    3.0,
+		back_threshold:    3.0,
 		media_controls:        false,
 		error_behavior_output: ErrorBehavior::DEFAULT,
 		error_behavior_seek:   ErrorBehavior::DEFAULT,

@@ -18,27 +18,17 @@ pub struct Back {
 	/// TODO
 	pub back: usize,
 	/// TODO
-	pub threshold: Option<f64>,
+	pub threshold: Option<BackThreshold>,
 }
 
-// impl<Data: ValidData> ApplyReturn<Signal<Data>, Back, Result<(), BackError>> for AudioState<Data> {
-// 	fn apply_return(s: &mut Back, w: &mut Self, _: &Self) -> Result<(), BackError> {
-// 		// INVARIANT: [Kernel] checks that this
-// 		// [Back] can fully go backwards.
-// 		//
-// 		// The input was replaced with a viable
-// 		// [Back] if the over(under?)flowed.
-// 		//
-// 		// The queue has at least 1 length.
-// 		w.current = Some(Current {
-// 			source: w.queue[s.back].clone(),
-// 			index: 0,
-// 			elapsed: 0.0,
-// 		});
-
-// 		Ok(())
-// 	}
-// }
+/// TODO
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
+#[derive(Copy,Clone,Debug,PartialEq,PartialOrd)]
+pub struct BackThreshold {
+	/// TODO
+	pub seconds: f64,
+}
 
 //---------------------------------------------------------------------------------------------------- BackError
 /// TODO
