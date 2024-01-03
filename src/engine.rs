@@ -599,6 +599,12 @@ where
 	}
 
 	/// TODO
+	pub fn stop(&mut self) -> AudioStateSnapshot<Data> {
+		try_send!(self.send_stop, ());
+		recv!(self.recv_audio_state)
+	}
+
+	/// TODO
 	pub fn clear(&mut self, clear: Clear) -> AudioStateSnapshot<Data> {
 		try_send!(self.send_clear, clear);
 		recv!(self.recv_audio_state)

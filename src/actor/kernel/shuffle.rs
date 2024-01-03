@@ -3,9 +3,10 @@
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
 	actor::kernel::{Kernel,DiscardCurrentAudio,KernelToDecode},
-	state::{AudioStateSnapshot,ValidData},
+	state::{AudioStateSnapshot,ValidData,Current},
 	signal::shuffle::Shuffle,
 	signal::seek::{Seek,SeekError,SeekedTime},
+	macros::try_send,
 };
 use crossbeam::channel::{Sender,Receiver};
 
@@ -17,12 +18,12 @@ impl<Data: ValidData> Kernel<Data> {
 		shuffle: Shuffle,
 		to_audio: &Sender<DiscardCurrentAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
-		from_decode_seek: &Receiver<Result<SeekedTime, SeekError>>,
-		to_engine: &Sender<Result<AudioStateSnapshot<Data>, SeekError>>,
+		to_engine: &Sender<AudioStateSnapshot<Data>>,
 	) {
 		let queue_len = self.w.queue.len();
 
 		if queue_len == 0 {
+			try_send!(to_engine, self.audio_state_snapshot());
 			return;
 		}
 
@@ -30,7 +31,21 @@ impl<Data: ValidData> Kernel<Data> {
 		// element is to restart the track
 		// (using seek behavior).
 		if queue_len == 1 {
-			self.seek(Seek::Absolute(0.0), to_decode, from_decode_seek, to_engine);
+			let source = self.w.queue[0].clone();
+
+			self.new_source(to_audio, to_decode, source.clone());
+
+			let current = Some(Current {
+				source,
+				index: 0,
+				elapsed: 0.0,
+			});
+
+			self.w.add_commit_push(|w, _| {
+				w.current = current.clone();
+			});
+
+			try_send!(to_engine, self.audio_state_snapshot());
 			return;
 		}
 
@@ -118,6 +133,8 @@ impl<Data: ValidData> Kernel<Data> {
 		// INVARIANT: must be [`push_clone()`]
 		// since `Shuffle` is non-deterministic.
 		self.w.push_clone();
+
+		try_send!(to_engine, self.audio_state_snapshot());
 	}
 }
 

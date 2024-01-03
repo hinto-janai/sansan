@@ -1,17 +1,32 @@
 //! TODO
 
 //---------------------------------------------------------------------------------------------------- Use
-use crate::actor::kernel::Kernel;
-use crate::state::ValidData;
-use crate::signal::Clear;
+use crate::{
+	actor::kernel::Kernel,
+	state::ValidData,
+	signal::Clear,
+	state::AudioStateSnapshot,
+	macros::try_send,
+};
+use crossbeam::channel::Sender;
 
 //----------------------------------------------------------------------------------------------------
 impl<Data: ValidData> Kernel<Data> {
 	/// TODO
-	pub(super) fn clear(&mut self, clear: Clear) {
+	pub(super) fn clear(
+		&mut self,
+		clear: Clear,
+		to_engine: &Sender<AudioStateSnapshot<Data>>,
+	) {
 		match clear {
-			Clear::Queue => if self.queue_empty() { return },
-			Clear::Current => if !self.source_is_some() { return },
+			Clear::Queue => if self.queue_empty() {
+				try_send!(to_engine, self.audio_state_snapshot());
+				return;
+			},
+			Clear::Current => if !self.source_is_some() {
+				try_send!(to_engine, self.audio_state_snapshot());
+				return;
+			},
 		}
 
 		self.w.add_commit_push(|w, _| {
@@ -20,6 +35,8 @@ impl<Data: ValidData> Kernel<Data> {
 				Clear::Current => w.current = None,
 			}
 		});
+
+		try_send!(to_engine, self.audio_state_snapshot());
 	}
 }
 

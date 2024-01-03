@@ -7,13 +7,18 @@ use crate::{
 	signal::volume::Volume,
 	macros::{try_send,recv},
 };
-use crossbeam::channel::{Sender,Receiver};
+use crossbeam::channel::Sender;
 
 //----------------------------------------------------------------------------------------------------
 impl<Data: ValidData> Kernel<Data> {
 	/// TODO
-	pub(super) fn volume(&mut self, volume: Volume) {
+	pub(super) fn volume(
+		&mut self,
+		volume: Volume,
+		to_engine: &Sender<AudioStateSnapshot<Data>>,
+	) {
 		if self.w.volume == volume {
+			try_send!(to_engine, self.audio_state_snapshot());
 			return;
 		}
 
@@ -21,6 +26,8 @@ impl<Data: ValidData> Kernel<Data> {
 		self.w.add_commit_push(|w, _| {
 			w.volume = volume;
 		});
+
+		try_send!(to_engine, self.audio_state_snapshot());
 	}
 }
 

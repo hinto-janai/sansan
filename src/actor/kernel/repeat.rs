@@ -16,14 +16,21 @@ use std::{
 //----------------------------------------------------------------------------------------------------
 impl<Data: ValidData> Kernel<Data> {
 	/// TODO
-	pub(super) fn repeat(&mut self, repeat: Repeat) {
+	pub(super) fn repeat(
+		&mut self,
+		repeat: Repeat,
+		to_engine: &Sender<AudioStateSnapshot<Data>>,
+	) {
 		if self.w.repeat == repeat {
+			try_send!(to_engine, self.audio_state_snapshot());
 			return;
 		}
 
 		self.atomic_state.repeat.set(repeat);
 
 		self.w.add_commit_push(|w, _| w.repeat = repeat);
+
+		try_send!(to_engine, self.audio_state_snapshot());
 	}
 }
 

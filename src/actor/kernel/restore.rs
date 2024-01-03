@@ -3,7 +3,8 @@
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
 	actor::kernel::{Kernel,KernelToDecode,DiscardCurrentAudio},
-	state::{AudioState,ValidData},
+	state::{AudioState,AudioStateSnapshot,ValidData},
+	macros::try_send,
 };
 use crossbeam::channel::Sender;
 use std::sync::atomic::Ordering;
@@ -16,6 +17,7 @@ impl<Data: ValidData> Kernel<Data> {
 		audio_state: AudioState<Data>,
 		to_audio: &Sender<DiscardCurrentAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
+		to_engine: &Sender<AudioStateSnapshot<Data>>,
 	) {
 		// Update atomic audio state.
 		self.atomic_state.playing.store(audio_state.playing, Ordering::Release);
@@ -49,6 +51,8 @@ impl<Data: ValidData> Kernel<Data> {
 		if let Some(source) = maybe_source {
 			self.new_source(to_audio, to_decode, source);
 		}
+
+		try_send!(to_engine, self.audio_state_snapshot());
 	}
 }
 

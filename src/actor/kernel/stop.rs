@@ -1,14 +1,22 @@
 //! TODO
 
 //---------------------------------------------------------------------------------------------------- Use
-use crate::actor::kernel::Kernel;
-use crate::state::ValidData;
+use crate::{
+	actor::kernel::Kernel,
+	state::{AudioStateSnapshot,ValidData},
+	macros::try_send,
+};
+use crossbeam::channel::Sender;
 
 //----------------------------------------------------------------------------------------------------
 impl<Data: ValidData> Kernel<Data> {
 	/// TODO
-	pub(super) fn stop(&mut self) {
+	pub(super) fn stop(
+		&mut self,
+		to_engine: &Sender<AudioStateSnapshot<Data>>,
+	) {
 		if !self.source_is_some() || self.queue_empty() {
+			try_send!(to_engine, self.audio_state_snapshot());
 			return;
 		}
 
@@ -20,6 +28,8 @@ impl<Data: ValidData> Kernel<Data> {
 		// The queue is empty, no need to re-apply,
 		// just clone the empty state.
 		self.w.push_clone();
+
+		try_send!(to_engine, self.audio_state_snapshot());
 	}
 }
 

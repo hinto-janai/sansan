@@ -16,8 +16,10 @@ impl<Data: ValidData> Kernel<Data> {
 		&mut self,
 		to_audio: &Sender<DiscardCurrentAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
+		to_engine: &Sender<AudioStateSnapshot<Data>>,
 	) {
 		if self.queue_empty() {
+			try_send!(to_engine, self.audio_state_snapshot());
 			return;
 		}
 
@@ -74,6 +76,8 @@ impl<Data: ValidData> Kernel<Data> {
 		if let Some(current) = current {
 			self.new_source(to_audio, to_decode, current.source);
 		}
+
+		try_send!(to_engine, self.audio_state_snapshot());
 	}
 }
 
