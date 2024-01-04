@@ -48,27 +48,23 @@ impl<Data: ValidData> Kernel<Data> {
 
 			Seek::Forward(time) => {
 				let new = time + (time_now_seconds as f64 + time_now_frac);
-				let new = if new > secs_total {
+				if new > secs_total {
 					// Seeked further than total track time, saturate at the last millisecond.
 					// TODO: maybe just calculate the next track?
-					secs_total
+					Time { seconds: secs_total as u64, frac: secs_total.fract() }
 				} else {
-					new
-				};
-
-				Time { seconds: new as u64, frac: new.fract() }
+					Time { seconds: new as u64, frac: new.fract() }
+				}
 			},
 
 			Seek::Backward(time)  => {
 				let new = (time_now_seconds as f64 + time_now_frac) - time;
-				let new = if new.is_sign_negative() {
+				if new.is_sign_negative() {
 					// Seeked further back than 0.0, saturate.
-					0.0
+					Time { seconds: 0, frac: 0.0 }
 				} else {
-					new
-				};
-
-				Time { seconds: new as u64, frac: new.fract() }
+					Time { seconds: new as u64, frac: new.fract() }
+				}
 			},
 		}
 	}
@@ -93,7 +89,7 @@ impl<Data: ValidData> Kernel<Data> {
 			// built around them.
 			let time = Self::seek_inner(
 				seek,  // `Seek` object
-				300.0, // secs_total
+				300.1, // secs_total
 				150,   // time_now.seconds
 				0.5,   // time_now.frac
 			);
@@ -109,6 +105,9 @@ impl<Data: ValidData> Kernel<Data> {
 				},
 			}
 		};
+
+		// TODO: debug print.
+		// println!("{seeked_time}");
 
 		self.w.add_commit_push(|w, _| {
 			// INVARIANT: we checked the `Current` is `Some` above.
@@ -167,5 +166,29 @@ mod tests {
 		let resp = engine.restore(audio_state);
 		assert_eq!(resp.queue.len(), 10);
 		assert_eq!(resp.current.as_ref().unwrap().index, 4);
+
+		//---------------------------------- Seek backwards (150.5 -> 149.0)
+		let resp = engine.seek(Seek::Backward(1.5)).unwrap();
+		assert_eq!(resp.current.as_ref().unwrap().elapsed, 149.0);
+
+		//---------------------------------- Seek forwards (150.5 -> 152.0)
+		let resp = engine.seek(Seek::Forward(1.5)).unwrap();
+		assert_eq!(resp.current.as_ref().unwrap().elapsed, 152.0);
+
+		//---------------------------------- Seek absolute (150.5 -> 200.123)
+		let resp = engine.seek(Seek::Absolute(200.123)).unwrap();
+		assert_eq!(resp.current.as_ref().unwrap().elapsed, 200.123);
+
+		//---------------------------------- Saturate at max seconds when seeking out-of-bounds absolute
+		let resp = engine.seek(Seek::Absolute(999.0)).unwrap();
+		assert_eq!(resp.current.as_ref().unwrap().elapsed, 300.1);
+
+		//---------------------------------- Saturate at max seconds when seeking out-of-bounds forwards
+		let resp = engine.seek(Seek::Forward(999.0)).unwrap();
+		assert_eq!(resp.current.as_ref().unwrap().elapsed, 300.1);
+
+		//---------------------------------- Saturate at 0.0 when seeking out-of-bounds backwards
+		let resp = engine.seek(Seek::Backward(999.0)).unwrap();
+		assert_eq!(resp.current.as_ref().unwrap().elapsed, 0.0);
 	}
 }
