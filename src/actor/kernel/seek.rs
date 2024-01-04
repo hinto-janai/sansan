@@ -33,11 +33,22 @@ impl<Data: ValidData> Kernel<Data> {
 		time_now_seconds: u64, // `SourceDecode::time_now.seconds`
 		time_now_frac:    f64, // `SourceDecode::time_now.frac`
 	) -> Time {
+		// Re-map weird floats.
+		let remap = |time: f64| -> f64 {
+			use std::num::FpCategory as F;
+			match time.classify() {
+				F::Nan => secs_total,
+				F::Infinite => if time.is_sign_negative() { 0.0 } else { secs_total },
+				F::Zero | F::Subnormal => 0.0,
+				F::Normal => if time.is_sign_negative() { 0.0 } else { time },
+			}
+		};
+
 		// Get the absolute timestamp of where we'll be seeking.
-		// TODO: handle NaN + inf + -inf
 		match seek {
 			Seek::Absolute(time) => {
-				if time > secs_total {
+				let time = remap(time);
+				if time >= secs_total {
 					// Seeked further than total track time, saturate at the last millisecond.
 					// TODO: maybe just calculate the next track?
 					Time { seconds: secs_total as u64, frac: secs_total.fract() }
@@ -47,8 +58,9 @@ impl<Data: ValidData> Kernel<Data> {
 			},
 
 			Seek::Forward(time) => {
+				let time = remap(time);
 				let new = time + (time_now_seconds as f64 + time_now_frac);
-				if new > secs_total {
+				if new >= secs_total {
 					// Seeked further than total track time, saturate at the last millisecond.
 					// TODO: maybe just calculate the next track?
 					Time { seconds: secs_total as u64, frac: secs_total.fract() }
@@ -58,6 +70,7 @@ impl<Data: ValidData> Kernel<Data> {
 			},
 
 			Seek::Backward(time)  => {
+				let time = remap(time);
 				let new = (time_now_seconds as f64 + time_now_frac) - time;
 				if new.is_sign_negative() {
 					// Seeked further back than 0.0, saturate.
@@ -121,6 +134,7 @@ impl<Data: ValidData> Kernel<Data> {
 
 //---------------------------------------------------------------------------------------------------- Tests
 #[cfg(test)]
+#[allow(clippy::cognitive_complexity)]
 mod tests {
 	use super::*;
 	use crate::{
@@ -190,5 +204,37 @@ mod tests {
 		//---------------------------------- Saturate at 0.0 when seeking out-of-bounds backwards
 		let resp = engine.seek(Seek::Backward(999.0)).unwrap();
 		assert_eq!(resp.current.as_ref().unwrap().elapsed, 0.0);
+
+		//---------------------------------- NaN -> saturate at end/beginning
+		let resp = engine.seek(Seek::Absolute(f64::NAN)).unwrap();
+		assert_eq!(resp.current.as_ref().unwrap().elapsed, 300.1);
+		let resp = engine.seek(Seek::Forward(f64::NAN)).unwrap();
+		assert_eq!(resp.current.as_ref().unwrap().elapsed, 300.1);
+		let resp = engine.seek(Seek::Backward(f64::NAN)).unwrap();
+		assert_eq!(resp.current.as_ref().unwrap().elapsed, 0.0);
+
+		//---------------------------------- Infinity -> saturate at end
+		let resp = engine.seek(Seek::Absolute(f64::INFINITY)).unwrap();
+		assert_eq!(resp.current.as_ref().unwrap().elapsed, 300.1);
+		let resp = engine.seek(Seek::Forward(f64::INFINITY)).unwrap();
+		assert_eq!(resp.current.as_ref().unwrap().elapsed, 300.1);
+		let resp = engine.seek(Seek::Backward(f64::INFINITY)).unwrap();
+		assert_eq!(resp.current.as_ref().unwrap().elapsed, 0.0);
+
+		//---------------------------------- Negative Infinity -> 0.0
+		let resp = engine.seek(Seek::Absolute(f64::NEG_INFINITY)).unwrap();
+		assert_eq!(resp.current.as_ref().unwrap().elapsed, 0.0);
+		let resp = engine.seek(Seek::Forward(f64::NEG_INFINITY)).unwrap();
+		assert_eq!(resp.current.as_ref().unwrap().elapsed, 150.5);
+		let resp = engine.seek(Seek::Backward(f64::NEG_INFINITY)).unwrap();
+		assert_eq!(resp.current.as_ref().unwrap().elapsed, 150.5);
+
+		//---------------------------------- Negative -> 0.0
+		let resp = engine.seek(Seek::Absolute(-123.123)).unwrap();
+		assert_eq!(resp.current.as_ref().unwrap().elapsed, 0.0);
+		let resp = engine.seek(Seek::Forward(-123.123)).unwrap();
+		assert_eq!(resp.current.as_ref().unwrap().elapsed, 150.5);
+		let resp = engine.seek(Seek::Backward(-123.123)).unwrap();
+		assert_eq!(resp.current.as_ref().unwrap().elapsed, 150.5);
 	}
 }
