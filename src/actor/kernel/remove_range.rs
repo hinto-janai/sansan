@@ -67,6 +67,15 @@ impl<Data: ValidData> Kernel<Data> {
 		// This `'scope` returns an `Option<usize>` calculating
 		// what our `Current`'s new index should be, if `None`
 		// it means we wiped our current AND there was nothing after.
+		//
+		// If `maybe_source_index` is `Some(index)` AND `index_wiped` is `true`
+		// it means there is a new `Source` that must be sent to `Audio/Decode`.
+		//
+		// match (maybe_source_index, index_wiped) {
+		//     (Some(index), false) => our index was updated, but we're still on the same `Source` (continue playback as normal)
+		//     (Some(index), true)  => our index was updated, and the underlying `Source` is different so switch to it
+		//     (None, _)            => we removed until the end of the queue, there's no `Source`'s left
+		// }
 		let maybe_source_index = 'scope: {
 			// Return if no `Current`.
 			let Some(current) = self.w.current.as_ref() else {
@@ -146,15 +155,17 @@ impl<Data: ValidData> Kernel<Data> {
 			}
 		};
 
-		// TODO: debug log
-		println!("{maybe_source_index:?}");
-
 		// TODO: we shouldn't restart when maintaining the same index.
 
+		// TODO: debug log
+		println!("{maybe_source_index:?} - {index_wiped}");
+
 		// If we have a new `Source`, send it to `Audio/Decode`.
-		if let Some(index) = maybe_source_index {
-			let source = self.w.queue[index].clone();
-			self.new_source(to_audio, to_decode, source);
+		if index_wiped {
+			if let Some(index) = maybe_source_index {
+				let source = self.w.queue[index].clone();
+				self.new_source(to_audio, to_decode, source);
+			}
 		} else {
 			// The queue finished, we must set atomic state.
 			self.atomic_state.playing.store(false, Ordering::Release);
@@ -167,12 +178,20 @@ impl<Data: ValidData> Kernel<Data> {
 			w.queue.drain(start..=end);
 
 			if let Some(index) = maybe_source_index {
-				// There was another `Source` to play.
-				w.current = Some(Current {
-					source: w.queue[index].clone(),
-					index,
-					elapsed: 0.0
-				});
+				// There was a _new_ `Source` to play.
+				if index_wiped {
+					w.current = Some(Current {
+						source: w.queue[index].clone(),
+						index,
+						elapsed: 0.0
+					});
+				} else {
+					// INVARIANT: we know at this point our `current` is `Some`.
+					//
+					// Our index changed, but the underlying `Source`
+					// is the same, so just update the index.
+					w.current.as_mut().unwrap().index = index;
+				}
 			} else {
 				w.current = None;
 				w.playing = false;
