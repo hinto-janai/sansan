@@ -89,14 +89,18 @@ impl<Data: ValidData> Kernel<Data> {
 					// if there's more tracks ahead of us, we're now at the start index
 					// (the tracks ahead move <- backwards towards us)
 					//
-					//        removed
-					//      /---------\
+					// E.g, if our current.index were `d`:
+					//
+					//   start        end
 					//     v           v
 					// [a, b, c, d, e, f, g]
 					//      ______________|
 					//     /
 					//     v
 					// [a, g]
+					//     ^
+					//     |
+					//     new current.index ([1], aka `start`, but now with track `g`)
 					Some(start)
 				} else {
 					// else, we wiped all the way until the end, so stop.
@@ -104,17 +108,17 @@ impl<Data: ValidData> Kernel<Data> {
 				};
 			}
 
-			if current.index >= end {
-				// If the current index is greater than the end:
+			if current.index > end {
+				// If the current.index is greater than the end:
 				//
 				//  start   end   current.index
 				//     v     v        v
-				// [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+				// [a, b, c, d, e, f, g, h, i, j]
 				//                    |
 				//            ________|
 				//           /
 				//           v
-				// [0, 4, 5, 6, 7, 8, 9]
+				// [a, e, f, g, h, i, j]
 				//
 				// We should subtract the current.index so it lines up correctly.
 				// In the above case we are taking out 3 elements, so:
@@ -122,21 +126,20 @@ impl<Data: ValidData> Kernel<Data> {
 				let new_index = current.index - ((end + 1) - start);
 				Some(new_index)
 			} else if current.index < start {
-				// If the start is greater than current index:
+				// If the current index is less than the start:
 				//
-				// current.end   start     end
+				// current.index   start    end
 				//     v           v        v
-				// [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-				//     |
+				// [a, b, c, d, e, f, g, h, i, j]
 				//     |
 				//     v
-				// [0, 1, 2, 3, 4, 9]
+				// [a, b, c, d, e, j]
 				//
 				// We can keep the same index in this instance.
 				Some(current.index)
 			} else {
 				// If we're at this point, we can assert:
-				// 1. We deleted our `Current` index
+				// 1. We deleted our current.index
 				// 2. There was no more tracks ahead in the queue (we may have removed them)
 				println!("end");
 				None
