@@ -93,25 +93,17 @@ mod tests {
 			queue_end_clear: false,
 		};
 
-		// Restore.
-		engine.restore(audio_state.clone());
-		// The above immediately sends without waiting for a reply
-		// so we must wait a little here while `Kernel` is actually
-		// applying the patches.
-		std::thread::sleep(std::time::Duration::from_millis(100));
-
 		// Assert our current `AudioState` matches the restored version.
-		assert_eq!(*engine.reader().get(), audio_state);
+		let resp = engine.restore(audio_state.clone());
+		assert_eq!(*resp, audio_state);
 
 		// Try restoring `AudioState` with a messed up index.
 		audio_state.current.as_mut().unwrap().index = usize::MAX;
-		engine.restore(audio_state.clone());
-		std::thread::sleep(std::time::Duration::from_millis(100));
-
+		let resp = engine.restore(audio_state.clone());
 		// Assert our current `AudioState` matches the restored version,
 		// with the exception of `Current`, which got purged since it
 		// had a bad index.
 		audio_state.current = None;
-		assert_eq!(*engine.reader().get(), audio_state);
+		assert_eq!(*resp, audio_state);
 	}
 }

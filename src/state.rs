@@ -10,7 +10,7 @@ use std::{
 	sync::Arc,
 	sync::atomic::AtomicBool,
 	path::Path,
-	collections::VecDeque,
+	collections::VecDeque, borrow::Borrow,
 };
 
 //---------------------------------------------------------------------------------------------------- Constants
@@ -175,6 +175,13 @@ impl<Data: ValidData> std::ops::Deref for AudioStateSnapshot<Data> {
 impl<Data: ValidData> AsRef<AudioState<Data>> for AudioStateSnapshot<Data> {
 	#[inline]
 	fn as_ref(&self) -> &AudioState<Data> {
+		&self.0
+	}
+}
+
+impl<Data: ValidData> Borrow<AudioState<Data>> for AudioStateSnapshot<Data> {
+	#[inline]
+	fn borrow(&self) -> &AudioState<Data> {
 		&self.0
 	}
 }
