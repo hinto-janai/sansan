@@ -23,51 +23,52 @@ impl<Data: ValidData> Kernel<Data> {
 	/// which makes this hard to test (it's a live stateful operation).
 	/// So instead, we take generic arguments so we can control the state.
 	///
-	/// This returns the symphonia `Time` unit that `Decode`
-	/// uses to actually seek - or an error, if one occured.
+	/// This returns the symphonia `Time` unit that `Decode` uses to actually seek.
 	///
-	/// In tests, this function's return value is akin to
-	/// `Decode` actually sending back a response to `Kernel`.
+	/// In tests, this function's return value is similar to `Decode`
+	/// actually sending back a successful response to `Kernel`.
 	pub(crate) fn seek_inner(
 		seek: Seek,
 		secs_total:       f64, // `SourceDecode::secs_total`
 		time_now_seconds: u64, // `SourceDecode::time_now.seconds`
 		time_now_frac:    f64, // `SourceDecode::time_now.frac`
-	) -> Result<Time, SeekError> {
+	) -> Time {
 		// Get the absolute timestamp of where we'll be seeking.
+		// TODO: handle NaN + inf + -inf
 		match seek {
 			Seek::Absolute(time) => {
-				// TODO: handle error.
-				// seeked further than total track time.
 				if time > secs_total {
-					Err(todo!())
+					// Seeked further than total track time, saturate at the last millisecond.
+					// TODO: maybe just calculate the next track?
+					Time { seconds: secs_total as u64, frac: secs_total.fract() }
 				} else {
-					Ok(Time { seconds: time as u64, frac: time.fract() })
+					Time { seconds: time as u64, frac: time.fract() }
 				}
 			},
 
 			Seek::Forward(time) => {
 				let new = time + (time_now_seconds as f64 + time_now_frac);
-
-				// TODO: error or skip.
-				// seeked further than total track time.
-				if new > secs_total {
-					Err(todo!())
+				let new = if new > secs_total {
+					// Seeked further than total track time, saturate at the last millisecond.
+					// TODO: maybe just calculate the next track?
+					secs_total
 				} else {
-					Ok(Time { seconds: new as u64, frac: new.fract() })
-				}
+					new
+				};
+
+				Time { seconds: new as u64, frac: new.fract() }
 			},
 
 			Seek::Backward(time)  => {
 				let new = (time_now_seconds as f64 + time_now_frac) - time;
-
-				// TODO: error or skip.
-				// seeked backwards more than 0.0.
-				if new.is_sign_negative() {
-					Err(todo!())
+				let new = if new.is_sign_negative() {
+					// Seeked further back than 0.0, saturate.
+					0.0
 				} else {
-					Ok(Time { seconds: new as u64, frac: new.fract() })
-				}
+					new
+				};
+
+				Time { seconds: new as u64, frac: new.fract() }
 			},
 		}
 	}
@@ -90,18 +91,13 @@ impl<Data: ValidData> Kernel<Data> {
 			// Re-use logic in tests. See above `seek_inner()`
 			// These input values are static, the tests are
 			// built around them.
-			match Self::seek_inner(
+			let time = Self::seek_inner(
 				seek,  // `Seek` object
 				300.0, // secs_total
 				150,   // time_now.seconds
 				0.5,   // time_now.frac
-			) {
-				Ok(time) => time.seconds as f64 + time.frac,
-				Err(e) => {
-					try_send!(to_engine, Err(e));
-					return;
-				}
-			}
+			);
+			time.seconds as f64 + time.frac
 		} else {
 			// Tell [Decode] to seek, return error if it errors.
 			try_send!(to_decode, KernelToDecode::Seek(seek));
@@ -139,28 +135,37 @@ mod tests {
 
 	#[test]
 	fn seek() {
+		// The actual `seek()` function itself has hardcoded values
+		// for the current track's length, elapsed, etc, in `#[cfg(test)]`.
+		// The below tests are testing around those values.
+
 		let mut engine = crate::tests::init();
 		let sources = crate::tests::sources();
-		assert_eq!(*engine.reader().get(), AudioState::DEFAULT);
+		let audio_state = engine.reader().get();
+		assert_eq!(*audio_state, AudioState::DEFAULT);
+		assert_eq!(audio_state.queue.len(), 0);
+		assert_eq!(audio_state.current, None);
 
-		// Set-up the new `AudioState` we'll be restoring.
-		let queue: VecDeque<Source<usize>> = sources.iter().map(Clone::clone).collect();
-		assert_eq!(queue.len(), 10);
-		// let mut audio_state = AudioState {
-		let audio_state = AudioState {
-			current: Some(Current {
-				source: queue[0].clone(),
-				index: 0,
-				elapsed: 123.123,
-			}),
-			queue,
-			playing: true,
-			repeat: Repeat::Current,
-			volume: Volume::NEW_100,
-			back_threshold: 1.333,
-			queue_end_clear: false,
-		};
-		let resp = engine.restore(audio_state.clone());
-		assert_eq!(*resp, audio_state);
+		//---------------------------------- No `Current`, early return
+		let resp = engine.seek(Seek::Absolute(200.0));
+		assert_eq!(resp, Err(SeekError::NoActiveSource));
+
+		//---------------------------------- Set-up our baseline `AudioState`
+		let mut audio_state = AudioState::DEFAULT;
+
+		for i in 0..10 {
+			let source = crate::tests::source(i);
+			audio_state.queue.push_back(source);
+		}
+
+		audio_state.current = Some(Current {
+			source: audio_state.queue[4].clone(),
+			index: 4,
+			elapsed: 150.5,
+		});
+
+		let resp = engine.restore(audio_state);
+		assert_eq!(resp.queue.len(), 10);
+		assert_eq!(resp.current.as_ref().unwrap().index, 4);
 	}
 }

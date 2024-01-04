@@ -322,18 +322,12 @@ impl<Data: ValidData> Decode<Data> {
 		// Re-use seek logic.
 		// This is in a separate inner function
 		// because it needs to be tested "functionally".
-		let time = match crate::actor::kernel::Kernel::<Data>::seek_inner(
+		let time = crate::actor::kernel::Kernel::<Data>::seek_inner(
 			seek,
 			self.source.secs_total,
 			self.source.time_now.seconds,
 			self.source.time_now.frac,
-		) {
-			Ok(t) => t,
-			Err(e) => {
-				self.handle_error(e, self.eb_seek, "seek");
-				return;
-			},
-		};
+		);
 
 		// Attempt seek.
 		match self.source.reader.seek(
