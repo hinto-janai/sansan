@@ -51,5 +51,88 @@ impl<Data: ValidData> Kernel<Data> {
 
 //---------------------------------------------------------------------------------------------------- Tests
 #[cfg(test)]
+#[allow(clippy::cognitive_complexity)]
 mod tests {
+	use super::*;
+	use crate::{
+		state::AudioState,
+		signal::set_index::{SetIndex,SetIndexError},
+		state::Current,
+	};
+	use pretty_assertions::assert_eq;
+
+	#[test]
+	fn set_index() {
+		let mut engine = crate::tests::init();
+		let sources = crate::tests::sources();
+		let audio_state = engine.reader().get();
+		assert_eq!(*audio_state, AudioState::DEFAULT);
+		assert_eq!(audio_state.queue.len(), 0);
+		assert_eq!(audio_state.current, None);
+
+		//---------------------------------- No `Current`, early return
+		let resp = engine.set_index(SetIndex { index: 0, play: None });
+		assert_eq!(resp, Err(SetIndexError::QueueEmpty));
+
+		//---------------------------------- Set-up our baseline `AudioState`
+		let mut audio_state = AudioState::DEFAULT;
+
+		for i in 0..10 {
+			let source = crate::tests::source(i);
+			audio_state.queue.push_back(source);
+		}
+
+		audio_state.current = Some(Current {
+			source: audio_state.queue[4].clone(),
+			index: 4,
+			elapsed: 150.5,
+		});
+
+		let resp = engine.restore(audio_state);
+		assert_eq!(resp.queue.len(), 10);
+		assert_eq!(resp.current.as_ref().unwrap().index, 4);
+
+		//---------------------------------- Index to the last element
+		let resp = engine.set_index(SetIndex { index: 9, play: None }).unwrap();
+		let current = resp.current.as_ref().unwrap();
+		assert_eq!(current.index, 9);
+		assert_eq!(*current.source.data(), 9);
+		assert_eq!(current.elapsed, 0.0);
+		assert_eq!(resp.playing, false);
+
+		//---------------------------------- Index to the first element
+		let resp = engine.set_index(SetIndex { index: 0, play: None }).unwrap();
+		let current = resp.current.as_ref().unwrap();
+		assert_eq!(current.index, 0);
+		assert_eq!(*current.source.data(), 0);
+		assert_eq!(current.elapsed, 0.0);
+		assert_eq!(resp.playing, false);
+
+		//---------------------------------- Index to the first element, and play
+		let resp = engine.set_index(SetIndex { index: 0, play: Some(true) }).unwrap();
+		let current = resp.current.as_ref().unwrap();
+		assert_eq!(current.index, 0);
+		assert_eq!(*current.source.data(), 0);
+		assert_eq!(current.elapsed, 0.0);
+		assert_eq!(resp.playing, true);
+
+		//---------------------------------- Index to the first element, and pause
+		let resp = engine.set_index(SetIndex { index: 0, play: Some(false) }).unwrap();
+		let current = resp.current.as_ref().unwrap();
+		assert_eq!(current.index, 0);
+		assert_eq!(*current.source.data(), 0);
+		assert_eq!(current.elapsed, 0.0);
+		assert_eq!(resp.playing, false);
+
+		//---------------------------------- Out-of-bounds index
+		let resp = engine.set_index(SetIndex { index: 10, play: None });
+		assert_eq!(resp, Err(SetIndexError::OutOfBounds));
+		// AudioState is unchanged.
+		let audio_state = engine.reader().get();
+		let current = audio_state.current.as_ref().unwrap();
+		assert_eq!(current.index, 0);
+		assert_eq!(*current.source.data(), 0);
+		assert_eq!(current.elapsed, 0.0);
+		assert_eq!(audio_state.playing, false);
+	}
 }
