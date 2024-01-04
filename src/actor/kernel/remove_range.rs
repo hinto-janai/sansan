@@ -37,7 +37,8 @@ impl<Data: ValidData> Kernel<Data> {
 		// Acquire the _index_ of the start and end bounds.
 		// i.e. if the `vec.len()` is 5, then `start = 0`, `end = 4`.
 		let start = match remove_range.start_bound {
-			Bound::Included(u) | Bound::Excluded(u) => u, // 1 -> 0
+			Bound::Included(u) => u,
+			Bound::Excluded(u) => u + 1,
 			Bound::Unbounded => 0, // ..1 -> 0..1
 		};
 		let end = match remove_range.end_bound {
@@ -53,7 +54,8 @@ impl<Data: ValidData> Kernel<Data> {
 		};
 
 		// TODO: debug log
-		// println!("{start} -> {end}");
+		println!("index_wiped: {index_wiped}");
+		println!("{start} -> {end}");
 
 		// If the range is empty, or the end is larger
 		// than the queue length, return bad index error.
@@ -91,7 +93,8 @@ impl<Data: ValidData> Kernel<Data> {
 					//      /---------\
 					//     v           v
 					// [a, b, c, d, e, f, g]
-					//     |
+					//      ______________|
+					//     /
 					//     v
 					// [a, g]
 					Some(start)
@@ -102,7 +105,7 @@ impl<Data: ValidData> Kernel<Data> {
 			}
 
 			if current.index >= end {
-				// If the current index is greater than the end, e.g:
+				// If the current index is greater than the end:
 				//
 				//  start   end   current.index
 				//     v     v        v
@@ -117,17 +120,33 @@ impl<Data: ValidData> Kernel<Data> {
 				// In the above case we are taking out 3 elements, so:
 				// 6 - (3+1) - 1 = index 3.
 				let new_index = current.index - ((end + 1) - start);
-				break 'scope Some(new_index);
+				Some(new_index)
+			} else if current.index < start {
+				// If the start is greater than current index:
+				//
+				// current.end   start     end
+				//     v           v        v
+				// [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+				//     |
+				//     |
+				//     v
+				// [0, 1, 2, 3, 4, 9]
+				//
+				// We can keep the same index in this instance.
+				Some(current.index)
+			} else {
+				// If we're at this point, we can assert:
+				// 1. We deleted our `Current` index
+				// 2. There was no more tracks ahead in the queue (we may have removed them)
+				println!("end");
+				None
 			}
-
-			// If we're at this point, we can assert:
-			// 1. We deleted our `Current` index
-			// 2. There was no more tracks ahead in the queue (we may have removed them)
-			None
 		};
 
 		// TODO: debug log
-		// println!("{maybe_source_index:?}");
+		println!("{maybe_source_index:?}");
+
+		// TODO: we shouldn't restart when maintaining the same index.
 
 		// If we have a new `Source`, send it to `Audio/Decode`.
 		if let Some(index) = maybe_source_index {
@@ -163,6 +182,7 @@ impl<Data: ValidData> Kernel<Data> {
 
 //---------------------------------------------------------------------------------------------------- Tests
 #[cfg(test)]
+#[allow(clippy::cognitive_complexity)]
 mod tests {
 	use super::*;
 	use crate::{
