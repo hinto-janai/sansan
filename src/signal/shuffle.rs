@@ -11,9 +11,11 @@ use crate::source::Source;
 #[derive(Copy,Clone,Debug,PartialEq,PartialOrd,Eq,Ord,Hash)]
 pub enum Shuffle {
 	/// TODO
+	Reset,
+	/// TODO
 	Queue,
 	/// TODO
-	Reset,
+	Full,
 }
 
 //---------------------------------------------------------------------------------------------------- someday::Apply

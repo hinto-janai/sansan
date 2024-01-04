@@ -158,14 +158,14 @@ mod tests {
 			}
 
 			// Assert the other parts of the data are sane as well.
-			assert_eq!(a.queue.len(),        i);
-			assert_eq!(a.queue.get(i),       None);
-			assert_eq!(a.playing,            false);
-			assert_eq!(a.repeat,             Repeat::Off);
-			assert_eq!(a.volume,             Volume::DEFAULT);
-			assert_eq!(a.back_threshold, 3.0);
-			assert_eq!(a.queue_end_clear,    true);
-			assert_eq!(a.current,            None);
+			assert_eq!(a.queue.len(),     i);
+			assert_eq!(a.queue.get(i),    None);
+			assert_eq!(a.playing,         false);
+			assert_eq!(a.repeat,          Repeat::Off);
+			assert_eq!(a.volume,          Volume::DEFAULT);
+			assert_eq!(a.back_threshold,  3.0);
+			assert_eq!(a.queue_end_clear, true);
+			assert_eq!(a.current,         None);
 		}
 
 		//---------------------------------- Append sources to the back.
