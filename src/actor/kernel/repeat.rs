@@ -51,23 +51,19 @@ mod tests {
 		assert_eq!(reader.get().repeat, Repeat::Off);
 
 		//---------------------------------- Same return, early return.
-		engine.repeat(Repeat::Off);
-		sleep(Duration::from_secs(1));
-		assert_eq!(reader.get().repeat, Repeat::Off);
+		let resp = engine.repeat(Repeat::Off);
+		assert_eq!(resp.repeat, Repeat::Off);
 
 		//---------------------------------- Repeat::Queue
-		engine.repeat(Repeat::Queue);
-		sleep(Duration::from_secs(1));
-		assert_eq!(reader.get().repeat, Repeat::Queue);
+		let resp = engine.repeat(Repeat::Queue);
+		assert_eq!(resp.repeat, Repeat::Queue);
 
 		//---------------------------------- Repeat::Current
-		engine.repeat(Repeat::Current);
-		sleep(Duration::from_secs(1));
-		assert_eq!(reader.get().repeat, Repeat::Current);
+		let resp = engine.repeat(Repeat::Current);
+		assert_eq!(resp.repeat, Repeat::Current);
 
 		//---------------------------------- Repeat::Off
-		engine.repeat(Repeat::Off);
-		sleep(Duration::from_secs(1));
-		assert_eq!(reader.get().repeat, Repeat::Off);
+		let resp = engine.repeat(Repeat::Off);
+		assert_eq!(resp.repeat, Repeat::Off);
 	}
 }

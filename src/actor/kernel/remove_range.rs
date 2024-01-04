@@ -54,8 +54,8 @@ impl<Data: ValidData> Kernel<Data> {
 		};
 
 		// TODO: debug log
-		println!("index_wiped: {index_wiped}");
-		println!("{start} -> {end}");
+		// println!("index_wiped: {index_wiped}");
+		// println!("{start} -> {end}");
 
 		// If the range is empty, or the end is larger
 		// than the queue length, return bad index error.
@@ -150,15 +150,12 @@ impl<Data: ValidData> Kernel<Data> {
 				// If we're at this point, we can assert:
 				// 1. We deleted our current.index
 				// 2. There was no more tracks ahead in the queue (we may have removed them)
-				println!("end");
 				None
 			}
 		};
 
-		// TODO: we shouldn't restart when maintaining the same index.
-
 		// TODO: debug log
-		println!("{maybe_source_index:?} - {index_wiped}");
+		// println!("{maybe_source_index:?} - {index_wiped}");
 
 		// If we have a new `Source`, send it to `Audio/Decode`.
 		if index_wiped {
