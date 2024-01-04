@@ -319,48 +319,19 @@ impl<Data: ValidData> Decode<Data> {
 	#[inline]
 	/// TODO
 	fn seek(&mut self, seek: signal::Seek, to_kernel_seek: &Sender<Result<SeekedTime, SeekError>>) {
-		use signal::Seek as S;
-
-		// Get the absolute timestamp of where we'll be seeking.
-		let time = match seek {
-			S::Absolute(time) => {
-				// TODO: handle error.
-				// seeked further than total track time.
-				if time > self.source.secs_total {
-					todo!();
-				}
-
-				Time { seconds: time as u64, frac: time.fract() }
-			},
-
-			S::Forward(time) => {
-				let new = time + (
-					self.source.time_now.seconds as f64 +
-					self.source.time_now.frac
-				);
-
-				// TODO: error or skip.
-				// seeked further than total track time.
-				if new > self.source.secs_total {
-					todo!()
-				}
-
-				Time { seconds: new as u64, frac: new.fract() }
-			},
-
-			S::Backward(time)  => {
-				let new =
-					(self.source.time_now.seconds as f64 +
-					self.source.time_now.frac) -
-					time;
-
-				// TODO: error or skip.
-				// seeked backwards more than 0.0.
-				if new.is_sign_negative() {
-					todo!()
-				}
-
-				Time { seconds: new as u64, frac: new.fract() }
+		// Re-use seek logic.
+		// This is in a separate inner function
+		// because it needs to be tested "functionally".
+		let time = match crate::actor::kernel::Kernel::<Data>::seek_inner(
+			seek,
+			self.source.secs_total,
+			self.source.time_now.seconds,
+			self.source.time_now.frac,
+		) {
+			Ok(t) => t,
+			Err(e) => {
+				self.handle_error(e, self.eb_seek, "seek");
+				return;
 			},
 		};
 

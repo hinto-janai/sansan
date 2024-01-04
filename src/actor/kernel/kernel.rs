@@ -368,7 +368,7 @@ where
 
 	#[inline]
 	/// TODO
-	pub(super) fn source_is_some(&self) -> bool {
+	pub(super) fn current_is_some(&self) -> bool {
 		self.w.current.is_some()
 	}
 

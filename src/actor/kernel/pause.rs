@@ -16,7 +16,7 @@ impl<Data: ValidData> Kernel<Data> {
 		&mut self,
 		to_engine: &Sender<AudioStateSnapshot<Data>>,
 	) {
-		if !self.source_is_some() || !self.playing() {
+		if !self.current_is_some() || !self.playing() {
 			try_send!(to_engine, self.audio_state_snapshot());
 			return;
 		}

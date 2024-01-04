@@ -23,7 +23,7 @@ impl<Data: ValidData> Kernel<Data> {
 				try_send!(to_engine, self.audio_state_snapshot());
 				return;
 			},
-			Clear::Current => if !self.source_is_some() {
+			Clear::Current => if !self.current_is_some() {
 				try_send!(to_engine, self.audio_state_snapshot());
 				return;
 			},
