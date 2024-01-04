@@ -52,92 +52,110 @@ impl<Data: ValidData> Kernel<Data> {
 			false
 		};
 
+		// TODO: debug log
+		// println!("{start} -> {end}");
+
 		// If the range is empty, or the end is larger
 		// than the queue length, return bad index error.
-		if (start >= end) || (end >= self.w.queue.len()) {
+		if (start > end) || (end >= self.w.queue.len()) {
 			try_send!(to_engine, Err(RemoveError::BadIndex));
 			return;
 		}
 
-		// This function returns an `Option<Source>` when the we
-		// removed the track we were on, and there was another
-		// track available ahead of it.
-		//
-		// It also returns a bool telling us if the
-		// queue is still playing or not.
-		let (_, (maybe_source, queue_ended), _) = self.w.add_commit_push(|w, _| {
-			// INVARIANT: we check above this index
-			// exists, this should never panic.
-			w.queue.drain(start..=end);
-
-			// Return if we drained the entire queue.
-			if w.queue.is_empty() {
-				if w.queue_end_clear {
-					w.queue.clear();
-				}
-				w.current = None;
-				w.playing = false;
-				return (None, true);
-			}
-
-			let Some(current) = w.current.as_mut() else {
-				return (None, false);
+		// This `'scope` returns an `Option<usize>` calculating
+		// what our `Current`'s new index should be, if `None`
+		// it means we wiped our current AND there was nothing after.
+		let maybe_source_index = 'scope: {
+			// Return if no `Current`.
+			let Some(current) = self.w.current.as_ref() else {
+				break 'scope None;
 			};
 
-			// INVARIANT: the queue is not empty, checked above.
-
 			// Figure out the new `Source` index after draining.
-			if start == 0 && index_wiped {
-				// If the start is 0 and our index got wiped, we should reset to 0.
-				current.index = 0;
-				return (Some(w.queue[0].clone()), false);
-			}
 
-			if let Some(next_source) = w.queue.get(current.index + 1) {
-				// If we deleted our current index, but there's
-				// more songs ahead of us, don't change the current index,
-				// just set the new track that the index represents.
-				if start == current.index {
-					current.index += 1;
-					return (Some(next_source.clone()), false);
-				}
+			// If we deleted our current index...
+			if index_wiped {
+				break 'scope if index_wiped && (end + 1 == self.w.queue.len()) {
+					// Return if we are ending the entire queue, either by:
+					// 1. Draining everything
+					// 2. Draining our current.index up until the end
+					None
+				} else if start == 0 {
+					// if the start is 0, we should reset to 0
+					Some(0)
+				} else if end < self.w.queue.len() {
+					// if there's more tracks ahead of us, we're now at the start index
+					// (the tracks ahead move <- backwards towards us)
+					//
+					//        removed
+					//      /---------\
+					//     v           v
+					// [a, b, c, d, e, f, g]
+					//     |
+					//     v
+					// [a, g]
+					Some(start)
+				} else {
+					// else, we wiped all the way until the end, so stop.
+					None
+				};
 			}
 
 			if current.index >= end {
 				// If the current index is greater than the end, e.g:
 				//
-				// [0]
-				// [1] <- start
-				// [2]
-				// [3] <- end
-				// [4]
-				// [5] <- current.index
-				// [6]
+				//  start   end   current.index
+				//     v     v        v
+				// [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+				//                    |
+				//            ________|
+				//           /
+				//           v
+				// [0, 4, 5, 6, 7, 8, 9]
 				//
 				// We should subtract the current.index so it lines up correctly.
-				// In the above case we are taking out 3 elements,
-				// so the current.index should go from 5 to (5 - 3), so element 2:
-				//
-				// [0]
-				// [1] (used to be [4])
-				// [2] <- new current.index
-				// [3] (used to be [6])
-				//
-				let new_index = current.index - (end - start);
-				current.index = new_index;
-				return (Some(w.queue[new_index].clone()), false);
+				// In the above case we are taking out 3 elements, so:
+				// 6 - (3+1) - 1 = index 3.
+				let new_index = current.index - ((end + 1) - start);
+				break 'scope Some(new_index);
 			}
 
-			todo!("there's probably other branches left");
-		});
+			// If we're at this point, we can assert:
+			// 1. We deleted our `Current` index
+			// 2. There was no more tracks ahead in the queue (we may have removed them)
+			None
+		};
 
-		#[allow(clippy::else_if_without_else)]
-		// If the queue finished, we must tell set atomic state.
-		if queue_ended {
-			self.atomic_state.playing.store(false, Ordering::Release);
-		} else if let Some(source) = maybe_source {
+		// TODO: debug log
+		// println!("{maybe_source_index:?}");
+
+		// If we have a new `Source`, send it to `Audio/Decode`.
+		if let Some(index) = maybe_source_index {
+			let source = self.w.queue[index].clone();
 			self.new_source(to_audio, to_decode, source);
+		} else {
+			// The queue finished, we must set atomic state.
+			self.atomic_state.playing.store(false, Ordering::Release);
 		}
+
+		// Commit the data.
+		self.w.add_commit_push(|w, _| {
+			// INVARIANT: we check above this index
+			// exists, this should never panic.
+			w.queue.drain(start..=end);
+
+			if let Some(index) = maybe_source_index {
+				// There was another `Source` to play.
+				w.current = Some(Current {
+					source: w.queue[index].clone(),
+					index,
+					elapsed: 0.0
+				});
+			} else {
+				w.current = None;
+				w.playing = false;
+			}
+		});
 
 		try_send!(to_engine, Ok(self.audio_state_snapshot()));
 	}
@@ -146,4 +164,126 @@ impl<Data: ValidData> Kernel<Data> {
 //---------------------------------------------------------------------------------------------------- Tests
 #[cfg(test)]
 mod tests {
+	use super::*;
+	use crate::{
+		state::AudioState,
+		engine::Engine,
+		signal::{back::{Back,BackThreshold}, SetIndex},
+	};
+	use pretty_assertions::assert_eq;
+
+	#[test]
+	fn remove_range() {
+		let mut engine = crate::tests::init();
+		let audio_state = engine.reader().get();
+
+		//---------------------------------- Empty queue
+		assert_eq!(engine.reader().get().queue.len(), 0);
+		let resp = engine.remove_range(0..10);
+		assert_eq!(resp, Err(RemoveError::QueueEmpty));
+		assert_eq!(*audio_state, AudioState::DEFAULT); // didn't change
+
+		//---------------------------------- Our baseline audio state.
+		fn restore_audio_state(engine: &mut Engine<usize>) {
+			let mut audio_state = AudioState::DEFAULT;
+
+			for i in 0..10 {
+				let source = crate::tests::source(i);
+				audio_state.queue.push_back(source);
+			}
+
+			audio_state.current = Some(Current {
+				source: audio_state.queue[4].clone(),
+				index: 4,
+				elapsed: 0.0,
+			});
+
+			let resp = engine.restore(audio_state);
+			assert_eq!(resp.queue.len(), 10);
+			assert_eq!(resp.current.as_ref().unwrap().index, 4);
+		}
+		restore_audio_state(&mut engine);
+		let audio_state = engine.reader().get();
+
+		//---------------------------------- Remove bad index
+		let resp = engine.remove_range(56745..198517);
+		assert_eq!(resp, Err(RemoveError::BadIndex));
+		assert_eq!(engine.reader().get(), audio_state); // didn't change
+
+		//---------------------------------- Remove the 5th index
+		let resp = engine.remove_range(5..6).unwrap();
+		let queue_data: Vec<usize> = resp.queue.iter().map(|s| *s.data()).collect();
+		assert_eq!(queue_data, [0, 1, 2, 3, 4, /* 5, */ 6, 7, 8, 9]);
+		restore_audio_state(&mut engine);
+
+		//---------------------------------- Remove index 0..=3
+		let resp = engine.remove_range(0..=3).unwrap();
+		let queue_data: Vec<usize> = resp.queue.iter().map(|s| *s.data()).collect();
+		assert_eq!(queue_data, [/* 0, 1, 2, 3, */ 4, 5, 6, 7, 8, 9]);
+		assert_eq!(resp.current.as_ref().unwrap().index, 0);
+		assert_eq!(*resp.current.as_ref().unwrap().source.data(), 4);
+		restore_audio_state(&mut engine);
+
+		//---------------------------------- Remove index 1..=3
+		let resp = engine.remove_range(1..=3).unwrap();
+		let queue_data: Vec<usize> = resp.queue.iter().map(|s| *s.data()).collect();
+		assert_eq!(queue_data, [0, /* 1, 2, 3, */ 4, 5, 6, 7, 8, 9]);
+		assert_eq!(resp.current.as_ref().unwrap().index, 1);
+		assert_eq!(*resp.current.as_ref().unwrap().source.data(), 4);
+		restore_audio_state(&mut engine);
+
+		//---------------------------------- Remove index 6..=8
+		let resp = engine.remove_range(6..=8).unwrap();
+		let queue_data: Vec<usize> = resp.queue.iter().map(|s| *s.data()).collect();
+		assert_eq!(queue_data, [0, 1, 2, 3, 4, 5, /* 5, 6, 7, 8, */ 9]);
+		restore_audio_state(&mut engine);
+
+		//---------------------------------- Remove index 6..8
+		let resp = engine.remove_range(6..8).unwrap();
+		let queue_data: Vec<usize> = resp.queue.iter().map(|s| *s.data()).collect();
+		assert_eq!(queue_data, [0, 1, 2, 3, 4, 5, /* 5, 6, 7, */ 8, 9]);
+		restore_audio_state(&mut engine);
+
+		//---------------------------------- Remove index 6..
+		let resp = engine.remove_range(6..).unwrap();
+		let queue_data: Vec<usize> = resp.queue.iter().map(|s| *s.data()).collect();
+		assert_eq!(queue_data, [0, 1, 2, 3, 4, 5, /* 5, 6, 7, 8, 9 */]);
+		restore_audio_state(&mut engine);
+
+		//---------------------------------- Remove current index 4..6
+		let resp = engine.remove_range(4..6).unwrap();
+		let queue_data: Vec<usize> = resp.queue.iter().map(|s| *s.data()).collect();
+		assert_eq!(queue_data, [0, 1, 2, 3, /* 4, 5, */ 6, 7, 8, 9]);
+		// There were tracks ahead, so our index doesn't move,
+		// although the underlying track does.
+		assert_eq!(resp.current.as_ref().unwrap().index, 4);
+		assert_eq!(*resp.current.as_ref().unwrap().source.data(), 6);
+		restore_audio_state(&mut engine);
+
+		//---------------------------------- Remove current index 2..6
+		let resp = engine.remove_range(2..6).unwrap();
+		let queue_data: Vec<usize> = resp.queue.iter().map(|s| *s.data()).collect();
+		assert_eq!(queue_data, [0, 1, /*, 2, 3, 4, 5, */ 6, 7, 8, 9]);
+		assert_eq!(resp.current.as_ref().unwrap().index, 2);
+		assert_eq!(*resp.current.as_ref().unwrap().source.data(), 6);
+		restore_audio_state(&mut engine);
+
+		//---------------------------------- Remove current index 4..
+		let resp = engine.remove_range(4..).unwrap();
+		let queue_data: Vec<usize> = resp.queue.iter().map(|s| *s.data()).collect();
+		assert_eq!(queue_data, [0, 1, 2, 3, /* 4, 5, 6, 7, 8, 9 */]);
+		assert_eq!(resp.current.as_ref(), None);
+		restore_audio_state(&mut engine);
+
+		//---------------------------------- Remove entire queue
+		let resp = engine.remove_range(..).unwrap();
+		let queue_data: Vec<usize> = resp.queue.iter().map(|s| *s.data()).collect();
+		assert_eq!(queue_data, []);
+		assert_eq!(resp.current.as_ref(), None);
+
+		//---------------------------------- Empty queue
+		assert_eq!(engine.reader().get().queue.len(), 0);
+		let resp = engine.remove_range(0..10);
+		assert_eq!(resp, Err(RemoveError::QueueEmpty));
+	}
 }
