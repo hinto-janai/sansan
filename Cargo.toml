@@ -41,7 +41,9 @@ strip     = "none"
 opt-level = 1
 
 [features]
-default = ["serde", "cubeb"]
+# TODO: Change default to cubeb after testing.
+# default = ["serde", "cubeb"]
+default = ["serde", "cpal"]
 
 [dev-dependencies]
 bincode = { version = "2.0.0-rc.3", features = ["derive"]  }
@@ -61,6 +63,7 @@ log          = { version = "0.4.20", features = ["serde"], optional = true }
 
 ### Regular libraries.
 arrayvec     = { version = "0.7.4" }
+cfg-if       = { version = "1.0.0" }
 crossbeam    = { version = "0.8.3", features = ["crossbeam-channel"] }
 #once_cell    = { version = "1.18.0" }
 rand         = { version = "0.8.5" }
@@ -78,8 +81,7 @@ rb                    = { version = "0.4.1" }
 
 ### Optional Audio libraries.
 cubeb = { version = "0.10.7", optional = true }
-# TODO: eventually as another backend
-#cpal  = { version = "0.15.2", optional = true }
+cpal  = { version = "0.15.2", optional = true }
 
 ## Windows.
 [target.'cfg(windows)'.dependencies]

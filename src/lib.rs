@@ -123,6 +123,13 @@
 #![cfg_attr(debug_assertions, allow(clippy::todo))]
 #![cfg_attr(debug_assertions, allow(clippy::multiple_crate_versions))]
 
+// There are some `as` casts but they are:
+// - handled with `.try_into()`
+// - are `u32 as usize/u64`
+// - are gated by `#[cfg(...)]`
+#[cfg(not(any(target_pointer_width = "64", target_pointer_width = "32")))]
+compile_error!("sansan is only compatible with 64/32-bit CPUs");
+
 //---------------------------------------------------------------------------------------------------- Public API
 /// TODO
 pub mod state;
