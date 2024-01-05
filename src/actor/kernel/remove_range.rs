@@ -38,7 +38,7 @@ impl<Data: ValidData> Kernel<Data> {
 		// i.e. if the `vec.len()` is 5, then `start = 0`, `end = 4`.
 		let start = match remove_range.start_bound {
 			Bound::Included(u) => u,
-			Bound::Excluded(u) => u + 1,
+			Bound::Excluded(u) => u.saturating_add(1),
 			Bound::Unbounded => 0, // ..1 -> 0..1
 		};
 		let end = match remove_range.end_bound {
@@ -86,7 +86,7 @@ impl<Data: ValidData> Kernel<Data> {
 
 			// If we deleted our current index...
 			if index_wiped {
-				break 'scope if index_wiped && (end + 1 == self.w.queue.len()) {
+				break 'scope if index_wiped && (end.saturating_add(1) == self.w.queue.len()) {
 					// Return if we are ending the entire queue, either by:
 					// 1. Draining everything
 					// 2. Draining our current.index up until the end
@@ -132,7 +132,7 @@ impl<Data: ValidData> Kernel<Data> {
 				// We should subtract the current.index so it lines up correctly.
 				// In the above case we are taking out 3 elements, so:
 				// 6 - (3+1) - 1 = index 3.
-				let new_index = current.index - ((end + 1) - start);
+				let new_index = current.index - (end.saturating_add(1) - start);
 				Some(new_index)
 			} else if current.index < start {
 				// If the current index is less than the start:

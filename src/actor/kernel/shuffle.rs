@@ -123,8 +123,9 @@ impl<Data: ValidData> Kernel<Data> {
 					// queue.len() == 5
 					// queue[..4]  == [0, 1, 2, 3] (range exclusive)
 					// (4+1) < 5   == false (so don't index)
-					if i + 1 < queue.len() {
-						queue[i + 1..].shuffle(&mut rng);
+					let new_index = i.saturating_add(1);
+					if new_index < queue.len() {
+						queue[new_index..].shuffle(&mut rng);
 					}
 
 					None
