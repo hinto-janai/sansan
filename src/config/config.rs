@@ -78,14 +78,6 @@ where
 #[strum(serialize_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum ErrorBehavior {
-	/// Pause the audio stream.
-	///
-	/// This will set the [`AudioState`]'s `playing`
-	/// to `false` and pause playback.
-	///
-	/// This is the default behavior.
-	Pause,
-
 	/// Continue playback.
 	///
 	/// `sansan` will essentially do nothing
@@ -99,38 +91,24 @@ pub enum ErrorBehavior {
 	///
 	/// For `audio_source_behavior` in [`Config`], this does the same as [`Self::Skip`]
 	/// since we cannot "continue" a [`Source`] that does not work (i.e, missing file).
+	///
+	/// This is the default behavior.
 	Continue,
 
-	/// Skip the current `(track|seek|packet)`.
+	/// Pause the audio stream.
 	///
-	/// This will "skip" something depending on the
-	/// context this variant is used in.
-	///
-	/// | [`Config`] field        | Behavior |
-	/// |-------------------------|----------|
-	/// | `error_behavior_output` | The current track is skipped
-	/// | `error_behavior_seek`   | The seek operation is ignored (nothing happens)
-	/// | `error_behavior_decode` | The audio packet that errored is ignored, and decoding continues
-	/// | `error_behavior_source` | The track (source) that errored is skipped
-	Skip,
-
-	/// Panic on error.
-	///
-	/// This will cause the audio/decode thread
-	/// to panic when encountering an error.
-	///
-	/// This could be useful in situations where
-	/// you know failures are not possible.
-	Panic,
+	/// This will set the [`AudioState`]'s `playing`
+	/// to `false` and pause playback.
+	Pause,
 }
 
 impl ErrorBehavior {
 	/// ```rust
 	/// # use sansan::config::*;
-	/// assert_eq!(ErrorBehavior::DEFAULT, ErrorBehavior::Pause);
+	/// assert_eq!(ErrorBehavior::DEFAULT, ErrorBehavior::Continue);
 	/// assert_eq!(ErrorBehavior::DEFAULT, ErrorBehavior::default());
 	/// ```
-	pub const DEFAULT: Self = Self::Pause;
+	pub const DEFAULT: Self = Self::Continue;
 }
 
 impl Default for ErrorBehavior {

@@ -158,31 +158,26 @@ impl<Data: ValidData> Caller<Data> {
 	// These are the functions invoked in response
 	// to exact messages/signals from the other actors.
 
-	#[inline]
 	/// TODO
 	fn next(&mut self) {
 		Self::call(&self.audio_state.get(), &mut self.cb_next);
 	}
 
-	#[inline]
 	/// TODO
 	fn queue_end(&mut self) {
 		Self::call(&self.audio_state.get(), &mut self.cb_queue_end);
 	}
 
-	#[inline]
 	/// TODO
 	fn repeat(&mut self) {
 		Self::call(&self.audio_state.get(), &mut self.cb_repeat);
 	}
 
-	#[inline]
 	/// TODO
 	fn elapsed(&mut self) {
 		Self::call(&self.audio_state.get(), &mut self.cb_elapsed);
 	}
 
-	#[inline]
 	/// TODO
 	fn call(
 		audio_state: &AudioState<Data>,

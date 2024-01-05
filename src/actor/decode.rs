@@ -347,13 +347,9 @@ impl<Data: ValidData> Decode<Data> {
 		behavior:   ErrorBehavior,
 		error_type: &'static str,
 	) {
-		use ErrorBehavior as E;
-
 		match behavior {
-			E::Pause    => todo!(), // TODO: tell [Kernel] to pause
-			E::Continue => todo!(),
-			E::Skip     => todo!(), // TODO: tell [Kernel] to skip
-			E::Panic    => panic!("{error_type} error: {error}"),
+			ErrorBehavior::Continue => todo!(),
+			ErrorBehavior::Pause    => todo!(), // TODO: tell [Kernel] to pause
 		}
 	}
 

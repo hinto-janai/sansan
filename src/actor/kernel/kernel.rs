@@ -372,45 +372,10 @@ where
 		self.w.current.is_some()
 	}
 
-	// /// TODO
-	// fn add_commit_push<Input, Output>(&mut self, input: Input) -> Output
-	// where
-	// 	Input: Clone,
-	// 	Signal<Data>: From<Input>,
-	// 	AudioState<Data>: ApplyReturn<Signal<Data>, Input, Output>,
-	// {
-	// 	// SAFETY: Special signals, they must always
-	// 	// be cloned, so they should never be passed
-	// 	// to this function.
-	// 	#[cfg(debug_assertions)]
-	// 	#[allow(clippy::wildcard_enum_match_arm)]
-	// 	{
-	// 		match input.clone().into() {
-	// 			Signal::Shuffle(_) => panic!("shuffle was passed to add_commit_push()"),
-	// 			Signal::Stop(_)    => panic!("stop was passed to add_commit_push()"),
-	// 			_ => (),
-	// 		}
-	// 	}
-
-	// 	let output = self.w.commit_return(input);
-	// 	self.w.push();
-	// 	output
-	// }
-
 	#[inline]
 	/// TODO
 	pub(super) fn audio_state_snapshot(&self) -> AudioStateSnapshot<Data> {
 		AudioStateSnapshot(self.w.head_remote_ref())
-	}
-
-	#[inline]
-	/// TODO
-	pub(super) fn less_than_threshold(&self, threshold: f64) -> bool {
-		if let Some(current) = &self.w.current {
-			current.elapsed < threshold
-		} else {
-			false
-		}
 	}
 }
 

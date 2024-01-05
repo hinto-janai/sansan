@@ -4,6 +4,8 @@
 //! trait using `cpal` as a backend.
 //!
 //! For documentation on `AudioOutput`, see `output.rs`.
+//!
+//! TODO: update leftover doc comments and code from cubeb
 
 //----------------------------------------------------------------------------------------------- use
 use crate::{

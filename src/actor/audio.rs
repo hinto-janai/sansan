@@ -95,6 +95,10 @@ pub(crate) struct TookAudioBuffer;
 
 /// TODO
 pub(crate) enum AudioToKernel {
+	/// We (Audio) successfully wrote an audio buffer
+	/// to the audio output device with this timestamp.
+	/// (Please update the `AudioState` to reflect this).
+	WroteAudioBuffer(Time),
 }
 
 //---------------------------------------------------------------------------------------------------- Audio Impl
@@ -179,22 +183,27 @@ where
 	#[cold]
 	#[inline(never)]
 	/// `Audio`'s main function.
-	fn main(mut self, channels: Channels) {
+	fn main(mut self, c: Channels) {
 		// Create channels that we will
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
 
-		assert_eq!(0, select.recv(&channels.from_decode));
-		assert_eq!(1, select.recv(&channels.from_kernel));
-		assert_eq!(2, select.recv(&channels.shutdown));
+		assert_eq!(0, select.recv(&c.from_decode));
+		assert_eq!(1, select.recv(&c.from_kernel));
+		assert_eq!(2, select.recv(&c.shutdown));
 
 		loop {
 			self.playing = self.atomic_state.playing.load(Ordering::Acquire);
 
 			// If we're playing, check if we have samples to play.
 			if self.playing {
-				if let Ok(msg) = channels.from_decode.try_recv() {
-					self.play_audio_buffer(msg, &channels.to_gc, &channels.to_caller_elapsed);
+				if let Ok(msg) = c.from_decode.try_recv() {
+					self.play_audio_buffer(
+						msg,
+						&c.to_gc,
+						&c.to_kernel,
+						&c.to_caller_elapsed
+					);
 				}
 			}
 
@@ -220,19 +229,24 @@ where
 			match select_index {
 				// From `Decode`.
 				0 => {
-					let msg = select_recv!(channels.from_decode);
-					self.play_audio_buffer(msg, &channels.to_gc, &channels.to_caller_elapsed);
+					let msg = select_recv!(c.from_decode);
+					self.play_audio_buffer(
+						msg,
+						&c.to_gc,
+						&c.to_kernel,
+						&c.to_caller_elapsed
+					);
 				},
 
 				// From `Kernel`.
 				1 => {
-					let msg = select_recv!(channels.from_kernel);
-					self.discard_audio(&channels.from_decode, &channels.to_gc);
+					let msg = select_recv!(c.from_kernel);
+					self.discard_audio(&c.from_decode, &c.to_gc);
 				},
 
 				// Shutdown.
 				2 => {
-					select_recv!(channels.shutdown);
+					select_recv!(c.shutdown);
 					debug2!("Audio - shutting down");
 					// Wait until all threads are ready to shutdown.
 					debug2!("Audio - waiting on others...");
@@ -262,6 +276,7 @@ where
 		&mut self,
 		msg: (AudioBuffer<f32>, symphonia::core::units::Time),
 		to_gc: &Sender<AudioBuffer<f32>>,
+		to_kernel: &Sender<AudioToKernel>,
 		to_caller_elapsed: &Option<(Sender<()>, f64)>,
 	) {
 		let (audio, time) = msg;
@@ -280,10 +295,10 @@ where
 				None,  // TODO: buffer_milliseconds
 			) {
 				Ok(o)  => self.output = o,
-
-				// And if we couldn't, handle error.
-				Err(e) => {
-					todo!();
+				// And if we couldn't, tell `Kernel` we errored.
+				Err(e) => match self.eb_output {
+					ErrorBehavior::Continue => todo!(),
+					ErrorBehavior::Pause    => todo!(), // TODO: tell [Kernel] to pause
 				},
 			}
 		}
@@ -294,13 +309,10 @@ where
 		if let Err(e) = self.output.write(audio, to_gc, volume) {
 			// TODO: Send error the engine backchannel
 			// or discard depending on user config.
-			use ErrorBehavior as E;
 			#[allow(clippy::match_same_arms)] // TODO
 			match self.eb_output {
-				E::Pause    => (), // TODO: tell [Kernel] to pause
-				E::Continue => (),
-				E::Skip     => (), // TODO: tell [Kernel] to skip
-				E::Panic    => panic!("audio output error: {e}"),
+				ErrorBehavior::Continue => todo!(),
+				ErrorBehavior::Pause    => todo!(), // TODO: tell [Kernel] to pause
 			}
 		}
 
@@ -317,7 +329,7 @@ where
 
 		// TODO: tell [Kernel] we just wrote
 		// an audio buffer with [time] timestamp.
-		// todo!();
+		try_send!(to_kernel, AudioToKernel::WroteAudioBuffer(time));
 	}
 
 	#[inline]
