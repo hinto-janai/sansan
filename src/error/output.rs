@@ -48,5 +48,5 @@ pub enum OutputError {
 	/// An unknown or very specific error occurred.
 	///
 	/// The `str` will contain more information.
-	Unknown(&'static str),
+	Unknown(std::borrow::Cow<'static, str>),
 }
