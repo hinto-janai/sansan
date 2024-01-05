@@ -5,7 +5,6 @@ use std::thread::JoinHandle;
 use crossbeam::channel::{Receiver, Select, Sender};
 use strum::EnumCount;
 use crate::{
-	channel,
 	state::AudioState,
 	config::ErrorBehavior,
 };

@@ -7,7 +7,6 @@ use crate::{
 	config::{Callback,Callbacks},
 	state::{AudioState,AudioStateReader,ValidData},
 	macros::{send,try_recv,debug2,try_send,select_recv},
-	channel::SansanSender,
 	error::SansanError,
 };
 use std::sync::{

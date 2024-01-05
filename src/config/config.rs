@@ -6,7 +6,6 @@ use crate::{
 	error::SansanError,
 	config::callbacks::Callbacks,
 	engine::Engine,
-	channel::SansanSender,
 	state::{AudioState,ValidData},
 };
 use strum::{
@@ -182,7 +181,7 @@ where
 		init_blocking:         false,
 		shutdown_blocking:     false,
 		restore:               None,
-		back_threshold:    3.0,
+		back_threshold:        3.0,
 		media_controls:        false,
 		error_behavior_output: ErrorBehavior::DEFAULT,
 		error_behavior_seek:   ErrorBehavior::DEFAULT,

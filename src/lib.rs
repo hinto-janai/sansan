@@ -143,7 +143,6 @@ pub mod source;
 	// SourceError,DecodeError,Metadata,
 // };
 
-pub mod channel;
 pub mod config;
 pub mod signal;
 /// TODO

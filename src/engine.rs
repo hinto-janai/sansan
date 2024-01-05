@@ -13,7 +13,6 @@ use crate::{
 	},
 	error::SansanError,
 	audio::{cubeb::Cubeb,rubato::Rubato},
-	channel::SansanSender,
 	macros::{send,recv,try_send,try_recv,debug2},
 	source::Source,
 	signal::{

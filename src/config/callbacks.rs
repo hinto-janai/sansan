@@ -3,7 +3,6 @@
 //---------------------------------------------------------------------------------------------------- use
 use crate::{
 	state::{AudioState,ValidData},
-	channel::SansanSender,
 	error::{OutputError,DecodeError,SourceError,SansanError},
 	signal::SeekError,
 };

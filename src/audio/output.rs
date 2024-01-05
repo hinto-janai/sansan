@@ -13,7 +13,7 @@
 use crate::{
 	error::OutputError,
 	audio::resampler::Resampler,
-	channel::SansanSender, signal::Volume
+	signal::Volume
 };
 use symphonia::core::audio::{
 	AudioBuffer,SignalSpec,Channels, Signal, AudioBufferRef, SampleBuffer,
