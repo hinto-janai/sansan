@@ -12,7 +12,6 @@ use crate::{
 		caller::Caller,
 	},
 	error::SansanError,
-	audio::{cubeb::Cubeb,rubato::Rubato},
 	macros::{send,recv,try_send,try_recv,debug2},
 	source::Source,
 	signal::{
@@ -33,6 +32,20 @@ use std::sync::{
 // Prevent collision with [S] generic.
 use crossbeam::channel::Sender as S;
 use crossbeam::channel::Receiver as R;
+
+// Audio I/O backends.
+cfg_if::cfg_if! {
+	if #[cfg(feature = "cubeb")] {
+		use crate::audio::cubeb::Cubeb as AudioOutputStruct;
+	} else if #[cfg(feature = "cpal")] {
+		use crate::audio::cpal::Cpal as AudioOutputStruct;
+	} else {
+		use crate::audio::cubeb::Cubeb as AudioOutputStruct;
+	}
+}
+
+// Resampler backends.
+use crate::audio::rubato::Rubato as ResamplerStruct;
 
 //---------------------------------------------------------------------------------------------------- Constants
 /// Total count of all the "actors" in our system.
@@ -301,7 +314,7 @@ where
 				from_kernel:       a_from_k,
 				eb_output:         config.error_behavior_output,
 			},
-			Audio::<Cubeb<Rubato>>::init
+			Audio::<AudioOutputStruct<ResamplerStruct>>::init
 		);
 
 		//-------------------------------------------------------------- Spawn [Decode]

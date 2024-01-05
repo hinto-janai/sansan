@@ -18,12 +18,24 @@ use crate::actor::kernel::DiscardCurrentAudio;
 use crate::audio::{
 	output::AudioOutput,
 	resampler::Resampler,
-	cubeb::Cubeb,
-	rubato::Rubato,
 };
 use crate::macros::{send,try_recv,debug2,try_send,select_recv};
 use crate::signal::Volume;
 use crate::state::AtomicAudioState;
+
+// Audio I/O backends.
+cfg_if::cfg_if! {
+	if #[cfg(feature = "cubeb")] {
+		use crate::audio::cubeb::Cubeb as AudioOutputStruct;
+	} else if #[cfg(feature = "cpal")] {
+		use crate::audio::cpal::Cpal as AudioOutputStruct;
+	} else {
+		use crate::audio::cubeb::Cubeb as AudioOutputStruct;
+	}
+}
+
+// Resampler backends.
+use crate::audio::rubato::Rubato as ResamplerStruct;
 
 //---------------------------------------------------------------------------------------------------- Constants
 /// `AUDIO_BUFFER_LEN` is the buffer size of the channel
@@ -143,7 +155,7 @@ where
 				// TODO:
 				// obtain audio output depending on user config.
 				// hang, try again, etc.
-				let output: Cubeb<Rubato> = Cubeb::dummy().unwrap();
+				let output: AudioOutputStruct<ResamplerStruct> = AudioOutputStruct::dummy().unwrap();
 
 				let this = Audio {
 					atomic_state,

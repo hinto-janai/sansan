@@ -71,7 +71,7 @@ pub(crate) struct Cpal<R: Resampler> {
 	/// which errors, so we rely on this
 	/// "something recently caused and error
 	/// and i'm just gonna set this bool" hack.
-	error: Receiver<OutputError>,
+	error: Receiver<cpal::StreamError>,
 
 	/// The resampler.
 	resampler: Option<R>,
@@ -304,11 +304,12 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 			}
 			// TODO: test if we need this.
 			// Mute any remaining samples.
-			output[output.len()..].fill(0.0);
+			let written = output.len();
+			output[written..].fill(0.0);
 		};
 		// The callback `cpal` will call when errors occur.
 		let error_callback = move |error: cpal::StreamError| {
-			error_send.try_send(error.into());
+			drop(error_send.try_send(error));
 		};
 
 		// Build the audio stream.
