@@ -29,7 +29,7 @@ where
 {
 	//------------------------------------------ Engine
 	/// TODO
-	pub callbacks: Callbacks<Data>,
+	pub callbacks: Callbacks,
 	/// TODO
 	pub callback_low_priority: bool,
 	/// TODO

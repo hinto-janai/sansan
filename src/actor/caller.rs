@@ -21,10 +21,10 @@ use std::sync::{
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct Caller<Data: ValidData> {
-	cb_next:       Option<Callback<Data>>,
-	cb_queue_end:  Option<Callback<Data>>,
-	cb_repeat:     Option<Callback<Data>>,
-	cb_elapsed:    Option<Callback<Data>>,
+	cb_next:       Option<Callback>,
+	cb_queue_end:  Option<Callback>,
+	cb_repeat:     Option<Callback>,
+	cb_elapsed:    Option<Callback>,
 	audio_state:   AudioStateReader<Data>,
 	shutdown_wait: Arc<Barrier>,
 }
@@ -45,10 +45,10 @@ struct Channels {
 #[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) init_barrier:  Option<Arc<Barrier>>,
-	pub(crate) cb_next:       Option<Callback<Data>>,
-	pub(crate) cb_queue_end:  Option<Callback<Data>>,
-	pub(crate) cb_repeat:     Option<Callback<Data>>,
-	pub(crate) cb_elapsed:    Option<Callback<Data>>,
+	pub(crate) cb_next:       Option<Callback>,
+	pub(crate) cb_queue_end:  Option<Callback>,
+	pub(crate) cb_repeat:     Option<Callback>,
+	pub(crate) cb_elapsed:    Option<Callback>,
 	pub(crate) low_priority:  bool,
 	pub(crate) audio_state:   AudioStateReader<Data>,
 	pub(crate) shutdown_wait: Arc<Barrier>,
@@ -186,10 +186,10 @@ impl<Data: ValidData> Caller<Data> {
 	/// TODO
 	fn call(
 		audio_state: &AudioState<Data>,
-		callback: &mut Option<Callback<Data>>
+		callback: &mut Option<Callback>
 	) {
 		if let Some(cb) = callback.as_mut() {
-			cb(audio_state);
+			cb();
 		}
 	}
 }

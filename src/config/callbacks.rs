@@ -17,7 +17,7 @@ use crate::Engine; // docs
 
 //---------------------------------------------------------------------------------------------------- Callback
 /// Boxed, dynamically dispatched function with access to the current audio state.
-pub(crate) type Callback<Data> = Box<dyn FnMut(&AudioState<Data>) + Send + Sync + 'static>;
+pub(crate) type Callback = Box<dyn FnMut() + Send + 'static>;
 
 //---------------------------------------------------------------------------------------------------- Callbacks
 /// TODO
@@ -61,28 +61,29 @@ pub(crate) type Callback<Data> = Box<dyn FnMut(&AudioState<Data>) + Send + Sync 
 // let duration = std::time::Duration::from_secs(1);
 // callbacks.elapsed(Callback::Channel(elapsed_send), duration);
 // ```
-pub struct Callbacks<Data>
-where
-	Data: ValidData,
-{
+pub struct Callbacks {
 	/// TODO
-	pub(crate) next:      Option<Callback<Data>>,
+	pub(crate) next:      Option<Callback>,
 	/// TODO
-	pub(crate) queue_end: Option<Callback<Data>>,
+	pub(crate) queue_end: Option<Callback>,
 	/// TODO
-	pub(crate) repeat:    Option<Callback<Data>>,
+	pub(crate) repeat:    Option<Callback>,
 	/// TODO
-	pub(crate) elapsed:   Option<(Callback<Data>, f64)>,
+	pub(crate) elapsed:   Option<(Callback, f64)>,
 	/// TODO
-	pub(crate) error:     Option<Callback<Data>>,
+	pub(crate) error:     Option<Callback>,
 }
 
 //---------------------------------------------------------------------------------------------------- Callbacks Impl
-impl<Data> Callbacks<Data>
-where
-	Data:   ValidData,
-{
+impl Callbacks {
 	/// A fresh [`Self`] with no callbacks, same as [`Self::new()`]
+	///
+	/// ```rust
+	/// # use sansan::*;
+	/// # use sansan::config::*;
+	/// let callbacks: Callbacks = Callbacks::DEFAULT;
+	/// assert!(callbacks.all_none());
+	/// ```
 	pub const DEFAULT: Self = Self {
 		next:      None,
 		queue_end: None,
@@ -91,7 +92,6 @@ where
 		error:     None,
 	};
 
-
 	#[cold]
 	#[must_use]
 	/// Returns a fresh [`Self`] with no callbacks, same as [`Self::DEFAULT`].
@@ -99,8 +99,9 @@ where
 	/// ```rust
 	/// # use sansan::*;
 	/// # use sansan::config::*;
-	/// let callbacks: Callbacks<()> = Callbacks::new();
+	/// let callbacks: Callbacks = Callbacks::new();
 	/// assert!(callbacks.all_none());
+	/// ```
 	pub const fn new() -> Self {
 		Self::DEFAULT
 	}
@@ -127,22 +128,31 @@ where
 
 	#[cold]
 	/// TODO
-	pub fn next(&mut self, callback: Callback<Data>) -> &mut Self {
-		self.next = Some(callback);
+	pub fn next<F>(&mut self, callback: F) -> &mut Self
+	where
+		F: FnMut() + Send + Sync + 'static
+	{
+		self.next = Some(Box::new(callback));
 		self
 	}
 
 	#[cold]
 	/// TODO
-	pub fn queue_end(&mut self, callback: Callback<Data>) -> &mut Self {
-		self.queue_end = Some(callback);
+	pub fn queue_end<F>(&mut self, callback: F) -> &mut Self
+	where
+		F: FnMut() + Send + Sync + 'static
+	{
+		self.queue_end = Some(Box::new(callback));
 		self
 	}
 
 	#[cold]
 	/// TODO
-	pub fn repeat(&mut self, callback: Callback<Data>) -> &mut Self {
-		self.repeat = Some(callback);
+	pub fn repeat<F>(&mut self, callback: F) -> &mut Self
+	where
+		F: FnMut() + Send + Sync + 'static
+	{
+		self.repeat = Some(Box::new(callback));
 		self
 	}
 
@@ -157,28 +167,42 @@ where
 	/// - Not an abnormal float ([`f64::NAN`], [`f64::INFINITY`], etc)
 	///
 	/// or [`Engine::init`] will panic.
-	pub fn elapsed(&mut self, callback: Callback<Data>, seconds: f64) -> &mut Self {
-		self.elapsed = Some((callback, seconds));
+	pub fn elapsed<F>(&mut self, callback: F, seconds: f64) -> &mut Self
+	where
+		F: FnMut() + Send + Sync + 'static
+	{
+		self.elapsed = Some((Box::new(callback), seconds));
 		self
 	}
 
 	#[cold]
 	/// TODO
-	pub fn error(&mut self, callback: Callback<Data>) -> &mut Self {
-		self.error = Some(callback);
+	pub fn error<F>(&mut self, callback: F) -> &mut Self
+	where
+		F: FnMut() + Send + Sync + 'static
+	{
+		self.error = Some(Box::new(callback));
 		self
 	}
 }
 
 //---------------------------------------------------------------------------------------------------- Callbacks Trait Impl
-impl<Data: ValidData> Default for Callbacks<Data> {
-	#[inline]
+impl Default for Callbacks {
+	#[cold]
+	/// Same as [`Self::new`].
+	///
+	/// ```rust
+	/// # use sansan::*;
+	/// # use sansan::config::*;
+	/// let callbacks: Callbacks = Callbacks::default();
+	/// assert!(callbacks.all_none());
+	/// ```
 	fn default() -> Self {
 		Self::DEFAULT
 	}
 }
 
-impl<Data: ValidData> fmt::Debug for Callbacks<Data> {
+impl fmt::Debug for Callbacks {
 	#[allow(clippy::missing_docs_in_private_items)]
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		const SOME: &str = "Some";
