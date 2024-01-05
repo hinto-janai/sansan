@@ -34,4 +34,40 @@ impl<Data: ValidData> Kernel<Data> {
 //---------------------------------------------------------------------------------------------------- Tests
 #[cfg(test)]
 mod tests {
+	use super::*;
+	use crate::signal::SetIndex;
+	use crate::signal::add::{AddMany,InsertMethod};
+	use crate::state::{AudioState,Current};
+	use pretty_assertions::assert_eq;
+	use std::thread::sleep;
+	use std::time::Duration;
+
+	#[test]
+	fn toggle() {
+		let mut engine = crate::tests::init();
+		let reader = engine.reader();
+		assert_eq!(reader.get().volume.inner(), Volume::DEFAULT.inner());
+
+		let resp = engine.volume(Volume::new(0.0));
+		assert_eq!(resp.volume.inner(), 0.0);
+
+		let mut float = 0.0_f32;
+		for _ in 0..400 {
+			float += 0.025;
+
+			assert_eq!(float.is_nan(),           false);
+			assert_eq!(float.is_sign_negative(), false);
+			assert_eq!(float.is_subnormal(),     false);
+			assert_eq!(float.is_sign_positive(), true);
+			assert_eq!(float.is_normal(),        true);
+
+			let volume = Volume::new(float);
+			let resp = engine.volume(volume);
+			assert_eq!(resp.volume, volume);
+		}
+
+		//---------------------------------- At max
+		let reader = engine.reader();
+		assert_eq!(reader.get().volume.inner(), 1.0);
+	}
 }
