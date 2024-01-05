@@ -41,5 +41,5 @@ pub struct BackThreshold {
 #[derive(thiserror::Error)]
 pub enum BackError {
 	/// TODO
-	EmptyQueue,
+	QueueEmpty,
 }

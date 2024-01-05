@@ -4,7 +4,7 @@
 use crate::{
 	actor::kernel::kernel::{Kernel,DiscardCurrentAudio,KernelToDecode},
 	state::{AudioStateSnapshot,ValidData,Current},
-	signal::repeat::Repeat,
+	signal::skip::Skip,
 	macros::try_send,
 };
 use crossbeam::channel::{Sender,Receiver};
@@ -23,59 +23,9 @@ impl<Data: ValidData> Kernel<Data> {
 			return;
 		}
 
-		// INVARIANT:
-		// The queue may or may not have any more [Source]'s left.
-		//
-		// We must check for [Repeat] as well.
-		//
-		// This returns an `Option<usize>` representing
-		// the index of a potential new `Source` in the queue.
-		//
-		// `None` means our queue is done, and [Kernel]
-		// must clean the audio state up, and tell everyone else.
-		//
-		// `Some(usize)` means there is a new source to play at that index.
-		let maybe_source_index = if let Some(current) = self.w.current.as_ref() {
-			// The next index handling depends on our repeat mode.
-			match self.w.repeat {
-				Repeat::Off | Repeat::Queue => {
-					// If there's 1 track after this...
-					let next_index = current.index + 1;
-					if next_index < self.w.queue.len() {
-						// Return that index
-						Some(next_index)
-					// Else, we're either:
-					} else if self.w.repeat == Repeat::Queue {
-						Some(0) // repeating the queue or...
-					} else {
-						None // ... at the end of the queue
-					}
-				},
-
-				// User wants to repeat current song, return the current index
-				Repeat::Current => Some(current.index),
-			}
-		} else {
-			// Default to the 0th track if there is no `Current`.
-			Some(0)
-		};
-
-		// Get a `Option<Current>` based off the `Option<usize>` above.
-		let current = maybe_source_index.map(|index| {
-			Current {
-				// INVARIANT: index is checked above.
-				source: self.w.queue[index].clone(),
-				index,
-				elapsed: 0.0,
-			}
-		});
-		// Set our `Current`.
-		self.w.add_commit_push(|w, _| w.current = current.clone());
-
-		// Forward potential `Source` to `Audio/Decode`
-		if let Some(current) = current {
-			self.new_source(to_audio, to_decode, current.source);
-		}
+		// Re-use `skip()`'s inner function.
+		// INVARIANT: `self.queue_empty()` must be handled by us.
+		self.skip_inner(Skip { skip: 1 }, to_audio, to_decode);
 
 		try_send!(to_engine, self.audio_state_snapshot());
 	}
@@ -86,6 +36,7 @@ impl<Data: ValidData> Kernel<Data> {
 mod tests {
 	use super::*;
 	use crate::signal::add::{AddMany,InsertMethod};
+	use crate::signal::repeat::Repeat;
 	use crate::state::{AudioState,Current};
 	use pretty_assertions::assert_eq;
 	use std::thread::sleep;

@@ -20,7 +20,7 @@ impl<Data: ValidData> Kernel<Data> {
 		to_engine: &Sender<Result<AudioStateSnapshot<Data>, BackError>>,
 	) {
 		if self.queue_empty() {
-			try_send!(to_engine, Err(BackError::EmptyQueue));
+			try_send!(to_engine, Err(BackError::QueueEmpty));
 			return;
 		}
 
@@ -99,7 +99,7 @@ mod tests {
 			threshold: Some(BackThreshold { seconds: 0.0 }),
 		};
 		let resp = engine.back(back);
-		assert_eq!(resp, Err(BackError::EmptyQueue));
+		assert_eq!(resp, Err(BackError::QueueEmpty));
 		assert_eq!(engine.reader().get(), audio_state); // didn't change
 
 		// Our baseline audio state.
