@@ -8,8 +8,6 @@ Instead of defining them all in `kernel.rs` one after the other, [creating 1 lar
 
 Each signal can have extensive tests and other helper functions all without blowing the 1 file up.
 
-TODO: add `Engine` <-> `Kernel` <-> `Signal` tests
-
 This doesn't change functionality, although, maintaining `10 * 300 line` files is a much better feeling than `1 * 3000 line` file.
 
 These are all defined as a `kernel.rs/Kernel` method, and in the same shape, i.e:
@@ -29,3 +27,8 @@ mod tests {
 	}
 }
 ```
+
+## `*_inner()`
+Some signals are reused, e.g, `next()` just calls `skip()` with a value of `1`.
+
+In cases like this, the `skip()` function is separated into a more functional version `skip_inner()` which gets reused.
