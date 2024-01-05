@@ -18,6 +18,7 @@ use symphonia::core::audio::{AudioBuffer,SignalSpec, SampleBuffer,Signal};
 use cubeb::StereoFrame;
 use crossbeam::channel::{Sender,Receiver};
 use std::num::NonZeroUsize;
+use std::borrow::Cow;
 use std::sync::{
 	Arc,
 	atomic::{AtomicBool,Ordering},
@@ -61,21 +62,8 @@ where
 	/// The actual audio stream.
 	stream: cubeb::Stream<StereoFrame<f32>>,
 
-	/// A mutable bool shared between the caller
-	/// and the cubeb audio stream.
-	///
-	/// cubeb will set this to `true` in cases
-	/// of error, and the caller should be
-	/// polling it and setting it to false
-	/// when the error is ACK'ed.
-	///
-	/// HACK:
-	/// cubeb only provides 1 error type,
-	/// we don't know which actions caused
-	/// which errors, so we rely on this
-	/// "something recently caused and error
-	/// and i'm just gonna set this bool" hack.
-	error: Arc<AtomicBool>,
+	/// `cubeb` sent us an error (we don't know what it was).
+	error: Receiver<()>,
 
 	/// The resampler.
 	resampler: Option<R>,
@@ -184,8 +172,7 @@ where
 		self.samples.clear();
 
 		// If [cubeb] errored, forward it.
-		if self.error.load(Ordering::Acquire) {
-			self.error.store(false, Ordering::Release);
+		if self.error.try_recv().is_ok() {
 			Err(OutputError::Write)
 		} else {
 			Ok(())
@@ -295,7 +282,7 @@ where
 					E::InvalidFormat |
 					E::NotSupported  |
 					E::InvalidParameter => E2::InvalidFormat,
-					E::Error => E2::Unknown("unknown cubeb context error"),
+					E::Error => E2::Unknown(Cow::Borrowed("cubeb context error")),
 				});
 			},
 		};
@@ -309,8 +296,7 @@ where
 		let (sender, receiver)           = crossbeam::channel::bounded(channel_len);
 		let (discard, discard_recv)      = crossbeam::channel::bounded(1);
 		let (drained_send, drained_recv) = crossbeam::channel::bounded(1);
-		let error       = Arc::new(AtomicBool::new(false));
-		let error_cubeb = Arc::clone(&error);
+		let (error_send, error_recv)     = crossbeam::channel::unbounded();
 
 		// The actual audio stream.
 		let mut builder = cubeb::StreamBuilder::<StereoFrame<f32>>::new();
@@ -351,7 +337,7 @@ where
 							send!(drained_send, ());
 						}
 					},
-					S::Error => error_cubeb.store(true, Ordering::Release),
+					S::Error => drop(error_send.try_send(())),
 					S::Started | S::Stopped => {},
 				}
 			});
@@ -367,7 +353,7 @@ where
 					E::InvalidFormat |
 					E::NotSupported  |
 					E::InvalidParameter => E2::InvalidFormat,
-					E::Error => E2::Unknown("unknown cubeb init error"),
+					E::Error => E2::Unknown(Cow::Borrowed("cubeb init error")),
 				});
 			},
 		};
@@ -402,7 +388,7 @@ where
 
 		Ok(Self {
 			stream,
-			error,
+			error: error_recv,
 			sender,
 			discard,
 			drained: drained_recv,
@@ -425,7 +411,7 @@ where
 			Err(e) => Err(match e.code() {
 				E::DeviceUnavailable               => E2::DeviceUnavailable,
 				E::InvalidFormat | E::NotSupported => E2::InvalidFormat,
-				E::Error | E::InvalidParameter     => E2::Unknown("unknown cubeb start error"), // should never happen?
+				E::Error | E::InvalidParameter     => E2::Unknown(Cow::Borrowed("unknown cubeb start error")), // should never happen?
 			})
 		}
 	}
@@ -439,7 +425,7 @@ where
 			Err(e) => Err(match e.code() {
 				E::DeviceUnavailable               => E2::DeviceUnavailable,
 				E::InvalidFormat | E::NotSupported => E2::InvalidFormat,
-				E::Error | E::InvalidParameter     => E2::Unknown("unknown cubeb stop error"), // should never happen?
+				E::Error | E::InvalidParameter     => E2::Unknown(Cow::Borrowed("unknown cubeb stop error")), // should never happen?
 			})
 		}
 	}
