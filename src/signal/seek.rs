@@ -52,4 +52,26 @@ pub(crate) type SeekedTime = f64;
 pub enum SeekError {
 	/// TODO
 	NoActiveSource,
+    /// The track is not seekable.
+    Unseekable,
+    /// The track can only be seeked forward.
+    ForwardOnly,
+    /// An unknown seeking error occured.
+    Unknown,
+}
+
+use symphonia::core::errors::Error as E;
+impl From<E> for SeekError {
+	fn from(error: E) -> Self {
+		let E::SeekError(seek_error) = error else {
+			return Self::Unknown;
+		};
+
+		use symphonia::core::errors::SeekErrorKind as K;
+		match seek_error {
+			K::Unseekable => Self::Unseekable,
+			K::ForwardOnly => Self::ForwardOnly,
+			K::OutOfRange | K::InvalidTrack => Self::Unknown,
+		}
+	}
 }
