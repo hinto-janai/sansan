@@ -264,7 +264,7 @@ where
 		// can safely _not_ spawn [Caller] and drop the
 		// [Receiver] end of the channels.
 		if callbacks.all_none() {
-			drop((callbacks, shutdown, next, queue_end, repeat, elapsed));
+			drop((shutdown, next, queue_end, repeat, elapsed));
 		} else {
 			spawn_actor!(
 				"Caller",
@@ -298,11 +298,11 @@ where
 		let (a_to_k, k_from_a) = unbounded();
 		let (k_to_a, a_from_k) = unbounded();
 		let (err_a_to_k, err_k_from_a) = unbounded();
-		let (err_k_to_a, err_a_from_k) = if config.callbacks.error_output.as_ref().is_some_and(ErrorCallback::is_continue) {
-			(None, None)
-		} else {
+		let (err_k_to_a, err_a_from_k) = if let Some(cb) = callbacks.error_output {
 			let (tx, rx) = unbounded();
-			(Some(tx), Some(rx))
+			((Some((tx, cb))), Some(rx))
+		} else {
+			(None, None)
 		};
 
 		// Shared values [Audio] <-> [Kernel].
@@ -338,23 +338,21 @@ where
 		let (d_shutdown,    shutdown)        = bounded(1);
 		let (d_to_p,        p_from_d)        = bounded(1);
 		let (p_to_d,        d_from_p)        = bounded(1);
+
 		let (err_decode_d_to_k, err_decode_k_from_d) = unbounded();
-		let (err_decode_k_to_d, err_decode_d_from_k) =
-			if config.callbacks.error_decode.as_ref().is_some_and(ErrorCallback::is_continue)
-		{
-			(None, None)
-		} else {
+		let (err_decode_k_to_d, err_decode_d_from_k) = if let Some(cb) = callbacks.error_decode {
 			let (tx, rx) = unbounded();
-			(Some(tx), Some(rx))
+			((Some((tx, cb))), Some(rx))
+		} else {
+			(None, None)
 		};
+
 		let (err_source_d_to_k, err_source_k_from_d) = unbounded();
-		let (err_source_k_to_d, err_source_d_from_k) =
-			if config.callbacks.error_source.as_ref().is_some_and(ErrorCallback::is_continue)
-		{
-			(None, None)
-		} else {
+		let (err_source_k_to_d, err_source_d_from_k) = if let Some(cb) = callbacks.error_source {
 			let (tx, rx) = unbounded();
-			(Some(tx), Some(rx))
+			((Some((tx, cb))), Some(rx))
+		} else {
+			(None, None)
 		};
 		spawn_actor!(
 			"Decode",

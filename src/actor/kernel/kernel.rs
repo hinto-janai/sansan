@@ -43,8 +43,8 @@ use crate::{
 		RemoveError,
 		RemoveRange,
 	},
-	error::{SourceError, OutputError, DecodeError},
-	source::Source,
+	error::{SourceError, OutputError, DecodeError, SansanError},
+	source::Source, config::ErrorCallback,
 };
 use std::collections::VecDeque;
 use std::sync::{
@@ -66,9 +66,9 @@ pub(crate) struct Kernel<Data: ValidData> {
 	///
 	/// This originally was [audio_state] but this field is
 	/// accessed a lot, so it is just [w], for [w]riter.
-	pub(super) w:                   someday::Writer<AudioState<Data>>,
-	pub(super) shutdown_wait:       Arc<Barrier>,
-	pub(super) to_gc:               Sender<AudioState<Data>>,
+	pub(super) w:               someday::Writer<AudioState<Data>>,
+	pub(super) shutdown_wait:   Arc<Barrier>,
+	pub(super) to_gc:           Sender<AudioState<Data>>,
 	pub(super) back_threshold:  f64,
 }
 
@@ -120,16 +120,16 @@ pub(crate) struct Channels<Data: ValidData> {
 	// [Audio]
 	pub(crate) to_audio:         Sender<DiscardCurrentAudio>,
 	pub(crate) from_audio:       Receiver<AudioToKernel>,
-	pub(crate) to_audio_error:   Option<Sender<()>>,
+	pub(crate) to_audio_error:   Option<(Sender<()>, ErrorCallback)>,
 	pub(crate) from_audio_error: Receiver<OutputError>,
 
 	// [Decode]
 	pub(crate) to_decode:           Sender<KernelToDecode<Data>>,
 	pub(crate) from_decode_seek:    Receiver<Result<SeekedTime, SeekError>>,
 	pub(crate) from_decode_source:  Receiver<Result<(), SourceError>>,
-	pub(crate) to_decode_error_d:   Option<Sender<()>>,
+	pub(crate) to_decode_error_d:   Option<(Sender<()>, ErrorCallback)>,
 	pub(crate) from_decode_error_d: Receiver<DecodeError>,
-	pub(crate) to_decode_error_s:   Option<Sender<()>>,
+	pub(crate) to_decode_error_s:   Option<(Sender<()>, ErrorCallback)>,
 	pub(crate) from_decode_error_s: Receiver<SourceError>,
 
 	// Shared common return channel for signals that don't have special output.
@@ -224,7 +224,7 @@ where
 	#[inline(never)]
 	#[allow(clippy::cognitive_complexity)]
 	/// `Kernel`'s main function.
-	fn main(mut self, c: Channels<Data>) {
+	fn main(mut self, mut c: Channels<Data>) {
 		// Create channels that we will
 		// be selecting/listening to for all time.
 		let mut select = Select::new();
@@ -293,9 +293,9 @@ where
 				18 => self.remove_range( select_recv!(c.recv_remove_range), &c.to_audio, &c.to_decode, &c.send_remove_range),
 
 				// Errors.
-				19 => self.output_error(select_recv!(c.from_audio_error), &c),
-				20 => self.decode_error(select_recv!(c.from_decode_error_d), &c),
-				21 => self.source_error(select_recv!(c.from_decode_error_s), &c),
+				19 => self.handle_error(select_recv!(c.from_audio_error).into(), c.to_audio_error.as_mut()),
+				20 => self.handle_error(select_recv!(c.from_decode_error_d).into(), c.to_decode_error_d.as_mut()),
+				21 => self.handle_error(select_recv!(c.from_decode_error_s).into(), c.to_decode_error_s.as_mut()),
 
 				// Shutdown.
 				22 => {
@@ -338,25 +338,32 @@ where
 	}
 
 	//---------------------------------------------------------------------------------------------------- Error handling
+	#[cold]
+	#[inline(never)]
 	/// TODO
-	fn output_error(&self, error: OutputError, channels: &Channels<Data>) {
-		todo!();
-	}
-
-	/// TODO
-	fn decode_error(&self, error: DecodeError, channels: &Channels<Data>) {
-		todo!();
-	}
-
-	/// TODO
-	fn source_error(&self, error: SourceError, channels: &Channels<Data>) {
-		todo!();
+	fn handle_error(
+		&mut self,
+		error: SansanError,
+		channel_and_callback: Option<&mut (Sender<()>, ErrorCallback)>,
+	) {
+		if let Some((channel, callback)) = channel_and_callback {
+			match callback {
+				ErrorCallback::Pause => self.pause_inner(),
+				ErrorCallback::PauseAndFn(f) => {
+					self.pause_inner();
+					f(error);
+				},
+				ErrorCallback::Fn(f) => f(error),
+			}
+			try_send!(channel, ());
+		}
 	}
 
 	//---------------------------------------------------------------------------------------------------- Misc Functions
 	// These are helper functions mostly used throughout
 	// the various signal handlers in the `kernel/` module.
 
+	#[inline]
 	/// TODO
 	pub(super) fn new_source(
 		&self,
@@ -369,6 +376,7 @@ where
 		try_send!(to_decode, KernelToDecode::NewSource(source));
 	}
 
+	#[inline]
 	/// TODO
 	pub(super) fn tell_audio_to_discard(&self, to_audio: &Sender<DiscardCurrentAudio>) {
 		// INVARIANT:
@@ -381,6 +389,7 @@ where
 		try_send!(to_audio, DiscardCurrentAudio);
 	}
 
+	#[inline]
 	/// TODO
 	pub(super) fn tell_decode_to_discard(to_decode: &Sender<KernelToDecode<Data>>) {
 		try_send!(to_decode, KernelToDecode::DiscardAudioAndStop);

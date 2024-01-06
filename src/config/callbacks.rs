@@ -28,24 +28,24 @@ use crate::Engine; // docs
 /// These are solely used in [`Config`], where each particular
 /// error point can be given a variant of [`ErrorCallback`] that
 /// determines what action `sansan` will take in the case.
+///
+/// # TODO - `None` behavior
+/// Continue playback.
+///
+/// `sansan` will essentially do nothing
+/// when this behavior is selected.
+///
+/// The tracks in the queue will continue
+/// to be decoded and played, even if the
+/// audio output device is not connected.
+///
+/// I.e, track progress will continue regardless of errors.
+///
+/// For `audio_source_behavior` in [`Config`], this does the same as [`Self::Skip`]
+/// since we cannot "continue" a [`Source`] that does not work (i.e, missing file).
+///
+/// This is the default behavior.
 pub enum ErrorCallback {
-	/// Continue playback.
-	///
-	/// `sansan` will essentially do nothing
-	/// when this behavior is selected.
-	///
-	/// The tracks in the queue will continue
-	/// to be decoded and played, even if the
-	/// audio output device is not connected.
-	///
-	/// I.e, track progress will continue regardless of errors.
-	///
-	/// For `audio_source_behavior` in [`Config`], this does the same as [`Self::Skip`]
-	/// since we cannot "continue" a [`Source`] that does not work (i.e, missing file).
-	///
-	/// This is the default behavior.
-	Continue,
-
 	/// Pause the audio stream.
 	///
 	/// This will set the [`AudioState`]'s `playing`
@@ -53,22 +53,18 @@ pub enum ErrorCallback {
 	Pause,
 
 	/// TODO
-	Function(Box<dyn FnMut(SansanError) + Send + Sync + 'static>),
+	PauseAndFn(Box<dyn FnMut(SansanError) + Send + Sync + 'static>),
+
+	/// TODO
+	Fn(Box<dyn FnMut(SansanError) + Send + Sync + 'static>),
 }
 
 impl ErrorCallback {
 	/// ```rust
 	/// # use sansan::config::*;
-	/// assert_eq!(ErrorCallback::DEFAULT, ErrorCallback::Continue);
-	/// assert_eq!(ErrorCallback::DEFAULT, ErrorCallback::default());
+	/// assert!(ErrorCallback::DEFAULT.is_pause());
 	/// ```
-	pub const DEFAULT: Self = Self::Continue;
-
-	#[must_use]
-	/// Returns `true` if `self == ErrorCallback::Continue`
-	pub const fn is_continue(&self) -> bool {
-		matches!(self, Self::Continue)
-	}
+	pub const DEFAULT: Self = Self::Pause;
 
 	#[must_use]
 	/// Returns `true` if `self == ErrorCallback::Pause`
@@ -77,9 +73,15 @@ impl ErrorCallback {
 	}
 
 	#[must_use]
-	/// Returns `true` if `self == ErrorCallback::Function(_)`
-	pub const fn is_function(&self) -> bool {
-		matches!(self, Self::Function(_))
+	/// Returns `true` if `self == ErrorCallback::PauseAndFn(_)`
+	pub const fn is_pause_and_fn(&self) -> bool {
+		matches!(self, Self::PauseAndFn(_))
+	}
+
+	#[must_use]
+	/// Returns `true` if `self == ErrorCallback::Fn(_)`
+	pub const fn is_fn(&self) -> bool {
+		matches!(self, Self::Fn(_))
 	}
 }
 

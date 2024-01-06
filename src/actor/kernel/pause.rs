@@ -21,15 +21,20 @@ impl<Data: ValidData> Kernel<Data> {
 			return;
 		}
 
-		self.atomic_state.playing.store(false, Ordering::Release);
-
-		self.w.add_commit_push(|w, _| {
-			debug_assert!(w.current.is_some());
-			debug_assert!(w.playing);
-			w.playing = false;
-		});
+		self.pause_inner();
 
 		try_send!(to_engine, self.audio_state_snapshot());
+	}
+
+	/// TODO
+	pub(super) fn pause_inner(&mut self) {
+		debug_assert!(self.w.current.is_some());
+		debug_assert!(self.w.playing);
+
+		self.atomic_state.playing.store(false, Ordering::Release);
+		self.w.add_commit_push(|w, _| {
+			w.playing = false;
+		});
 	}
 }
 
