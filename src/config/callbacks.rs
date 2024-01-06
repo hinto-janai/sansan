@@ -15,63 +15,100 @@ use std::{
 #[allow(unused_imports)]
 use crate::Engine; // docs
 
-//---------------------------------------------------------------------------------------------------- Callback
+//---------------------------------------------------------------------------------------------------- ErrorCallback
+/// The action `sansan` will take on various errors
+///
+/// `sansan` can error in various situations:
+/// - During playback (e.g, audio device was unplugged)
+/// - During decoding (e.g, corrupted data)
+/// - During [`Source`] loading (e.g, file doesn't exist)
+///
+/// When these errors occur, what should `sansan` do?
+///
+/// These are solely used in [`Config`], where each particular
+/// error point can be given a variant of [`ErrorCallback`] that
+/// determines what action `sansan` will take in the case.
+pub enum ErrorCallback {
+	/// Continue playback.
+	///
+	/// `sansan` will essentially do nothing
+	/// when this behavior is selected.
+	///
+	/// The tracks in the queue will continue
+	/// to be decoded and played, even if the
+	/// audio output device is not connected.
+	///
+	/// I.e, track progress will continue regardless of errors.
+	///
+	/// For `audio_source_behavior` in [`Config`], this does the same as [`Self::Skip`]
+	/// since we cannot "continue" a [`Source`] that does not work (i.e, missing file).
+	///
+	/// This is the default behavior.
+	Continue,
+
+	/// Pause the audio stream.
+	///
+	/// This will set the [`AudioState`]'s `playing`
+	/// to `false` and pause playback.
+	Pause,
+
+	/// TODO
+	Function(Box<dyn FnMut(SansanError) + Send + Sync + 'static>),
+}
+
+impl ErrorCallback {
+	/// ```rust
+	/// # use sansan::config::*;
+	/// assert_eq!(ErrorCallback::DEFAULT, ErrorCallback::Continue);
+	/// assert_eq!(ErrorCallback::DEFAULT, ErrorCallback::default());
+	/// ```
+	pub const DEFAULT: Self = Self::Continue;
+
+	#[must_use]
+	/// Returns `true` if `self == ErrorCallback::Continue`
+	pub const fn is_continue(&self) -> bool {
+		matches!(self, Self::Continue)
+	}
+
+	#[must_use]
+	/// Returns `true` if `self == ErrorCallback::Pause`
+	pub const fn is_pause(&self) -> bool {
+		matches!(self, Self::Pause)
+	}
+
+	#[must_use]
+	/// Returns `true` if `self == ErrorCallback::Function(_)`
+	pub const fn is_function(&self) -> bool {
+		matches!(self, Self::Function(_))
+	}
+}
+
+impl Default for ErrorCallback {
+	fn default() -> Self {
+		Self::DEFAULT
+	}
+}
+
+//---------------------------------------------------------------------------------------------------- Callbacks
 /// Boxed, dynamically dispatched function with access to the current audio state.
 pub(crate) type Callback = Box<dyn FnMut() + Send + 'static>;
 
-//---------------------------------------------------------------------------------------------------- Callbacks
 /// TODO
-// ```rust
-// # use sansan::*;
-// # use sansan::config::*;
-// # use sansan::state::*;
-// # use std::sync::{*,atomic::*};
-// // Create an empty `Callbacks`.
-// let mut callbacks = Callbacks::new();
-//
-// // Add a dynamically dispatched callback that:
-// // - Allocates
-// // - Uses `Box<dyn>`
-// // - Can capture variables
-// let queue_ended = Arc::new(AtomicBool::new(false));
-// let clone = Arc::clone(&queue_ended);
-// callbacks.queue_end(Callback::Dynamic(
-//     Box::new(move |audio_state: &AudioState<()>| {
-//         clone.store(true, Ordering::Relaxed)
-//     })
-// ));
-//
-// // Add a function pointer callback that:
-// // - Doesn't require allocation
-// // - Doesn't capture any variables
-// // - Mutates global state (stdout and atomic)
-// static REPEATS: AtomicUsize = AtomicUsize::new(0);
-// fn repeat(audio_state: &AudioState<()>) {
-//     println!("repeating queue/track");
-//     println!("current audio state: {audio_state:#?}");
-//     REPEATS.fetch_add(1, Ordering::Relaxed);
-// }
-// callbacks.next(Callback::Pointer(repeat));
-//
-// // Add a channel callback that:
-// // - Doesn't allocate (other than the channel itself)
-// // - Uses `SansanReceiver` + `SansanSender` (crossbeam or std or tokio)
-// // - Acts as an empty "notification" that something happened
-// let (elapsed_send, elapsed_recv) = crossbeam::channel::unbounded();
-// let duration = std::time::Duration::from_secs(1);
-// callbacks.elapsed(Callback::Channel(elapsed_send), duration);
-// ```
 pub struct Callbacks {
 	/// TODO
-	pub(crate) next:      Option<Callback>,
+	pub(crate) next: Option<Callback>,
 	/// TODO
 	pub(crate) queue_end: Option<Callback>,
 	/// TODO
-	pub(crate) repeat:    Option<Callback>,
+	pub(crate) repeat: Option<Callback>,
 	/// TODO
-	pub(crate) elapsed:   Option<(Callback, f64)>,
+	pub(crate) elapsed: Option<(Callback, f64)>,
 	/// TODO
-	pub(crate) error:     Option<Callback>,
+	pub(crate) error_decode: Option<ErrorCallback>,
+	/// TODO
+	pub(crate) error_source: Option<ErrorCallback>,
+	/// TODO
+	pub(crate) error_output: Option<ErrorCallback>,
 }
 
 //---------------------------------------------------------------------------------------------------- Callbacks Impl
@@ -85,11 +122,13 @@ impl Callbacks {
 	/// assert!(callbacks.all_none());
 	/// ```
 	pub const DEFAULT: Self = Self {
-		next:      None,
-		queue_end: None,
-		repeat:    None,
-		elapsed:   None,
-		error:     None,
+		next:         None,
+		queue_end:    None,
+		repeat:       None,
+		elapsed:      None,
+		error_decode: None,
+		error_source: None,
+		error_output: None,
 	};
 
 	#[cold]
@@ -113,7 +152,9 @@ impl Callbacks {
 		self.queue_end.is_none()    &&
 		self.repeat.is_none()       &&
 		self.elapsed.is_none()      &&
-		self.error.is_none()
+		self.error_decode.is_none() &&
+		self.error_source.is_none() &&
+		self.error_output.is_none()
 	}
 
 	/// TODO
@@ -123,7 +164,9 @@ impl Callbacks {
 		self.queue_end.is_some()    &&
 		self.repeat.is_some()       &&
 		self.elapsed.is_some()      &&
-		self.error.is_some()
+		self.error_decode.is_some() &&
+		self.error_source.is_some() &&
+		self.error_output.is_some()
 	}
 
 	#[cold]
@@ -177,11 +220,22 @@ impl Callbacks {
 
 	#[cold]
 	/// TODO
-	pub fn error<F>(&mut self, callback: F) -> &mut Self
-	where
-		F: FnMut() + Send + Sync + 'static
-	{
-		self.error = Some(Box::new(callback));
+	pub fn error_decode(&mut self, error_callback: ErrorCallback) -> &mut Self {
+		self.error_decode = Some(error_callback);
+		self
+	}
+
+	#[cold]
+	/// TODO
+	pub fn error_source(&mut self, error_callback: ErrorCallback) -> &mut Self {
+		self.error_source = Some(error_callback);
+		self
+	}
+
+	#[cold]
+	/// TODO
+	pub fn error_output(&mut self, error_callback: ErrorCallback) -> &mut Self {
+		self.error_output = Some(error_callback);
 		self
 	}
 }
@@ -209,11 +263,13 @@ impl fmt::Debug for Callbacks {
 		const NONE: &str = "None";
 
 		f.debug_struct("Callbacks")
-			.field("next",      if self.next.is_some()      { &SOME } else { &NONE })
-			.field("queue_end", if self.queue_end.is_some() { &SOME } else { &NONE })
-			.field("repeat",    if self.repeat.is_some()    { &SOME } else { &NONE })
-			.field("elapsed",   if self.elapsed.is_some()   { &SOME } else { &NONE })
-			.field("error",     if self.error.is_some()     { &SOME } else { &NONE })
+			.field("next",         if self.next.is_some()         { &SOME } else { &NONE })
+			.field("queue_end",    if self.queue_end.is_some()    { &SOME } else { &NONE })
+			.field("repeat",       if self.repeat.is_some()       { &SOME } else { &NONE })
+			.field("elapsed",      if self.elapsed.is_some()      { &SOME } else { &NONE })
+			.field("error_decode", if self.error_decode.is_some() { &SOME } else { &NONE })
+			.field("error_source", if self.error_source.is_some() { &SOME } else { &NONE })
+			.field("error_output", if self.error_output.is_some() { &SOME } else { &NONE })
 			.finish()
 	}
 }

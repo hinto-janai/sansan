@@ -2,7 +2,7 @@
 use std::{thread::JoinHandle, marker::PhantomData};
 use crate::{
 	state::{AudioStateSnapshot,AudioStateReader,AudioState,ValidData, AtomicAudioState},
-	config::{Config,Callback,Callbacks},
+	config::{Config,Callback,Callbacks,ErrorCallback},
 	actor::{
 		audio::{Audio,AUDIO_BUFFER_LEN},
 		decode::Decode,
@@ -235,7 +235,12 @@ where
 		// Only spawn [Caller] is callbacks exist,
 		// and only send messages from other actors
 		// if there are [Callback]'s in the vector.
-		let callbacks = config.callbacks;
+		let callbacks = {
+			// Prevent destructing `config`.
+			let mut cb = Callbacks::DEFAULT;
+			std::mem::swap(&mut cb, &mut config.callbacks);
+			cb
+		};
 
 		// Initialize [Caller]'s channels.
 		let (c_shutdown,          shutdown)  = bounded(1);
@@ -292,6 +297,13 @@ where
 		let (a_to_d, d_from_a) = unbounded();
 		let (a_to_k, k_from_a) = unbounded();
 		let (k_to_a, a_from_k) = unbounded();
+		let (err_a_to_k, err_k_from_a) = unbounded();
+		let (err_k_to_a, err_a_from_k) = if config.callbacks.error_output.as_ref().is_some_and(ErrorCallback::is_continue) {
+			(None, None)
+		} else {
+			let (tx, rx) = unbounded();
+			(Some(tx), Some(rx))
+		};
 
 		// Shared values [Audio] <-> [Kernel].
 		let audio_ready_to_recv = Arc::new(AtomicBool::new(false));
@@ -312,7 +324,8 @@ where
 				from_decode:       a_from_d,
 				to_kernel:         a_to_k,
 				from_kernel:       a_from_k,
-				eb_output:         config.error_behavior_output,
+				to_kernel_error:   err_a_to_k,
+				from_kernel_error: err_a_from_k,
 			},
 			Audio::<AudioOutputStruct<ResamplerStruct>>::init
 		);
@@ -325,6 +338,24 @@ where
 		let (d_shutdown,    shutdown)        = bounded(1);
 		let (d_to_p,        p_from_d)        = bounded(1);
 		let (p_to_d,        d_from_p)        = bounded(1);
+		let (err_decode_d_to_k, err_decode_k_from_d) = unbounded();
+		let (err_decode_k_to_d, err_decode_d_from_k) =
+			if config.callbacks.error_decode.as_ref().is_some_and(ErrorCallback::is_continue)
+		{
+			(None, None)
+		} else {
+			let (tx, rx) = unbounded();
+			(Some(tx), Some(rx))
+		};
+		let (err_source_d_to_k, err_source_k_from_d) = unbounded();
+		let (err_source_k_to_d, err_source_d_from_k) =
+			if config.callbacks.error_source.as_ref().is_some_and(ErrorCallback::is_continue)
+		{
+			(None, None)
+		} else {
+			let (tx, rx) = unbounded();
+			(Some(tx), Some(rx))
+		};
 		spawn_actor!(
 			"Decode",
 			crate::actor::decode::InitArgs {
@@ -340,9 +371,10 @@ where
 				to_kernel_seek:      d_to_k_seek,
 				to_kernel_source:    d_to_k_source,
 				from_kernel:         d_from_k,
-				eb_seek:             config.error_behavior_seek,
-				eb_decode:           config.error_behavior_decode,
-				eb_source:           config.error_behavior_source,
+				to_kernel_error_d:   err_decode_d_to_k,
+				from_kernel_error_d: err_decode_d_from_k,
+				to_kernel_error_s:   err_source_d_to_k,
+				from_kernel_error_s: err_source_d_from_k,
 			},
 			Decode::init
 		);
@@ -459,11 +491,17 @@ where
 			recv_next,
 			recv_previous,
 			recv_stop,
-			to_audio:           k_to_a,
-			from_audio:         k_from_a,
-			to_decode:          k_to_d,
-			from_decode_seek:   k_from_d_seek,
-			from_decode_source: k_from_d_source,
+			to_audio:            k_to_a,
+			from_audio:          k_from_a,
+			to_audio_error:      err_k_to_a,
+			from_audio_error:    err_k_from_a,
+			to_decode:           k_to_d,
+			from_decode_seek:    k_from_d_seek,
+			from_decode_source:  k_from_d_source,
+			to_decode_error_d:   err_decode_k_to_d,
+			to_decode_error_s:   err_source_k_to_d,
+			from_decode_error_d: err_decode_k_from_d,
+			from_decode_error_s: err_source_k_from_d,
 			send_audio_state,
 			recv_clear,
 			recv_repeat,

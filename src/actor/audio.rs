@@ -3,23 +3,19 @@
 //---------------------------------------------------------------------------------------------------- Use
 use std::thread::JoinHandle;
 use crossbeam::channel::{Receiver, Select, Sender};
-use strum::EnumCount;
-use crate::{
-	state::AudioState,
-	config::ErrorBehavior,
-};
 use symphonia::core::{audio::AudioBuffer, units::Time};
 use std::sync::{
 	Arc,
 	Barrier,
 	atomic::{AtomicBool,Ordering},
 };
+use crate::error::OutputError;
 use crate::actor::kernel::DiscardCurrentAudio;
 use crate::audio::{
 	output::AudioOutput,
 	resampler::Resampler,
 };
-use crate::macros::{send,try_recv,debug2,try_send,select_recv};
+use crate::macros::{send,try_recv,debug2,try_send,select_recv,recv};
 use crate::signal::Volume;
 use crate::state::AtomicAudioState;
 
@@ -58,13 +54,12 @@ pub(crate) struct Audio<Output>
 where
 	Output: AudioOutput,
 {
-	atomic_state:  Arc<AtomicAudioState>, // Shared atomic audio state with the rest of the actors
-	playing:       bool,                  // A local boolean so we don't have to atomic access each loop
-	elapsed:       f64,                   // Elapsed time, used for the elapsed callback (f64 is reset each call)
-	ready_to_recv: Arc<AtomicBool>,       // [Audio]'s way of telling [Decode] it is ready for samples
-	shutdown_wait: Arc<Barrier>,          // Shutdown barrier between all actors
-	output:        Output,                // Audio hardware/server connection
-	eb_output:     ErrorBehavior,         // Behavior on audio output errors
+	atomic_state:      Arc<AtomicAudioState>, // Shared atomic audio state with the rest of the actors
+	playing:           bool,                  // A local boolean so we don't have to atomic access each loop
+	elapsed:           f64,                   // Elapsed time, used for the elapsed callback (f64 is reset each call)
+	ready_to_recv:     Arc<AtomicBool>,       // [Audio]'s way of telling [Decode] it is ready for samples
+	shutdown_wait:     Arc<Barrier>,          // Shutdown barrier between all actors
+	output:            Output,                // Audio hardware/server connection
 }
 
 //---------------------------------------------------------------------------------------------------- Channels
@@ -81,6 +76,11 @@ struct Channels {
 
 	to_kernel:   Sender<AudioToKernel>,
 	from_kernel: Receiver<DiscardCurrentAudio>,
+
+	to_kernel_error:   Sender<OutputError>,
+	// If this is `Some`, we must hang on the channel until `Kernel`
+	// responds, else, we can continue, as in [`ErrorCallback::Continue`].
+	from_kernel_error: Option<Receiver<()>>,
 }
 
 //---------------------------------------------------------------------------------------------------- (Actual) Messages
@@ -115,7 +115,8 @@ pub(crate) struct InitArgs {
 	pub(crate) from_decode:       Receiver<(AudioBuffer<f32>, Time)>,
 	pub(crate) to_kernel:         Sender<AudioToKernel>,
 	pub(crate) from_kernel:       Receiver<DiscardCurrentAudio>,
-	pub(crate) eb_output:         ErrorBehavior,
+	pub(crate) to_kernel_error:   Sender<OutputError>,
+	pub(crate) from_kernel_error: Option<Receiver<()>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Audio Impl
@@ -143,7 +144,8 @@ where
 					from_decode,
 					to_kernel,
 					from_kernel,
-					eb_output,
+					to_kernel_error,
+					from_kernel_error,
 				} = args;
 
 				let channels = Channels {
@@ -154,6 +156,8 @@ where
 					from_decode,
 					to_kernel,
 					from_kernel,
+					to_kernel_error,
+					from_kernel_error,
 				};
 
 				// TODO:
@@ -168,7 +172,6 @@ where
 					ready_to_recv,
 					shutdown_wait,
 					output,
-					eb_output,
 				};
 
 				if let Some(init_barrier) = init_barrier {
@@ -198,12 +201,7 @@ where
 			// If we're playing, check if we have samples to play.
 			if self.playing {
 				if let Ok(msg) = c.from_decode.try_recv() {
-					self.play_audio_buffer(
-						msg,
-						&c.to_gc,
-						&c.to_kernel,
-						&c.to_caller_elapsed
-					);
+					self.play_audio_buffer(msg, &c);
 				}
 			}
 
@@ -230,12 +228,7 @@ where
 				// From `Decode`.
 				0 => {
 					let msg = select_recv!(c.from_decode);
-					self.play_audio_buffer(
-						msg,
-						&c.to_gc,
-						&c.to_kernel,
-						&c.to_caller_elapsed
-					);
+					self.play_audio_buffer(msg, &c);
 				},
 
 				// From `Kernel`.
@@ -275,9 +268,7 @@ where
 	fn play_audio_buffer(
 		&mut self,
 		msg: (AudioBuffer<f32>, symphonia::core::units::Time),
-		to_gc: &Sender<AudioBuffer<f32>>,
-		to_kernel: &Sender<AudioToKernel>,
-		to_caller_elapsed: &Option<(Sender<()>, f64)>,
+		c: &Channels,
 	) {
 		let (audio, time) = msg;
 
@@ -296,9 +287,12 @@ where
 			) {
 				Ok(o)  => self.output = o,
 				// And if we couldn't, tell `Kernel` we errored.
-				Err(e) => match self.eb_output {
-					ErrorBehavior::Continue => todo!(),
-					ErrorBehavior::Pause    => todo!(), // TODO: tell [Kernel] to pause
+				Err(e) => {
+					try_send!(c.to_kernel_error, e);
+					if let Some(channel) = c.from_kernel_error.as_ref() {
+						recv!(channel);
+					}
+					return;
 				},
 			}
 		}
@@ -306,19 +300,17 @@ where
 		let volume = self.atomic_state.volume.get();
 
 		// Write audio buffer (hangs).
-		if let Err(e) = self.output.write(audio, to_gc, volume) {
-			// TODO: Send error the engine backchannel
-			// or discard depending on user config.
-			#[allow(clippy::match_same_arms)] // TODO
-			match self.eb_output {
-				ErrorBehavior::Continue => todo!(),
-				ErrorBehavior::Pause    => todo!(), // TODO: tell [Kernel] to pause
+		if let Err(e) = self.output.write(audio, &c.to_gc, volume) {
+			try_send!(c.to_kernel_error, e);
+			if let Some(channel) = c.from_kernel_error.as_ref() {
+				recv!(channel);
 			}
+			return;
 		}
 
 		// Notify [Caller] if enough time
 		// has elapsed in the current track.
-		if let Some((sender, elapsed_target)) = to_caller_elapsed.as_ref() {
+		if let Some((sender, elapsed_target)) = c.to_caller_elapsed.as_ref() {
 			let total_seconds = time.seconds as f64 + time.frac;
 
 			if total_seconds >= *elapsed_target {
@@ -329,7 +321,7 @@ where
 
 		// TODO: tell [Kernel] we just wrote
 		// an audio buffer with [time] timestamp.
-		try_send!(to_kernel, AudioToKernel::WroteAudioBuffer(time));
+		try_send!(c.to_kernel, AudioToKernel::WroteAudioBuffer(time));
 	}
 
 	#[inline]

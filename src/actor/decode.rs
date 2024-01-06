@@ -9,8 +9,7 @@ use crate::{
 	state::{AudioState, ValidData},
 	actor::{audio::TookAudioBuffer,kernel::KernelToDecode},
 	macros::{recv,send,try_send,try_recv,debug2,select_recv},
-	config::ErrorBehavior,
-	error::SourceError,
+	error::{SourceError,DecodeError, SansanError},
 };
 use symphonia::core::{
 	audio::AudioBuffer,
@@ -56,9 +55,6 @@ pub(crate) struct Decode<Data: ValidData> {
 	to_pool:             Sender<VecDeque<ToAudio>>,   // Old buffer send to [Pool]
 	from_pool:           Receiver<VecDeque<ToAudio>>, // New buffer recv from [Pool]
 	shutdown_wait:       Arc<Barrier>,                // Shutdown barrier between all actors
-	eb_seek:             ErrorBehavior,               // Behavior on seek errors
-	eb_decode:           ErrorBehavior,               // Behavior on decoding errors
-	eb_source:           ErrorBehavior,               // Behavior on [Source] -> [SourceDecode] errors
 	_p:                  PhantomData<Data>,
 }
 
@@ -72,6 +68,13 @@ struct Channels<Data: ValidData> {
 	to_kernel_seek:   Sender<Result<SeekedTime, SeekError>>,
 	to_kernel_source: Sender<Result<(), SourceError>>,
 	from_kernel:      Receiver<KernelToDecode<Data>>,
+
+	// If the `from` channesl are `Some`, we must hang on the channel until
+	// `Kernel` responds, else, we can continue, as in [`ErrorCallback::Continue`].
+	to_kernel_error_d:   Sender<DecodeError>,
+	from_kernel_error_d: Option<Receiver<()>>,
+	to_kernel_error_s:   Sender<SourceError>,
+	from_kernel_error_s: Option<Receiver<()>>,
 }
 
 //---------------------------------------------------------------------------------------------------- (Actual) Messages
@@ -99,9 +102,10 @@ pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) to_kernel_seek:      Sender<Result<SeekedTime, SeekError>>,
 	pub(crate) to_kernel_source:    Sender<Result<(), SourceError>>,
 	pub(crate) from_kernel:         Receiver<KernelToDecode<Data>>,
-	pub(crate) eb_seek:             ErrorBehavior,
-	pub(crate) eb_decode:           ErrorBehavior,
-	pub(crate) eb_source:           ErrorBehavior,
+	pub(crate) to_kernel_error_d:   Sender<DecodeError>,
+	pub(crate) from_kernel_error_d: Option<Receiver<()>>,
+	pub(crate) to_kernel_error_s:   Sender<SourceError>,
+	pub(crate) from_kernel_error_s: Option<Receiver<()>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Decode Impl
@@ -127,9 +131,10 @@ impl<Data: ValidData> Decode<Data> {
 					to_kernel_seek,
 					to_kernel_source,
 					from_kernel,
-					eb_seek,
-					eb_decode,
-					eb_source,
+					to_kernel_error_d,
+					from_kernel_error_d,
+					to_kernel_error_s,
+					from_kernel_error_s,
 				} = args;
 
 				let channels = Channels {
@@ -140,6 +145,10 @@ impl<Data: ValidData> Decode<Data> {
 					to_kernel_seek,
 					to_kernel_source,
 					from_kernel,
+					to_kernel_error_d,
+					from_kernel_error_d,
+					to_kernel_error_s,
+					from_kernel_error_s,
 				};
 
 				let this = Self {
@@ -150,9 +159,6 @@ impl<Data: ValidData> Decode<Data> {
 					to_pool,
 					from_pool,
 					shutdown_wait,
-					eb_seek,
-					eb_decode,
-					eb_source,
 					_p: PhantomData,
 				};
 
@@ -230,7 +236,7 @@ impl<Data: ValidData> Decode<Data> {
 
 				// An actual error happened.
 				Err(e) => {
-					self.handle_error(e, self.eb_decode, "packet");
+					Self::handle_decode_error(&channels, DecodeError::from(e));
 					continue;
 				},
 			};
@@ -250,7 +256,7 @@ impl<Data: ValidData> Decode<Data> {
 					self.send_or_store_audio(&channels.to_audio, (audio, time));
 				}
 
-				Err(e) => self.handle_error(e, self.eb_decode, "decode"),
+				Err(e) => Self::handle_decode_error(&channels, DecodeError::from(e)),
 			}
 
 			// Send garbage to [Gc] instead of dropping locally.
@@ -266,7 +272,7 @@ impl<Data: ValidData> Decode<Data> {
 	/// Handle message's from `Kernel`.
 	fn msg_from_kernel(&mut self, channels: &Channels<Data>, msg: KernelToDecode<Data>) {
 		match msg {
-			KernelToDecode::NewSource(source)   => self.new_source(source, &channels.to_gc),
+			KernelToDecode::NewSource(source)   => self.new_source(source, channels),
 			KernelToDecode::Seek(seek)          => self.seek(seek, &channels.to_kernel_seek),
 			KernelToDecode::DiscardAudioAndStop => self.discard_audio_and_stop(),
 		}
@@ -302,16 +308,16 @@ impl<Data: ValidData> Decode<Data> {
 
 	#[inline]
 	/// TODO
-	fn new_source(&mut self, source: Source<Data>, to_gc: &Sender<DecodeToGc>) {
+	fn new_source(&mut self, source: Source<Data>, channels: &Channels<Data>) {
 		match source.try_into() {
 			Ok(mut s) => {
 				self.swap_audio_buffer();
 				std::mem::swap(&mut self.source, &mut s);
-				try_send!(to_gc, DecodeToGc::Source(s));
+				try_send!(channels.to_gc, DecodeToGc::Source(s));
 				self.done_decoding = false;
 			},
 
-			Err(e) => self.handle_error(e, self.eb_source, "source"),
+			Err(e) => Self::handle_source_error(channels, e),
 		}
 	}
 
@@ -334,22 +340,27 @@ impl<Data: ValidData> Decode<Data> {
 			SeekTo::Time { time, track_id: None },
 		) {
 			Ok(_)  => try_send!(to_kernel_seek, Ok(time.seconds as f64 + time.frac)),
-			Err(e) => self.handle_error(e, self.eb_seek, "seek"),
+			Err(e) => try_send!(to_kernel_seek, Err(e.into())),
 		}
 	}
 
 	#[cold]
 	#[inline(never)]
 	/// TODO
-	fn handle_error<E: std::error::Error>(
-		&mut self,
-		error:      E,
-		behavior:   ErrorBehavior,
-		error_type: &'static str,
-	) {
-		match behavior {
-			ErrorBehavior::Continue => todo!(),
-			ErrorBehavior::Pause    => todo!(), // TODO: tell [Kernel] to pause
+	fn handle_decode_error(channels: &Channels<Data>, error: DecodeError) {
+		try_send!(channels.to_kernel_error_d, error);
+		if let Some(channel) = channels.from_kernel_error_d.as_ref() {
+			recv!(channel);
+		}
+	}
+
+	#[cold]
+	#[inline(never)]
+	/// TODO
+	fn handle_source_error(channels: &Channels<Data>, error: SourceError) {
+		try_send!(channels.to_kernel_error_s, error);
+		if let Some(channel) = channels.from_kernel_error_s.as_ref() {
+			recv!(channel);
 		}
 	}
 

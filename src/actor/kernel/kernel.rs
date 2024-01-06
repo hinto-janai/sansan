@@ -43,7 +43,7 @@ use crate::{
 		RemoveError,
 		RemoveRange,
 	},
-	error::SourceError,
+	error::{SourceError, OutputError, DecodeError},
 	source::Source,
 };
 use std::collections::VecDeque;
@@ -118,13 +118,19 @@ pub(crate) struct Channels<Data: ValidData> {
 	pub(crate) shutdown_actor: Box<[Sender<()>]>,
 
 	// [Audio]
-	pub(crate) to_audio:   Sender<DiscardCurrentAudio>,
-	pub(crate) from_audio: Receiver<AudioToKernel>,
+	pub(crate) to_audio:         Sender<DiscardCurrentAudio>,
+	pub(crate) from_audio:       Receiver<AudioToKernel>,
+	pub(crate) to_audio_error:   Option<Sender<()>>,
+	pub(crate) from_audio_error: Receiver<OutputError>,
 
 	// [Decode]
-	pub(crate) to_decode:          Sender<KernelToDecode<Data>>,
-	pub(crate) from_decode_seek:   Receiver<Result<SeekedTime, SeekError>>,
-	pub(crate) from_decode_source: Receiver<Result<(), SourceError>>,
+	pub(crate) to_decode:           Sender<KernelToDecode<Data>>,
+	pub(crate) from_decode_seek:    Receiver<Result<SeekedTime, SeekError>>,
+	pub(crate) from_decode_source:  Receiver<Result<(), SourceError>>,
+	pub(crate) to_decode_error_d:   Option<Sender<()>>,
+	pub(crate) from_decode_error_d: Receiver<DecodeError>,
+	pub(crate) to_decode_error_s:   Option<Sender<()>>,
+	pub(crate) from_decode_error_s: Receiver<SourceError>,
 
 	// Shared common return channel for signals that don't have special output.
 	pub(crate) send_audio_state: Sender<AudioStateSnapshot<Data>>,
@@ -245,8 +251,12 @@ where
 		assert_eq!(16, select.recv(&c.recv_set_index));
 		assert_eq!(17, select.recv(&c.recv_remove));
 		assert_eq!(18, select.recv(&c.recv_remove_range));
-		assert_eq!(19, select.recv(&c.shutdown));
-		assert_eq!(20, select.recv(&c.shutdown_hang));
+		//
+		assert_eq!(19, select.recv(&c.from_audio_error));
+		assert_eq!(20, select.recv(&c.from_decode_error_d));
+		assert_eq!(21, select.recv(&c.from_decode_error_s));
+		assert_eq!(22, select.recv(&c.shutdown));
+		assert_eq!(23, select.recv(&c.shutdown_hang));
 
 		loop {
 			// 1. Receive a signal
@@ -282,7 +292,13 @@ where
 				17 => self.remove      ( select_recv!(c.recv_remove), &c.to_audio, &c.to_decode, &c.send_remove),
 				18 => self.remove_range( select_recv!(c.recv_remove_range), &c.to_audio, &c.to_decode, &c.send_remove_range),
 
-				19 => {
+				// Errors.
+				19 => self.output_error(select_recv!(c.from_audio_error), &c),
+				20 => self.decode_error(select_recv!(c.from_decode_error_d), &c),
+				21 => self.source_error(select_recv!(c.from_decode_error_s), &c),
+
+				// Shutdown.
+				22 => {
 					select_recv!(c.shutdown);
 					debug2!("Kernel - shutting down");
 
@@ -301,7 +317,7 @@ where
 				// Same as shutdown but sends a message to a
 				// hanging [Engine] indicating we're done, which
 				// allows the caller to return.
-				20 => {
+				23 => {
 					select_recv!(c.shutdown_hang);
 					debug2!("Kernel - shutting down (hang)");
 
@@ -319,6 +335,22 @@ where
 				_ => unreachable!(),
 			}
 		}
+	}
+
+	//---------------------------------------------------------------------------------------------------- Error handling
+	/// TODO
+	fn output_error(&self, error: OutputError, channels: &Channels<Data>) {
+		todo!();
+	}
+
+	/// TODO
+	fn decode_error(&self, error: DecodeError, channels: &Channels<Data>) {
+		todo!();
+	}
+
+	/// TODO
+	fn source_error(&self, error: SourceError, channels: &Channels<Data>) {
+		todo!();
 	}
 
 	//---------------------------------------------------------------------------------------------------- Misc Functions
