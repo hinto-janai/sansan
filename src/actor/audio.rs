@@ -54,12 +54,12 @@ pub(crate) struct Audio<Output>
 where
 	Output: AudioOutput,
 {
-	atomic_state:      Arc<AtomicAudioState>, // Shared atomic audio state with the rest of the actors
-	playing:           bool,                  // A local boolean so we don't have to atomic access each loop
-	elapsed:           f64,                   // Elapsed time, used for the elapsed callback (f64 is reset each call)
-	ready_to_recv:     Arc<AtomicBool>,       // [Audio]'s way of telling [Decode] it is ready for samples
-	shutdown_wait:     Arc<Barrier>,          // Shutdown barrier between all actors
-	output:            Output,                // Audio hardware/server connection
+	atomic_state:  Arc<AtomicAudioState>, // Shared atomic audio state with the rest of the actors
+	playing:       bool,                  // A local boolean so we don't have to atomic access each loop
+	elapsed:       f64,                   // Elapsed time, used for the elapsed callback (f64 is reset each call)
+	ready_to_recv: Arc<AtomicBool>,       // [Audio]'s way of telling [Decode] it is ready for samples
+	shutdown_wait: Arc<Barrier>,          // Shutdown barrier between all actors
+	output:        Output,                // Audio hardware/server connection
 }
 
 //---------------------------------------------------------------------------------------------------- Channels

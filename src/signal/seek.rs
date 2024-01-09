@@ -56,7 +56,7 @@ pub enum SeekError {
     Unseekable,
     /// The track can only be seeked forward.
     ForwardOnly,
-    /// An unknown seeking error occured.
+    /// An unknown seeking error occurred.
     Unknown,
 }
 
