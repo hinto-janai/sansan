@@ -44,7 +44,6 @@ opt-level = 1
 # TODO: Change default to cubeb after testing.
 # default = ["serde", "cubeb"]
 default = ["serde", "cpal"]
-print   = []
 
 [dev-dependencies]
 bincode = { version = "2.0.0-rc.3", features = ["derive"]  }

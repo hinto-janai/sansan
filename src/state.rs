@@ -127,7 +127,7 @@ impl AtomicAudioState {
 
 //---------------------------------------------------------------------------------------------------- Types
 cfg_if::cfg_if! {
-	if #[cfg(any(feature = "log", feature = "print"))] {
+	if #[cfg(feature = "log")] {
 		use std::fmt::Debug;
 		/// TODO
 		pub trait ValidData: Clone + Debug + Send + Sync + 'static {}

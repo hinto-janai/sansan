@@ -62,8 +62,6 @@ macro_rules! error2 {
     ($($arg:tt)+) => {{
         #[cfg(feature = "log")]
         ::log::error!($($arg)+);
-        #[cfg(all(not(feature = "log"), debug_assertions, feature = "print"))]
-        ::std::println!("ERROR | {}", format_args!($($arg)+));
     }};
 }
 pub(crate) use error2;
@@ -73,8 +71,6 @@ macro_rules! warn2 {
     ($($arg:tt)+) => {{
         #[cfg(feature = "log")]
         ::log::warn!($($arg)+);
-        #[cfg(all(not(feature = "log"), debug_assertions, feature = "print"))]
-        ::std::println!("WARN  | {}", format_args!($($arg)+));
     }};
 }
 pub(crate) use warn2;
@@ -84,8 +80,6 @@ macro_rules! info2 {
     ($($arg:tt)+) => {{
         #[cfg(feature = "log")]
         ::log::info!($($arg)+);
-        #[cfg(all(not(feature = "log"), debug_assertions, feature = "print"))]
-        ::std::println!("INFO  | {}", format_args!($($arg)+));
     }};
 }
 pub(crate) use info2;
@@ -95,8 +89,6 @@ macro_rules! debug2 {
     ($($arg:tt)+) => {{
         #[cfg(feature = "log")]
         ::log::debug!($($arg)+);
-        #[cfg(all(not(feature = "log"), debug_assertions, feature = "print"))]
-        ::std::println!("DEBUG | {}", format_args!($($arg)+));
     }};
 }
 pub(crate) use debug2;
@@ -106,8 +98,6 @@ macro_rules! trace2 {
     ($($arg:tt)+) => {{
         #[cfg(feature = "log")]
         ::log::trace!($($arg)+);
-        #[cfg(all(not(feature = "log"), debug_assertions, feature = "print"))]
-        ::std::println!("TRACE | {}", format_args!($($arg)+));
     }};
 }
 pub(crate) use trace2;
