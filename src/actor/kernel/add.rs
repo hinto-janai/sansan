@@ -4,8 +4,8 @@
 use crate::{
 	actor::kernel::kernel::{Kernel,DiscardCurrentAudio,KernelToDecode},
 	state::{AudioStateSnapshot,ValidData},
-	signal::add::{Add,InsertMethod},
-	macros::try_send,
+	signal::{add::{Add,InsertMethod}, AddMany},
+	macros::try_send, source::Sources,
 };
 use crossbeam::channel::{Sender,Receiver};
 
@@ -19,76 +19,8 @@ impl<Data: ValidData> Kernel<Data> {
 		to_decode: &Sender<KernelToDecode<Data>>,
 		to_engine: &Sender<AudioStateSnapshot<Data>>
 	) {
-		// This function returns an `Option<Source>` when the add
-		// operation has made it such that we are setting our [current]
-		// to the returned [Source].
-		//
-		// We must forward this [Source] to [Decode].
-		let (_, maybe_source, _) = self.w.add_commit_push(|w, _| {
-			if add.clear {
-				w.queue.clear();
-			}
-
-			// Map certain [Index] flavors into
-			// [Back/Front] and do safety checks.
-			let insert = match add.insert {
-				InsertMethod::Index(0) => { InsertMethod::Front },
-				InsertMethod::Index(i) if i >= w.queue.len() => { InsertMethod::Back },
-				// _ =>
-				InsertMethod::Back | InsertMethod::Front | InsertMethod::Index(_) => add.insert,
-			};
-
-			// [option] contains the [Source] we should send
-			// to [Decode], if we set our [current] to it.
-			let option = match insert {
-				InsertMethod::Back => {
-					let option = if w.queue.is_empty() && w.current.is_none() {
-						Some(add.source.clone())
-					} else {
-						None
-					};
-
-					w.queue.push_back(add.source.clone());
-
-					option
-				},
-
-				InsertMethod::Front => {
-					let option = if w.current.is_none() {
-						Some(add.source.clone())
-					} else {
-						None
-					};
-
-					w.queue.push_front(add.source.clone());
-
-					option
-				},
-
-				InsertMethod::Index(i) => {
-					debug_assert!(i > 0);
-					debug_assert!(i != w.queue.len());
-
-					w.queue.insert(i, add.source.clone());
-
-					None
-				},
-			};
-
-			if add.play {
-				w.playing = true;
-			}
-
-			option
-		});
-
-		// This [Add] might set our [current],
-		// it will return a [Some(source)] if so.
-		// We must forward it to [Decode].
-		if let Some(source) = maybe_source {
-			self.new_source(to_audio, to_decode, source);
-		}
-		try_send!(to_engine, self.audio_state_snapshot());
+		// Re-use `add_many()`.
+		self.add_many(add.into(), to_audio, to_decode, to_engine);
 	}
 }
 
