@@ -9,6 +9,7 @@
 use rubato::FftFixedIn;
 use std::num::NonZeroUsize;
 use crate::audio::resampler::Resampler;
+use crate::macros::{debug2,trace2};
 
 //----------------------------------------------------------------------------------------------- Rubato
 /// # Usage
@@ -68,6 +69,8 @@ impl Resampler for Rubato {
 		let duration           = duration.get();
 		let channel_count      = channel_count.get();
 
+		debug2!("Resampler(rubato) - sample_rate_input: {sample_rate_input}, sample_rate_target: {sample_rate_target}, duration: {duration}, channel_count: {channel_count}");
+
 		// Create resampler.
 		//
 		// INVARIANT: this panics if input/output sample rate is 0.
@@ -87,11 +90,20 @@ impl Resampler for Rubato {
 		// Interleaved capacity must be the capacity of all channels combined
 		let interleaved = vec![0.0; duration * channel_count];
 
+		debug2!(
+			"Resampler(rubato) - output.capacity(): {}, input.capacity(): {}, interleaved.capacity(): {}",
+			output.capacity(),
+			input.capacity(),
+			interleaved.capacity(),
+		);
+
 		Self { resampler, input, output, interleaved, duration, channel_count }
 	}
 
 	#[inline]
 	fn resample(&mut self, audio: &symphonia::core::audio::AudioBuffer<f32>) -> &[f32] {
+		trace2!("Resampler(rubato) - starting resample()");
+
 		// Collect `f32`'s from all channels into a single slice.
 		self.input
 			.iter_mut()
@@ -127,7 +139,9 @@ impl Resampler for Rubato {
 		// it matches the new output buffer length.
 		//
 		// https://github.com/hinto-janai/festival/pull/78
-		self.interleaved.resize(self.channel_count * self.output[0].len(), 0.0);
+		let len = self.channel_count * self.output[0].len();
+		trace2!("Resampler(rubato) - resampled interleaved length: {len}");
+		self.interleaved.resize(len, 0.0);
 
 		// Interleave the planar samples from Rubato.
 		//
