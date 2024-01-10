@@ -12,7 +12,7 @@ use crate::{
 		caller::Caller,
 	},
 	error::SansanError,
-	macros::{send,recv,try_send,try_recv,debug2},
+	macros::{send,recv,try_send,try_recv,debug2, error2},
 	source::Source,
 	signal::{
 		Add,AddMany,Back,Clear,Previous,RemoveRange,Remove,
@@ -140,6 +140,8 @@ where
 	/// # Panics
 	/// TODO
 	pub fn init(mut config: Config<Data>) -> Result<Self, EngineInitError> {
+		debug2!("Engine - initializing with config: {config:#?}");
+
 		// Some initial assertions that must be upheld.
 		// These may or may not have been already checked
 		// by other constructors, but we will check again here.
@@ -183,7 +185,10 @@ where
 			None
 		};
 
+		debug2!("Engine - input config's audio state: {:#?}", config.restore);
+
 		// Initialize the `AudioStateReader`.
+		// TODO: initialize with `Config`'s AudioState.
 		let (audio_state_reader, audio_state_writer) = someday::new(AudioState::DEFAULT);
 		let audio_state_reader = AudioStateReader(audio_state_reader);
 
