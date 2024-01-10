@@ -12,6 +12,11 @@ use crossbeam::channel::{Sender,Receiver};
 //----------------------------------------------------------------------------------------------------
 impl<Data: ValidData> Kernel<Data> {
 	/// TODO
+	///
+	/// # Invariants
+	/// 1. Current indices are allowed to change
+	/// 2. Current Source should _never_ change, unless going from `None` -> `Some(source)`
+	/// 3. Add operations saturate at out-of-bounds insertions (<0, >=queue.len())
 	pub(super) fn add_many(
 		&mut self,
 		add_many: AddMany<Data>,
