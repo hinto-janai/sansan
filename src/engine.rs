@@ -12,7 +12,7 @@ use crate::{
 		caller::Caller,
 	},
 	error::SansanError,
-	macros::{send,recv,try_send,try_recv,debug2, error2},
+	macros::{send,recv,try_send,try_recv,debug2, error2, info2},
 	source::Source,
 	signal::{
 		Add,AddMany,Back,Clear,Previous,RemoveRange,Remove,
@@ -140,7 +140,8 @@ where
 	/// # Panics
 	/// TODO
 	pub fn init(mut config: Config<Data>) -> Result<Self, EngineInitError> {
-		debug2!("Engine - initializing with config: {config:#?}");
+		info2!("Engine - initializing...");
+		debug2!("Engine - init config: {config:#?}");
 
 		// Some initial assertions that must be upheld.
 		// These may or may not have been already checked
@@ -185,7 +186,7 @@ where
 			None
 		};
 
-		debug2!("Engine - input config's audio state: {:#?}", config.restore);
+		debug2!("Engine - init config audio state: {:#?}", config.restore);
 
 		// Initialize the `AudioStateReader`.
 		// TODO: initialize with `Config`'s AudioState.
@@ -223,8 +224,10 @@ where
 				// test mode, although, forget the init_arg such that channel
 				// sends from `Kernel` still work and don't panic.
 				if cfg!(test) {
+					debug2!("Engine - test, skipping spawn of: {}", $actor_name);
 					std::mem::forget($init_args);
 				} else {
+					debug2!("Engine - spawning: {}", $actor_name);
 					if let Err(error) = $($spawn_fn)*($init_args) {
 						return Err(EngineInitError::ThreadSpawn {
 							name: $actor_name,
@@ -269,6 +272,7 @@ where
 		// can safely _not_ spawn [Caller] and drop the
 		// [Receiver] end of the channels.
 		if callbacks.all_none() {
+			debug2!("Engine - no callbacks, skipping `Caller` spawn");
 			drop((shutdown, next, queue_end, repeat, elapsed));
 		} else {
 			spawn_actor!(
@@ -553,6 +557,7 @@ where
 		}
 
 		//-------------------------------------------------------------- Return
+		info2!("Engine - initialization complete, returning");
 		Ok(Self {
 			audio: audio_state_reader,
 			shutdown,
@@ -775,17 +780,21 @@ where
 impl<Data: ValidData> Drop for Engine<Data> {
 	#[cold]
 	#[inline(never)]
+	#[allow(clippy::branches_sharing_code)]
 	fn drop(&mut self) {
 		if self.shutdown_blocking {
+			info2!("Engine - waiting on shutdown ...");
 			// Tell [Kernel] to shutdown,
 			// and to tell us when it's done.
 			self.shutdown_hang.try_send(()).unwrap();
 			// Hang until [Kernel] responds.
 			self.shutdown_done.recv().unwrap();
+			info2!("Engine - waiting on shutdown ... OK");
 		} else {
 			// Tell [Kernel] to shutdown,
 			// and to not notify us.
 			self.shutdown.try_send(()).unwrap();
+			info2!("Engine - async shutdown .. OK");
 		}
 	}
 }
