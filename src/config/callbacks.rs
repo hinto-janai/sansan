@@ -91,6 +91,19 @@ impl Default for ErrorCallback {
 	}
 }
 
+impl fmt::Debug for ErrorCallback {
+	#[allow(clippy::missing_docs_in_private_items)]
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		f.write_fmt(
+			match self {
+				Self::Pause => format_args!("ErrorCallback::Pause"),
+				Self::PauseAndFn(f) => format_args!("ErrorCallback::PauseAndFn(_)"),
+				Self::Fn(f) => format_args!("ErrorCallback::Fn(_)"),
+			}
+		)
+	}
+}
+
 //---------------------------------------------------------------------------------------------------- Callbacks
 /// Boxed, dynamically dispatched function with access to the current audio state.
 pub(crate) type Callback = Box<dyn FnMut() + Send + 'static>;
@@ -261,17 +274,14 @@ impl Default for Callbacks {
 impl fmt::Debug for Callbacks {
 	#[allow(clippy::missing_docs_in_private_items)]
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		const SOME: &str = "Some";
-		const NONE: &str = "None";
-
 		f.debug_struct("Callbacks")
-			.field("next",         if self.next.is_some()         { &SOME } else { &NONE })
-			.field("queue_end",    if self.queue_end.is_some()    { &SOME } else { &NONE })
-			.field("repeat",       if self.repeat.is_some()       { &SOME } else { &NONE })
-			.field("elapsed",      if self.elapsed.is_some()      { &SOME } else { &NONE })
-			.field("error_decode", if self.error_decode.is_some() { &SOME } else { &NONE })
-			.field("error_source", if self.error_source.is_some() { &SOME } else { &NONE })
-			.field("error_output", if self.error_output.is_some() { &SOME } else { &NONE })
+			.field("next",         &self.next.as_ref().map(|_|      "Some(_)"))
+			.field("queue_end",    &self.queue_end.as_ref().map(|_| "Some(_)"))
+			.field("repeat",       &self.repeat.as_ref().map(|_|    "Some(_)"))
+			.field("elapsed",      &self.elapsed.as_ref().map(|o|   format!("Some(_, {})", o.1)))
+			.field("error_decode", &self.error_decode)
+			.field("error_source", &self.error_source)
+			.field("error_output", &self.error_output)
 			.finish()
 	}
 }
