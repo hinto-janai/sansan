@@ -118,6 +118,7 @@
 	clippy::items_after_statements,
 	clippy::use_debug,
 	clippy::mem_forget,
+	clippy::else_if_without_else,
 )]
 
 #![cfg_attr(debug_assertions, allow(clippy::todo))]
