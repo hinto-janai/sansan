@@ -29,6 +29,7 @@ impl<Data: ValidData> Kernel<Data> {
 #[allow(clippy::bool_assert_comparison, clippy::cognitive_complexity)]
 mod tests {
 	use super::*;
+	use pretty_assertions::assert_eq;
 	use crate::{
 		engine::Engine,
 		signal::{repeat::Repeat,volume::Volume,add::AddMany},
@@ -45,6 +46,7 @@ mod tests {
 		fn assert(
 			engine: &mut Engine<usize>,
 			add: Add<usize>,
+			index: usize,
 			data: &[usize],
 		) {
 			// Send `Add` signal to the `Engine`
@@ -68,14 +70,13 @@ mod tests {
 			}
 
 			// Assert the other parts of the data are sane as well.
-			assert_eq!(a.queue.len(),        i);
-			assert_eq!(a.queue.get(i),       None);
-			assert_eq!(a.playing,            false);
-			assert_eq!(a.repeat,             Repeat::Off);
-			assert_eq!(a.volume,             Volume::DEFAULT);
-			assert_eq!(a.back_threshold, 3.0);
-			assert_eq!(a.queue_end_clear,    true);
-			assert_eq!(a.current,            None);
+			assert_eq!(a.queue.len(),     i);
+			assert_eq!(a.queue.get(i),    None);
+			assert_eq!(a.repeat,          Repeat::Off);
+			assert_eq!(a.volume,          Volume::DEFAULT);
+			assert_eq!(a.back_threshold,  3.0);
+			assert_eq!(a.queue_end_clear, true);
+			assert_eq!(a.current.as_ref().unwrap().index, index);
 		}
 
 		//---------------------------------- Set up state.
@@ -84,9 +85,14 @@ mod tests {
 			sources,
 			insert:  InsertMethod::Back,
 			clear:   false,
-			play:    false,
+			play:    true,
 		};
 		assert_eq!(engine.add_many(add_many).queue.len(), sources_len);
+
+		// Test comment notation for below.
+		//
+		// [i] == current.index (what our current index should be)
+		// v   == appended index (where we added onto to)
 
 		//---------------------------------- Append to the back.
 		let add = Add {
@@ -95,8 +101,9 @@ mod tests {
 			clear:  false,
 			play:   false,
 		};
-		//                                                  v
-		assert(engine, add, &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+		//                      [0]
+		//                       v
+		assert(engine, add, 0, &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
 		//---------------------------------- Insert in the front.
 		let add = Add {
@@ -105,8 +112,8 @@ mod tests {
 			clear:   false,
 			play:    false,
 		};
-		//                    v
-		assert(engine, add, &[20, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+		//                       v  [1]
+		assert(engine, add, 1, &[20, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
 		//---------------------------------- Insert in the middle.
 		let add = Add {
@@ -115,8 +122,8 @@ mod tests {
 			clear:   false,
 			play:    false,
 		};
-		//                                    v
-		assert(engine, add, &[20, 0, 1, 2, 3, 30, 4, 5, 6, 7, 8, 9, 10]);
+		//                          [1]          v
+		assert(engine, add, 1, &[20, 0, 1, 2, 3, 30, 4, 5, 6, 7, 8, 9, 10]);
 
 		//---------------------------------- Insert at index 0 (re-map to Insert::Front).
 		let add = Add {
@@ -125,8 +132,8 @@ mod tests {
 			clear:   false,
 			play:    false,
 		};
-		//                    v
-		assert(engine, add, &[40, 20, 0, 1, 2, 3, 30, 4, 5, 6, 7, 8, 9, 10]);
+		//                       v      [2]
+		assert(engine, add, 2, &[40, 20, 0, 1, 2, 3, 30, 4, 5, 6, 7, 8, 9, 10]);
 
 		//---------------------------------- Insert at last index (re-map to Insert::Back).
 		let add = Add {
@@ -135,8 +142,8 @@ mod tests {
 			clear:   false,
 			play:    false,
 		};
-		//                                                                  v
-		assert(engine, add, &[40, 20, 0, 1, 2, 3, 30, 4, 5, 6, 7, 8, 9, 10, 50]);
+		//                              [2]                                    v
+		assert(engine, add, 2, &[40, 20, 0, 1, 2, 3, 30, 4, 5, 6, 7, 8, 9, 10, 50]);
 
 		//---------------------------------- Insert at out-of-bounds index (re-map to Insert::Back).
 		let queue_len = engine.reader().get().queue.len();
@@ -146,7 +153,7 @@ mod tests {
 			clear:   false,
 			play:    false,
 		};
-		//                                                                      v
-		assert(engine, add, &[40, 20, 0, 1, 2, 3, 30, 4, 5, 6, 7, 8, 9, 10, 50, 60]);
+		//                              [2]                                        v
+		assert(engine, add, 2, &[40, 20, 0, 1, 2, 3, 30, 4, 5, 6, 7, 8, 9, 10, 50, 60]);
 	}
 }
