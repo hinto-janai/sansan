@@ -141,7 +141,7 @@ where
 	/// TODO
 	pub fn init(mut config: Config<Data>) -> Result<Self, EngineInitError> {
 		info2!("Engine - initializing...");
-		debug2!("Engine - init config: {config:#?}");
+		debug2!("Engine - init config:\n{config:#?}");
 
 		// Some initial assertions that must be upheld.
 		// These may or may not have been already checked
@@ -272,7 +272,7 @@ where
 		// can safely _not_ spawn [Caller] and drop the
 		// [Receiver] end of the channels.
 		if callbacks.all_none() {
-			debug2!("Engine - no callbacks, skipping `Caller` spawn");
+			debug2!("Engine - no callbacks, skipping `Caller`");
 			drop((shutdown, next, queue_end, repeat, elapsed));
 		} else {
 			spawn_actor!(
@@ -557,7 +557,7 @@ where
 		}
 
 		//-------------------------------------------------------------- Return
-		info2!("Engine - initialization complete, returning");
+		info2!("Engine - initialization complete");
 		Ok(Self {
 			audio: audio_state_reader,
 			shutdown,
