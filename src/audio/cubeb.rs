@@ -23,7 +23,7 @@ use std::sync::{
 	Arc,
 	atomic::{AtomicBool,Ordering},
 };
-use crate::macros::{recv,send,try_send,try_recv};
+use crate::macros::{recv,send,try_send,try_recv,debug2,trace2};
 
 //----------------------------------------------------------------------------------------------- Constants
 /// The most common sample rate to fallback to if we cannot
@@ -96,8 +96,11 @@ where
 		to_gc:  &Sender<AudioBuffer<f32>>,
 		volume: Volume,
 	) -> Result<(), OutputError> {
+		trace2!("AudioOutput(cubeb) - starting write() with volume: {volume}");
+
 		// Return if empty audio.
 		if audio.frames() == 0  {
+			trace2!("AudioOutput(cubeb) - audio.frames() == 0, returning early");
 			return Ok(());
 		}
 
@@ -143,6 +146,7 @@ where
 			},
 		};
 
+		trace2!("AudioOutput(cubeb) - sending {} samples to backend", samples.len());
 		// Send audio data to cubeb.
 		// Duplicate channel data if mono, else split left/right.
 		//
@@ -171,8 +175,9 @@ where
 		// is probably faster than swapping with [Pool].
 		self.samples.clear();
 
-		// If [cubeb] errored, forward it.
+		// If the backend errored, forward it.
 		if self.error.try_recv().is_ok() {
+			error2!("AudioOutput(cubeb) - error occured");
 			Err(OutputError::Write)
 		} else {
 			Ok(())
@@ -180,6 +185,8 @@ where
 	}
 
 	fn flush(&mut self) {
+		debug2!("AudioOutput(cubeb) - flush()");
+
 		if !self.playing {
 			return;
 		}
@@ -194,6 +201,8 @@ where
 	}
 
 	fn discard(&mut self) {
+		debug2!("AudioOutput(cubeb) - discard()");
+
 		if !self.playing {
 			return;
 		}
@@ -214,12 +223,15 @@ where
 	#[inline(never)]
 	#[allow(clippy::unwrap_in_result)]
 	fn try_open(
-		name: impl Into<Vec<u8>>,
+		name: String,
 		signal_spec: SignalSpec,
 		duration: symphonia::core::units::Duration,
 		disable_device_switch: bool,
 		buffer_milliseconds: Option<u8>,
 	) -> Result<Self, OutputError> {
+		debug2!("AudioOutput(cubeb) - try_open()");
+		debug2!("AudioOutput(cubeb) - signal_spec: {signal_spec:?} duration: {duration}, disable_device_switch: {disable_device_switch}, buffer_milliseconds: {buffer_milliseconds:?}");
+
 		let channels = std::cmp::max(signal_spec.channels.count(), 2);
 		// For the resampler.
 		let Some(channel_count) = NonZeroUsize::new(channels) else {
@@ -248,6 +260,8 @@ where
 		let Ok(sample_rate) = TryInto::<u32>::try_into(sample_rate) else {
 			return Err(OutputError::InvalidSampleRate);
 		};
+
+		debug2!("AudioOutput(cubeb) - channel_count: {channel_count}, sample_rate: {sample_rate}, sample_rate_input: {sample_rate_input}");
 
 		// TODO: support more than stereo.
 		let layout = if channels == 2 {
@@ -293,6 +307,8 @@ where
 			None => AUDIO_MILLISECOND_BUFFER_FALLBACK,
 		};
 		let channel_len = ((buffer_milliseconds * sample_rate as usize) / 1000) * channels;
+		debug2!("AudioOutput(cubeb) - buffer_milliseconds: {buffer_milliseconds}, channel_len: {channel_len}");
+
 		let (sender, receiver)           = crossbeam::channel::bounded(channel_len);
 		let (discard, discard_recv)      = crossbeam::channel::bounded(1);
 		let (drained_send, drained_recv) = crossbeam::channel::bounded(1);
@@ -308,6 +324,8 @@ where
 			// The actual callback `cubeb` will
 			// call when polling for audio data.
 			.data_callback(move |_, output| {
+				trace2!("AudioOutput - data callback, output.len(): {}", output.len());
+
 				// Fill output buffer while there are
 				// messages in the channel.
 				for o in output.iter_mut() {
@@ -324,7 +342,9 @@ where
 				}
 				// INVARIANT:
 				// We must tell cubeb how many bytes we wrote.
-				output.len() as isize
+				let written = output.len() as isize;
+				trace2!("AudioOutput - data callback, written: {written}");
+				written
 			})
 			// Cubeb calls this when the audio stream has changed
 			// states, e.g, play, pause, drained, error, etc.
@@ -372,8 +392,10 @@ where
 			None => NonZeroUsize::new(SAMPLE_RATE_FALLBACK as usize).unwrap(),
 		};
 		let resampler = if sample_rate_target == sample_rate_input {
+			debug2!("AudioOutput(cubeb) - skipping resampler, {sample_rate_input} == {sample_rate_target}");
 			None
 		} else {
+			debug2!("AudioOutput(cubeb) - creating resampler, {sample_rate_input} -> {sample_rate_target}");
 			Some(R::new(
 				sample_rate_input,
 				sample_rate_target,
@@ -405,6 +427,7 @@ where
 	fn play(&mut self) -> Result<(), OutputError> {
 		use cubeb::ErrorCode as E;
 		use OutputError as E2;
+		debug2!("AudioOutput(cubeb) - play()");
 
 		match self.stream.start() {
 			Ok(()) => { self.playing = true; Ok(()) },
@@ -419,6 +442,7 @@ where
 	fn pause(&mut self) -> Result<(), OutputError> {
 		use cubeb::ErrorCode as E;
 		use OutputError as E2;
+		debug2!("AudioOutput(cubeb) - pause()");
 
 		match self.stream.stop() {
 			Ok(()) => { self.playing = false; Ok(()) },

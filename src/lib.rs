@@ -119,6 +119,7 @@
 	clippy::use_debug,
 	clippy::mem_forget,
 	clippy::else_if_without_else,
+	clippy::str_to_string,
 )]
 
 #![cfg_attr(debug_assertions, allow(clippy::todo))]

@@ -66,7 +66,7 @@ where
 	/// with the same specification must be created.
 	fn try_open(
 		// The name of the audio stream?
-		name: impl Into<Vec<u8>>,
+		name: String,
 		// The audio's signal specification.
 		// We're opening a stream matching this spec.
 		signal_spec: SignalSpec,
@@ -130,6 +130,6 @@ where
 			// This also counts a mono speaker.
 			channels: Channels::FRONT_LEFT,
 		};
-		Self::try_open("", spec, 4096, false, None)
+		Self::try_open(String::new(), spec, 4096, false, None)
 	}
 }

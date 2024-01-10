@@ -22,7 +22,7 @@ use std::sync::{
 	Arc,
 	atomic::{AtomicBool,Ordering},
 };
-use crate::macros::{recv,send,try_send,try_recv};
+use crate::macros::{recv,send,try_send,try_recv,trace2,debug2,error2};
 use cpal::traits::{DeviceTrait,StreamTrait,HostTrait};
 
 //----------------------------------------------------------------------------------------------- Constants
@@ -103,8 +103,11 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 		to_gc:  &Sender<AudioBuffer<f32>>,
 		volume: Volume,
 	) -> Result<(), OutputError> {
+		trace2!("AudioOutput - write() with volume: {volume}");
+
 		// Return if empty audio.
 		if audio.frames() == 0  {
+			trace2!("AudioOutput - audio.frames() == 0, returning early");
 			return Ok(());
 		}
 
@@ -155,6 +158,7 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 		// This hangs until we've sent all the samples, which
 		// most likely take a while as [cubeb] will have a
 		// backlog of previous samples.
+		trace2!("AudioOutput - sending {} samples to backend", samples.len());
 		for sample in samples {
 			send!(self.sender, *sample);
 		};
@@ -169,8 +173,9 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 		// is probably faster than swapping with [Pool].
 		self.samples.clear();
 
-		// If [cubeb] errored, forward it.
+		// If the backend errored, forward it.
 		if let Ok(error) = self.error.try_recv() {
+			error2!("AudioOutput - error: {error}");
 			Err(error.into())
 		} else {
 			Ok(())
@@ -178,6 +183,8 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 	}
 
 	fn flush(&mut self) {
+		debug2!("AudioOutput - flush()");
+
 		if !self.playing {
 			return;
 		}
@@ -192,6 +199,8 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 	}
 
 	fn discard(&mut self) {
+		debug2!("AudioOutput - discard()");
+
 		if !self.playing {
 			return;
 		}
@@ -212,12 +221,15 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 	#[inline(never)]
 	#[allow(clippy::unwrap_in_result)]
 	fn try_open(
-		name: impl Into<Vec<u8>>,
+		name: String,
 		signal_spec: SignalSpec,
 		duration: symphonia::core::units::Duration,
 		disable_device_switch: bool,
 		buffer_milliseconds: Option<u8>,
 	) -> Result<Self, OutputError> {
+		debug2!("AudioOutput - try_open()");
+		debug2!("AudioOutput - signal_spec: {signal_spec:?}, duration: {duration}, disable_device_switch: {disable_device_switch}, buffer_milliseconds: {buffer_milliseconds:?}");
+
 		let channels = std::cmp::max(signal_spec.channels.count(), 2);
 		// For the resampler.
 		let Some(channel_count) = NonZeroUsize::new(channels) else {
@@ -247,6 +259,8 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 			return Err(OutputError::InvalidSampleRate);
 		};
 
+		debug2!("AudioOutput - channel_count: {channel_count}, sample_rate: {sample_rate}, sample_rate_input: {sample_rate_input}");
+
 		// Get default host.
 		let host = cpal::default_host();
 
@@ -260,6 +274,7 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 			Ok(config) => config,
 			Err(err) => return Err(err.into()),
 		};
+		debug2!("AudioOutput - device_config:\n{config:#?}");
 
 		// SOMEDAY: support non-f32.
 		if config.sample_format() != cpal::SampleFormat::F32 {
@@ -276,6 +291,7 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 				buffer_size: cpal::BufferSize::Default, // TODO: add our own buffer size
 			}
 		};
+		debug2!("AudioOutput - config:\n{config:#?}");
 
 		// The `cubeb` <-> AudioOutput channel will hold up to 20ms of audio data by default.
 		let buffer_milliseconds = match buffer_milliseconds {
@@ -283,6 +299,8 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 			None => AUDIO_MILLISECOND_BUFFER_FALLBACK,
 		};
 		let channel_len = ((buffer_milliseconds * sample_rate as usize) / 1000) * channels;
+		debug2!("AudioOutput - buffer_milliseconds: {buffer_milliseconds}, channel_len: {channel_len}");
+
 		let (sender, receiver)           = crossbeam::channel::bounded(channel_len);
 		let (discard, discard_recv)      = crossbeam::channel::bounded(1);
 		let (drained_send, drained_recv) = crossbeam::channel::bounded(1);
@@ -290,6 +308,8 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 
 		// The actual callback `cpal` will call when polling for audio data.
 		let data_callback = move |output: &mut [f32], _: &cpal::OutputCallbackInfo| {
+			trace2!("AudioOutput - data callback, output.len(): {}", output.len());
+
 			// Fill output buffer while there are
 			// messages in the channel.
 			for o in output.iter_mut() {
@@ -308,6 +328,7 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 			// Mute any remaining samples.
 			let written = output.len();
 			output[written..].fill(0.0);
+			trace2!("AudioOutput - data callback, written: {written}");
 		};
 		// The callback `cpal` will call when errors occur.
 		let error_callback = move |error: cpal::StreamError| {
@@ -333,9 +354,12 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 			// SAFETY: input is non-zero.
 			None => NonZeroUsize::new(SAMPLE_RATE_FALLBACK as usize).unwrap(),
 		};
+		#[allow(clippy::branches_sharing_code)]
 		let resampler = if sample_rate_target == sample_rate_input {
+			debug2!("AudioOutput - skipping resampler, {sample_rate_input} == {sample_rate_target}");
 			None
 		} else {
+			debug2!("AudioOutput - creating resampler, {sample_rate_input} -> {sample_rate_target}");
 			Some(R::new(
 				sample_rate_input,
 				sample_rate_target,
@@ -364,6 +388,7 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 	}
 
 	fn play(&mut self) -> Result<(), OutputError> {
+		debug2!("AudioOutput - play()");
 		match self.stream.pause() {
 			Ok(()) => { self.playing = true; Ok(()) },
 			Err(e) => Err(OutputError::Unknown(Cow::Owned(format!("cpal play error: {e:?}")))),
@@ -371,6 +396,7 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 	}
 
 	fn pause(&mut self) -> Result<(), OutputError> {
+		debug2!("AudioOutput - pause()");
 		match self.stream.pause() {
 			Ok(()) => { self.playing = false; Ok(()) },
 			Err(e) => Err(OutputError::Unknown(Cow::Owned(format!("cpal pause error: {e:?}")))),

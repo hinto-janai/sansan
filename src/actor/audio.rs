@@ -279,7 +279,7 @@ where
 		// matching audio output device or audio will get weird.
 		if spec != *self.output.spec() || duration != self.output.duration() {
 			match AudioOutput::try_open(
-				"TODO", // TODO: name
+				"TODO".to_string(), // TODO: name
 				spec,
 				duration,
 				false, // TODO: disable_device_switch
