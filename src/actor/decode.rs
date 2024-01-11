@@ -196,7 +196,7 @@ impl<Data: ValidData> Decode<Data> {
 
 				// Blocking
 				true => {
-					debug2!("Decode - waiting for msgs on select.ready()");
+					trace2!("Decode - waiting for msgs on select.ready()");
 					Ok(select.ready())
 				},
 			};
@@ -311,7 +311,16 @@ impl<Data: ValidData> Decode<Data> {
 	fn send_or_store_audio(&mut self, to_audio: &Sender<ToAudio>, data: ToAudio) {
 		if self.audio_is_ready(to_audio) {
 			trace2!("Decode - send_or_store_audio(), sending");
-			try_send!(to_audio, data);
+
+			if let Some(old_data) = self.buffer.pop_front() {
+				// We had some old audio left over, send that
+				// first and store the latest one for later.
+				try_send!(to_audio, old_data);
+				self.buffer.push_back(data);
+			} else {
+				// We had no stored audio data, send our input directly.
+				try_send!(to_audio, data);
+			}
 		} else {
 			trace2!("Decode - send_or_store_audio(), storing");
 			self.buffer.push_back(data);
