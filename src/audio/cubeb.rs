@@ -326,15 +326,17 @@ where
 			.data_callback(move |_, output| {
 				trace2!("AudioOutput - data callback, output.len(): {}", output.len());
 
+				// We received a "discard" signal.
+				// Discard all audio and return ASAP.
+				if discard_recv.try_recv().is_ok() {
+					while receiver.try_recv().is_ok() {} // drain channel
+					return;
+				}
+
 				// Fill output buffer while there are
 				// messages in the channel.
 				for o in output.iter_mut() {
-					// We received a "discard" signal.
-					// Discard all audio and return ASAP.
-					if discard_recv.try_recv().is_ok() {
-						while receiver.try_recv().is_ok() {} // drain channel
-						break;
-					} else if let Ok(audio) = receiver.try_recv() {
+					if let Ok(audio) = receiver.try_recv() {
 						*o = audio;
 					} else {
 						break;
