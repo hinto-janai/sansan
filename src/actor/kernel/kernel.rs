@@ -5,7 +5,7 @@ use std::{thread::JoinHandle, process::Output};
 use crossbeam::channel::{Sender, Receiver, Select};
 use rand::SeedableRng;
 use crate::{
-	macros::{send,recv,try_recv,try_send,debug2,select_recv},
+	macros::{send,recv,try_recv,try_send,debug2,select_recv, trace2},
 	valid_data::ValidData,
 	state::{
 		AudioState,
@@ -13,7 +13,7 @@ use crate::{
 		AudioStateSnapshot,
 		Current
 	},
-	actor::audio::AudioToKernel,
+	actor::audio::{WroteAudioBuffer, TookAudioBuffer},
 	signal::{
 		Play,
 		Toggle,
@@ -119,7 +119,7 @@ pub(crate) struct Channels<Data: ValidData> {
 
 	// [Audio]
 	pub(crate) to_audio:         Sender<DiscardCurrentAudio>,
-	pub(crate) from_audio:       Receiver<AudioToKernel>,
+	pub(crate) from_audio:       Receiver<WroteAudioBuffer>,
 	pub(crate) to_audio_error:   Option<(Sender<()>, ErrorCallback)>,
 	pub(crate) from_audio_error: Receiver<OutputError>,
 
@@ -232,31 +232,36 @@ where
 		// INVARIANT:
 		// The order these are selected MUST match
 		// the order of the match function mappings below.
-		assert_eq!(0,  select.recv(&c.recv_toggle));
-		assert_eq!(1,  select.recv(&c.recv_play));
-		assert_eq!(2,  select.recv(&c.recv_pause));
-		assert_eq!(3,  select.recv(&c.recv_stop));
-		assert_eq!(4,  select.recv(&c.recv_next));
-		assert_eq!(5,  select.recv(&c.recv_previous));
-		assert_eq!(6,  select.recv(&c.recv_clear));
-		assert_eq!(7,  select.recv(&c.recv_shuffle));
-		assert_eq!(8,  select.recv(&c.recv_repeat));
-		assert_eq!(9,  select.recv(&c.recv_volume));
-		assert_eq!(10, select.recv(&c.recv_restore));
-		assert_eq!(11, select.recv(&c.recv_add));
-		assert_eq!(12, select.recv(&c.recv_add_many));
-		assert_eq!(13, select.recv(&c.recv_seek));
-		assert_eq!(14, select.recv(&c.recv_skip));
-		assert_eq!(15, select.recv(&c.recv_back));
-		assert_eq!(16, select.recv(&c.recv_set_index));
-		assert_eq!(17, select.recv(&c.recv_remove));
-		assert_eq!(18, select.recv(&c.recv_remove_range));
-		//
-		assert_eq!(19, select.recv(&c.from_audio_error));
-		assert_eq!(20, select.recv(&c.from_decode_error_d));
-		assert_eq!(21, select.recv(&c.from_decode_error_s));
-		assert_eq!(22, select.recv(&c.shutdown));
-		assert_eq!(23, select.recv(&c.shutdown_hang));
+
+		// From `Audio`.
+		assert_eq!(0,  select.recv(&c.from_audio));
+		// Signals
+		assert_eq!(1,  select.recv(&c.recv_toggle));
+		assert_eq!(2,  select.recv(&c.recv_play));
+		assert_eq!(3,  select.recv(&c.recv_pause));
+		assert_eq!(4,  select.recv(&c.recv_stop));
+		assert_eq!(5,  select.recv(&c.recv_next));
+		assert_eq!(6,  select.recv(&c.recv_previous));
+		assert_eq!(7,  select.recv(&c.recv_clear));
+		assert_eq!(8,  select.recv(&c.recv_shuffle));
+		assert_eq!(9,  select.recv(&c.recv_repeat));
+		assert_eq!(10,  select.recv(&c.recv_volume));
+		assert_eq!(11, select.recv(&c.recv_restore));
+		assert_eq!(12, select.recv(&c.recv_add));
+		assert_eq!(13, select.recv(&c.recv_add_many));
+		assert_eq!(14, select.recv(&c.recv_seek));
+		assert_eq!(15, select.recv(&c.recv_skip));
+		assert_eq!(16, select.recv(&c.recv_back));
+		assert_eq!(17, select.recv(&c.recv_set_index));
+		assert_eq!(18, select.recv(&c.recv_remove));
+		assert_eq!(19, select.recv(&c.recv_remove_range));
+		// Errors
+		assert_eq!(20, select.recv(&c.from_audio_error));
+		assert_eq!(21, select.recv(&c.from_decode_error_d));
+		assert_eq!(22, select.recv(&c.from_decode_error_s));
+		// Shutdown
+		assert_eq!(23, select.recv(&c.shutdown));
+		assert_eq!(24, select.recv(&c.shutdown_hang));
 
 		loop {
 			// 1. Receive a signal
@@ -272,33 +277,40 @@ where
 			// so `Kernel` must check all requests and return early (or with
 			// and error) if invalid.
 			match select.ready() {
-				0  =>                  { select_recv!(c.recv_toggle); self.toggle(&c.to_audio, &c.to_decode, &c.send_audio_state) },
-				1  =>                  { select_recv!(c.recv_play); self.play(&c.to_audio, &c.to_decode, &c.send_audio_state) },
-				2  =>                  { select_recv!(c.recv_pause); self.pause(&c.send_audio_state) },
-				3  =>                  { select_recv!(c.recv_stop); self.stop(&c.send_audio_state) },
-				4  =>                  { select_recv!(c.recv_next); self.next(&c.to_audio, &c.to_decode, &c.send_audio_state) },
-				5  =>                  { select_recv!(c.recv_previous); self.previous(&c.to_audio, &c.to_decode, &c.send_audio_state) },
-				6  => self.clear       ( select_recv!(c.recv_clear), &c.send_audio_state),
-				7  => self.shuffle     ( select_recv!(c.recv_shuffle), &c.to_audio, &c.to_decode, &c.send_audio_state),
-				8  => self.repeat      ( select_recv!(c.recv_repeat), &c.send_audio_state),
-				9  => self.volume      ( select_recv!(c.recv_volume), &c.send_audio_state),
-				10 => self.restore     ( select_recv!(c.recv_restore), &c.to_audio, &c.to_decode, &c.send_audio_state),
-				11 => self.add         ( select_recv!(c.recv_add), &c.to_audio, &c.to_decode, &c.send_audio_state),
-				12 => self.add_many    ( select_recv!(c.recv_add_many), &c.to_audio, &c.to_decode, &c.send_audio_state),
-				13 => self.seek        ( select_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),
-				14 => self.skip        ( select_recv!(c.recv_skip), &c.to_audio, &c.to_decode, &c.send_skip),
-				15 => self.back        ( select_recv!(c.recv_back), &c.to_audio, &c.to_decode, &c.send_back),
-				16 => self.set_index   ( select_recv!(c.recv_set_index), &c.to_audio, &c.to_decode, &c.send_set_index),
-				17 => self.remove      ( select_recv!(c.recv_remove), &c.to_audio, &c.to_decode, &c.send_remove),
-				18 => self.remove_range( select_recv!(c.recv_remove_range), &c.to_audio, &c.to_decode, &c.send_remove_range),
+				// From `Audio`.
+				0 => {
+					let time = select_recv!(c.from_audio);
+					self.wrote_audio_buffer(time);
+				},
+
+				// Signals.
+				1  =>                  { select_recv!(c.recv_toggle); self.toggle(&c.to_audio, &c.to_decode, &c.send_audio_state) },
+				2  =>                  { select_recv!(c.recv_play); self.play(&c.to_audio, &c.to_decode, &c.send_audio_state) },
+				3  =>                  { select_recv!(c.recv_pause); self.pause(&c.send_audio_state) },
+				4  =>                  { select_recv!(c.recv_stop); self.stop(&c.send_audio_state) },
+				5  =>                  { select_recv!(c.recv_next); self.next(&c.to_audio, &c.to_decode, &c.send_audio_state) },
+				6  =>                  { select_recv!(c.recv_previous); self.previous(&c.to_audio, &c.to_decode, &c.send_audio_state) },
+				7  => self.clear       ( select_recv!(c.recv_clear), &c.send_audio_state),
+				8  => self.shuffle     ( select_recv!(c.recv_shuffle), &c.to_audio, &c.to_decode, &c.send_audio_state),
+				9  => self.repeat      ( select_recv!(c.recv_repeat), &c.send_audio_state),
+				10 => self.volume      ( select_recv!(c.recv_volume), &c.send_audio_state),
+				11 => self.restore     ( select_recv!(c.recv_restore), &c.to_audio, &c.to_decode, &c.send_audio_state),
+				12 => self.add         ( select_recv!(c.recv_add), &c.to_audio, &c.to_decode, &c.send_audio_state),
+				13 => self.add_many    ( select_recv!(c.recv_add_many), &c.to_audio, &c.to_decode, &c.send_audio_state),
+				14 => self.seek        ( select_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),
+				15 => self.skip        ( select_recv!(c.recv_skip), &c.to_audio, &c.to_decode, &c.send_skip),
+				16 => self.back        ( select_recv!(c.recv_back), &c.to_audio, &c.to_decode, &c.send_back),
+				17 => self.set_index   ( select_recv!(c.recv_set_index), &c.to_audio, &c.to_decode, &c.send_set_index),
+				18 => self.remove      ( select_recv!(c.recv_remove), &c.to_audio, &c.to_decode, &c.send_remove),
+				19 => self.remove_range( select_recv!(c.recv_remove_range), &c.to_audio, &c.to_decode, &c.send_remove_range),
 
 				// Errors.
-				19 => self.handle_error(select_recv!(c.from_audio_error).into(), c.to_audio_error.as_mut()),
-				20 => self.handle_error(select_recv!(c.from_decode_error_d).into(), c.to_decode_error_d.as_mut()),
-				21 => self.handle_error(select_recv!(c.from_decode_error_s).into(), c.to_decode_error_s.as_mut()),
+				20 => self.handle_error(select_recv!(c.from_audio_error).into(), c.to_audio_error.as_mut()),
+				21 => self.handle_error(select_recv!(c.from_decode_error_d).into(), c.to_decode_error_d.as_mut()),
+				22 => self.handle_error(select_recv!(c.from_decode_error_s).into(), c.to_decode_error_s.as_mut()),
 
 				// Shutdown.
-				22 => {
+				23 => {
 					select_recv!(c.shutdown);
 					debug2!("Kernel - shutting down");
 
@@ -317,7 +329,7 @@ where
 				// Same as shutdown but sends a message to a
 				// hanging [Engine] indicating we're done, which
 				// allows the caller to return.
-				23 => {
+				24 => {
 					select_recv!(c.shutdown_hang);
 					debug2!("Kernel - shutting down (hang)");
 
@@ -357,6 +369,21 @@ where
 			}
 			try_send!(channel, ());
 		}
+	}
+
+	//---------------------------------------------------------------------------------------------------- From Audio
+	#[inline]
+	/// Handler to when `Audio` messages us.
+	fn wrote_audio_buffer(&mut self, time: WroteAudioBuffer) {
+		// Calculate total time elasped.
+		let elapsed = time.seconds as f64 + time.frac;
+
+		// Update the `AudioState`.
+		self.w.add_commit_push(|w, _| {
+			if let Some(current) = w.current.as_mut() {
+				current.elapsed = elapsed;
+			}
+		});
 	}
 
 	//---------------------------------------------------------------------------------------------------- Misc Functions

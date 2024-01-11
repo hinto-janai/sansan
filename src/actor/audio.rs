@@ -74,7 +74,7 @@ struct Channels {
 	to_decode:   Sender<TookAudioBuffer>,
 	from_decode: Receiver<(AudioBuffer<f32>, Time)>,
 
-	to_kernel:   Sender<AudioToKernel>,
+	to_kernel:   Sender<WroteAudioBuffer>,
 	from_kernel: Receiver<DiscardCurrentAudio>,
 
 	to_kernel_error:   Sender<OutputError>,
@@ -94,12 +94,17 @@ struct Channels {
 pub(crate) struct TookAudioBuffer;
 
 /// TODO
-pub(crate) enum AudioToKernel {
-	/// We (Audio) successfully wrote an audio buffer
-	/// to the audio output device with this timestamp.
-	/// (Please update the `AudioState` to reflect this).
-	WroteAudioBuffer(Time),
-}
+// pub(crate) enum AudioToKernel {
+	// /// We (Audio) successfully wrote an audio buffer
+	// /// to the audio output device with this timestamp.
+	// /// (Please update the `AudioState` to reflect this).
+	// WroteAudioBuffer(Time),
+// }
+/// TODO
+/// We (Audio) successfully wrote an audio buffer
+/// to the audio output device with this timestamp.
+/// (Please update the `AudioState` to reflect this).
+pub(crate) type WroteAudioBuffer = Time;
 
 //---------------------------------------------------------------------------------------------------- Audio Impl
 #[allow(clippy::missing_docs_in_private_items)]
@@ -113,7 +118,7 @@ pub(crate) struct InitArgs {
 	pub(crate) to_caller_elapsed: Option<(Sender<()>, f64)>,
 	pub(crate) to_decode:         Sender<TookAudioBuffer>,
 	pub(crate) from_decode:       Receiver<(AudioBuffer<f32>, Time)>,
-	pub(crate) to_kernel:         Sender<AudioToKernel>,
+	pub(crate) to_kernel:         Sender<WroteAudioBuffer>,
 	pub(crate) from_kernel:       Receiver<DiscardCurrentAudio>,
 	pub(crate) to_kernel_error:   Sender<OutputError>,
 	pub(crate) from_kernel_error: Option<Receiver<()>>,
@@ -334,7 +339,7 @@ where
 
 		// TODO: tell [Kernel] we just wrote
 		// an audio buffer with [time] timestamp.
-		try_send!(c.to_kernel, AudioToKernel::WroteAudioBuffer(time));
+		try_send!(c.to_kernel, time);
 	}
 
 	#[inline]
