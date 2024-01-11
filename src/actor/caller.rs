@@ -6,7 +6,7 @@ use crossbeam::channel::{Receiver, Select, Sender};
 use crate::{
 	config::{Callback,Callbacks},
 	state::{AudioState,AudioStateReader,ValidData},
-	macros::{send,try_recv,debug2,try_send,select_recv},
+	macros::{send,try_recv,debug2,trace2,try_send,select_recv},
 	error::SansanError,
 };
 use std::sync::{
@@ -103,6 +103,7 @@ impl<Data: ValidData> Caller<Data> {
 				};
 
 				if let Some(init_barrier) = init_barrier {
+					debug2!("Caller - waiting on init_barrier...");
 					init_barrier.wait();
 				}
 
@@ -119,6 +120,8 @@ impl<Data: ValidData> Caller<Data> {
 	#[inline(never)]
 	/// `Caller`'s main function.
 	fn main(mut self, channels: Channels) {
+		debug2!("Caller - main()");
+
 		// Create channels that we will
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
@@ -160,21 +163,25 @@ impl<Data: ValidData> Caller<Data> {
 
 	/// TODO
 	fn next(&mut self) {
+		trace2!("Caller - next()");
 		Self::call(&self.audio_state.get(), &mut self.cb_next);
 	}
 
 	/// TODO
 	fn queue_end(&mut self) {
+		trace2!("Caller - queue_end()");
 		Self::call(&self.audio_state.get(), &mut self.cb_queue_end);
 	}
 
 	/// TODO
 	fn repeat(&mut self) {
+		trace2!("Caller - repeat()");
 		Self::call(&self.audio_state.get(), &mut self.cb_repeat);
 	}
 
 	/// TODO
 	fn elapsed(&mut self) {
+		trace2!("Caller - elapsed()");
 		Self::call(&self.audio_state.get(), &mut self.cb_elapsed);
 	}
 
