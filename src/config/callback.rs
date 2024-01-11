@@ -6,6 +6,7 @@ use crate::{
 	valid_data::ValidData,
 	error::{OutputError,DecodeError,SourceError,SansanError},
 	signal::SeekError,
+	config::error_callback::ErrorCallback,
 };
 use std::{
 	fmt,
@@ -16,95 +17,6 @@ use std::{
 #[allow(unused_imports)]
 use crate::Engine; // docs
 
-//---------------------------------------------------------------------------------------------------- ErrorCallback
-/// The action `sansan` will take on various errors
-///
-/// `sansan` can error in various situations:
-/// - During playback (e.g, audio device was unplugged)
-/// - During decoding (e.g, corrupted data)
-/// - During [`Source`] loading (e.g, file doesn't exist)
-///
-/// When these errors occur, what should `sansan` do?
-///
-/// These are solely used in [`Config`], where each particular
-/// error point can be given a variant of [`ErrorCallback`] that
-/// determines what action `sansan` will take in the case.
-///
-/// # TODO - `None` behavior
-/// Continue playback.
-///
-/// `sansan` will essentially do nothing
-/// when this behavior is selected.
-///
-/// The tracks in the queue will continue
-/// to be decoded and played, even if the
-/// audio output device is not connected.
-///
-/// I.e, track progress will continue regardless of errors.
-///
-/// For `audio_source_behavior` in [`Config`], this does the same as [`Self::Skip`]
-/// since we cannot "continue" a [`Source`] that does not work (i.e, missing file).
-///
-/// This is the default behavior.
-pub enum ErrorCallback {
-	/// Pause the audio stream.
-	///
-	/// This will set the [`AudioState`]'s `playing`
-	/// to `false` and pause playback.
-	Pause,
-
-	/// TODO
-	PauseAndFn(Box<dyn FnMut(SansanError) + Send + Sync + 'static>),
-
-	/// TODO
-	Fn(Box<dyn FnMut(SansanError) + Send + Sync + 'static>),
-}
-
-impl ErrorCallback {
-	/// ```rust
-	/// # use sansan::config::*;
-	/// assert!(ErrorCallback::DEFAULT.is_pause());
-	/// ```
-	pub const DEFAULT: Self = Self::Pause;
-
-	#[must_use]
-	/// Returns `true` if `self == ErrorCallback::Pause`
-	pub const fn is_pause(&self) -> bool {
-		matches!(self, Self::Pause)
-	}
-
-	#[must_use]
-	/// Returns `true` if `self == ErrorCallback::PauseAndFn(_)`
-	pub const fn is_pause_and_fn(&self) -> bool {
-		matches!(self, Self::PauseAndFn(_))
-	}
-
-	#[must_use]
-	/// Returns `true` if `self == ErrorCallback::Fn(_)`
-	pub const fn is_fn(&self) -> bool {
-		matches!(self, Self::Fn(_))
-	}
-}
-
-impl Default for ErrorCallback {
-	fn default() -> Self {
-		Self::DEFAULT
-	}
-}
-
-impl fmt::Debug for ErrorCallback {
-	#[allow(clippy::missing_docs_in_private_items)]
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		f.write_fmt(
-			match self {
-				Self::Pause => format_args!("ErrorCallback::Pause"),
-				Self::PauseAndFn(f) => format_args!("ErrorCallback::PauseAndFn(_)"),
-				Self::Fn(f) => format_args!("ErrorCallback::Fn(_)"),
-			}
-		)
-	}
-}
-
 //---------------------------------------------------------------------------------------------------- Callbacks
 /// Boxed, dynamically dispatched function with access to the current audio state.
 pub(crate) type Callback = Box<dyn FnMut() + Send + 'static>;
@@ -112,24 +24,24 @@ pub(crate) type Callback = Box<dyn FnMut() + Send + 'static>;
 /// TODO
 pub struct Callbacks {
 	/// TODO
-	pub(crate) next: Option<Callback>,
+	pub next: Option<Callback>,
 	/// TODO
-	pub(crate) queue_end: Option<Callback>,
+	pub queue_end: Option<Callback>,
 	/// TODO
-	pub(crate) repeat: Option<Callback>,
+	pub repeat: Option<Callback>,
 	/// TODO
-	pub(crate) elapsed: Option<(Callback, f64)>,
+	pub elapsed: Option<(Callback, f64)>,
 	/// TODO
-	pub(crate) error_decode: Option<ErrorCallback>,
+	pub error_decode: Option<ErrorCallback>,
 	/// TODO
-	pub(crate) error_source: Option<ErrorCallback>,
+	pub error_source: Option<ErrorCallback>,
 	/// TODO
-	pub(crate) error_output: Option<ErrorCallback>,
+	pub error_output: Option<ErrorCallback>,
 }
 
 //---------------------------------------------------------------------------------------------------- Callbacks Impl
 impl Callbacks {
-	/// A fresh [`Self`] with no callbacks, same as [`Self::new()`]
+	/// A fresh [`Self`] with no callbacks.
 	///
 	/// ```rust
 	/// # use sansan::*;
@@ -146,20 +58,6 @@ impl Callbacks {
 		error_source: None,
 		error_output: None,
 	};
-
-	#[cold]
-	#[must_use]
-	/// Returns a fresh [`Self`] with no callbacks, same as [`Self::DEFAULT`].
-	///
-	/// ```rust
-	/// # use sansan::*;
-	/// # use sansan::config::*;
-	/// let callbacks: Callbacks = Callbacks::new();
-	/// assert!(callbacks.all_none());
-	/// ```
-	pub const fn new() -> Self {
-		Self::DEFAULT
-	}
 
 	/// TODO
 	#[must_use]
@@ -259,7 +157,7 @@ impl Callbacks {
 //---------------------------------------------------------------------------------------------------- Callbacks Trait Impl
 impl Default for Callbacks {
 	#[cold]
-	/// Same as [`Self::new`].
+	/// Same as [`Self::DEFAULT`].
 	///
 	/// ```rust
 	/// # use sansan::*;

@@ -4,7 +4,7 @@
 use std::marker::PhantomData;
 use crate::{
 	error::SansanError,
-	config::callbacks::Callbacks,
+	config::callback::Callbacks,
 	engine::Engine,
 	state::AudioState,
 	valid_data::ValidData,

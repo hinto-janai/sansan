@@ -167,7 +167,7 @@ where
 
 		// If the backend errored, forward it.
 		if self.error.try_recv().is_ok() {
-			error2!("AudioOutput(cubeb) - error occured");
+			error2!("AudioOutput(cubeb) - error occurred");
 			Err(OutputError::Write)
 		} else {
 			Ok(())
