@@ -1,4 +1,4 @@
-//! TODO
+//! Audio sources.
 
 mod source;
 pub use source::Source;

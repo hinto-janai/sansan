@@ -1,4 +1,4 @@
-//! TODO
+//! General errors that can occur.
 
 mod decoder;
 pub use decoder::DecodeError;

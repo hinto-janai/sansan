@@ -1,4 +1,4 @@
-//! [`Engine`] configuration
+//! Initialization configuration for the [`Engine`].
 
 #[allow(unused_imports)] // docs
 use crate::Engine;

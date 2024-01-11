@@ -9,6 +9,7 @@ use crate::{
 	Engine,
 	config::Config,
 	source::Source,
+	state::AudioState,
 };
 
 //---------------------------------------------------------------------------------------------------- ErrorCallback
@@ -65,7 +66,7 @@ impl ErrorCallback {
 	#[cold]
 	#[must_use]
 	/// TODO
-	pub fn into_pause_and_fn<F>(&mut self, callback: F) -> Self
+	pub fn new_pause_and_fn<F>(&mut self, callback: F) -> Self
 	where
 		F: FnMut(SansanError) + Send + Sync + 'static
 	{
@@ -75,7 +76,7 @@ impl ErrorCallback {
 	#[cold]
 	#[must_use]
 	/// TODO
-	pub fn into_fn<F>(&mut self, callback: F) -> Self
+	pub fn new_fn<F>(&mut self, callback: F) -> Self
 	where
 		F: FnMut(SansanError) + Send + Sync + 'static
 	{

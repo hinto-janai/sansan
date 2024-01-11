@@ -61,6 +61,8 @@ use crate::audio::rubato::Rubato as ResamplerStruct;
 pub(crate) const ACTOR_COUNT: usize = 7;
 
 //---------------------------------------------------------------------------------------------------- Engine
+/// The main handle to `sansan`'s audio system.
+///
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
 #[derive(Debug)]

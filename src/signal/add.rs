@@ -55,7 +55,7 @@ where
 {
 	/// The [`Sources`] to add to the queue
 	pub sources: Sources<Data>,
-	/// How should we add these [`Source`](s) to the queue?
+	/// How should we add these [`Source`]'s to the queue?
 	pub method: AddMethod,
 	/// Should we clear the queue before adding?
 	pub clear: bool,
