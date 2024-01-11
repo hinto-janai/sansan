@@ -182,6 +182,61 @@ impl<'a, Data: ValidData> IntoIterator for &'a Sources<Data> {
 	}
 }
 
+/// From 1 Source.
+impl<Data: ValidData> From<Source<Data>> for Sources<Data> {
+	fn from(value: Source<Data>) -> Self {
+		Self::from_1(value)
+	}
+}
+
+/// Impl `From` trait for arrays.
+macro_rules! impl_from_array {
+	($(
+		$array_len:literal => // Array length
+		$constructor:ident,   // The constructor function
+		$(,)?
+	)*) => {
+		$(
+			impl<Data: ValidData> From<[Source<Data>; $array_len]> for Sources<Data> {
+				fn from(value: [Source<Data>; $array_len]) -> Self {
+					Self::$constructor(value)
+				}
+			}
+		)*
+	};
+}
+impl_from_array! {
+	2  => from_2,
+	3  => from_3,
+	4  => from_4,
+	5  => from_5,
+	6  => from_6,
+	7  => from_7,
+	8  => from_8,
+	9  => from_9,
+	10 => from_10,
+	11 => from_11,
+	12 => from_12,
+	13 => from_13,
+	14 => from_14,
+	15 => from_15,
+	16 => from_16,
+	17 => from_17,
+	18 => from_18,
+	19 => from_19,
+	21 => from_21,
+	22 => from_22,
+	23 => from_23,
+	24 => from_24,
+	25 => from_25,
+	26 => from_26,
+	27 => from_27,
+	28 => from_28,
+	29 => from_29,
+	31 => from_31,
+	32 => from_32,
+}
+
 //---------------------------------------------------------------------------------------------------- SourcesInner
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
