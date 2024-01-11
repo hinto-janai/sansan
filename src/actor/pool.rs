@@ -9,7 +9,7 @@ use crate::{
 	state::{Current,ValidData,QUEUE_LEN},
 	actor::audio::TookAudioBuffer,
 	actor::decode::DECODE_BUFFER_LEN,
-	macros::{recv,send,try_send,try_recv,debug2,select_recv},
+	macros::{recv,send,try_send,try_recv,debug2,trace2,select_recv},
 };
 use symphonia::core::{audio::AudioBuffer, units::Time};
 use std::{
@@ -112,6 +112,7 @@ impl<Data: ValidData> Pool<Data> {
 				};
 
 				if let Some(init_barrier) = init_barrier {
+					debug2!("Pool - waiting on init_barrier...");
 					init_barrier.wait();
 				}
 
@@ -124,6 +125,8 @@ impl<Data: ValidData> Pool<Data> {
 	#[inline(never)]
 	/// `Pool`'s main function.
 	fn main(mut self, channels: Channels<Data>) {
+		debug2!("Pool - main()");
+
 		// Create channels that we will
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
@@ -166,6 +169,8 @@ impl<Data: ValidData> Pool<Data> {
 		channels: &Channels<Data>,
 		mut buffer: VecDeque<(AudioBuffer<f32>, Time)>
 	) {
+		trace2!("Pool - from_decode(), buffer.len(): {}", buffer.len());
+
 		// Quickly swap with local buffer that
 		// was cleaned from the last call.
 		std::mem::swap(&mut self.buffer_decode, &mut buffer);
