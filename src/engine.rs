@@ -16,7 +16,7 @@ use crate::{
 	source::Source,
 	signal::{
 		Add,AddMany,Back,Clear,Previous,RemoveRange,Remove,
-		Repeat,Seek,SetIndex,Shuffle,Skip,Volume,InsertMethod,
+		Repeat,Seek,SetIndex,Shuffle,Skip,Volume,AddMethod,
 		SeekError,Next,PreviousError,SkipError,
 		BackError,SetIndexError,RemoveError, BackThreshold,
 	}

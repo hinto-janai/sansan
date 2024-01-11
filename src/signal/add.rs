@@ -20,7 +20,7 @@ where
 	/// The [`Source`] to add to the queue
 	pub source: Source<Data>,
 	/// How should we add this [`Source`] to the queue?
-	pub insert: InsertMethod,
+	pub method: AddMethod,
 	/// Should we clear the queue before adding?
 	pub clear: bool,
 	/// Should we start playing after adding?
@@ -53,7 +53,7 @@ where
 	/// The [`Sources`] to add to the queue
 	pub sources: Sources<Data>,
 	/// How should we add these [`Source`](s) to the queue?
-	pub insert: InsertMethod,
+	pub method: AddMethod,
 	/// Should we clear the queue before adding?
 	pub clear: bool,
 	/// Should we start playing after adding?
@@ -64,7 +64,7 @@ impl<Data: ValidData> From<Add<Data>> for AddMany<Data> {
 	fn from(add: Add<Data>) -> Self {
 		Self {
 			sources: Sources::from_1(add.source),
-			insert: add.insert,
+			method: add.method,
 			clear: add.clear,
 			play: add.play,
 		}
@@ -95,7 +95,7 @@ impl<Data: ValidData> From<Add<Data>> for AddMany<Data> {
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[strum(serialize_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
-pub enum InsertMethod {
+pub enum AddMethod {
 	#[default]
 	/// Add a single or multiple songs to the back.
 	///

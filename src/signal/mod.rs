@@ -3,7 +3,7 @@
 use crate::Engine;
 
 pub(crate) mod add;
-pub use add::{Add,AddMany,InsertMethod};
+pub use add::{Add,AddMany,AddMethod};
 
 pub(crate) mod back;
 pub use back::{Back,BackError,BackThreshold};

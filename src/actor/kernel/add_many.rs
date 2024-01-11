@@ -4,7 +4,7 @@
 use crate::{
 	actor::kernel::kernel::{Kernel,DiscardCurrentAudio,KernelToDecode},
 	state::{AudioStateSnapshot,ValidData,Current},
-	signal::add::{AddMany,InsertMethod},
+	signal::add::{AddMany,AddMethod},
 	macros::try_send,
 };
 use crossbeam::channel::{Sender,Receiver};
@@ -33,10 +33,10 @@ impl<Data: ValidData> Kernel<Data> {
 
 		// Map certain [Index] flavors into
 		// [Back/Front] and do safety checks.
-		let insert = match add_many.insert {
-			InsertMethod::Index(0) => { InsertMethod::Front },
-			InsertMethod::Index(i) if i >= self.w.queue.len() => { InsertMethod::Back },
-			InsertMethod::Back | InsertMethod::Front | InsertMethod::Index(_) => add_many.insert,
+		let method = match add_many.method {
+			AddMethod::Index(0) => { AddMethod::Front },
+			AddMethod::Index(i) if i >= self.w.queue.len() => { AddMethod::Back },
+			AddMethod::Back | AddMethod::Front | AddMethod::Index(_) => add_many.method,
 		};
 
 		// This block returns an
@@ -49,8 +49,8 @@ impl<Data: ValidData> Kernel<Data> {
 		// A `Some(usize)` means only our _index_ of our `Current` must be updated.
 		//
 		// These are mutually exclusive.
-		let (maybe_source, maybe_index) = match insert {
-			InsertMethod::Back => {
+		let (maybe_source, maybe_index) = match method {
+			AddMethod::Back => {
 				// Adding onto the back will never change our `Current` index.
 				//
 				//   current [2]
@@ -67,7 +67,7 @@ impl<Data: ValidData> Kernel<Data> {
 				}
 			},
 
-			InsertMethod::Front => {
+			AddMethod::Front => {
 				// Adding onto the front will always increment our `Current` index.
 				//
 				//   current [2]
@@ -85,7 +85,7 @@ impl<Data: ValidData> Kernel<Data> {
 				}
 			},
 
-			InsertMethod::Index(index) => {
+			AddMethod::Index(index) => {
 				// These two should be remapped to other insert variants above.
 				assert!(index > 0);
 				assert!(index != self.w.queue.len());
@@ -147,14 +147,14 @@ impl<Data: ValidData> Kernel<Data> {
 			}
 
 			// Apply insertions.
-			match insert {
-				InsertMethod::Back => {
+			match method {
+				AddMethod::Back => {
 					for source in add_many_sources {
 						w.queue.push_back(source.clone());
 					}
 				},
 
-				InsertMethod::Front => {
+				AddMethod::Front => {
 					// Must be pushed on the front in reverse order, e.g:
 					//
 					// Queue:         [0, 1, 2]
@@ -169,7 +169,7 @@ impl<Data: ValidData> Kernel<Data> {
 					}
 				},
 
-				InsertMethod::Index(index) => {
+				AddMethod::Index(index) => {
 					for (i, source) in add_many_sources.iter().enumerate() {
 						w.queue.insert(i + index, source.clone());
 					}
@@ -250,7 +250,7 @@ mod tests {
 		//---------------------------------- Append sources to the back.
 		let add_many = AddMany {
 			sources,
-			insert:  InsertMethod::Back,
+			method:  AddMethod::Back,
 			clear:   false,
 			play:    true,
 		};
@@ -261,7 +261,7 @@ mod tests {
 		//---------------------------------- Insert in the front.
 		let add_many = AddMany {
 			sources: crate::tests::sources_10_20_30(),
-			insert:  InsertMethod::Front,
+			method:  AddMethod::Front,
 			clear:   false,
 			play:    false,
 		};
@@ -271,7 +271,7 @@ mod tests {
 		//---------------------------------- Insert in the middle.
 		let add_many = AddMany {
 			sources: crate::tests::sources_40_50_60(),
-			insert:  InsertMethod::Index(5),
+			method:  AddMethod::Index(5),
 			clear:   false,
 			play:    false,
 		};
@@ -281,7 +281,7 @@ mod tests {
 		//---------------------------------- Insert at index 0 (re-map to Insert::Front).
 		let add_many = AddMany {
 			sources: crate::tests::sources_11_22_33(),
-			insert:  InsertMethod::Index(0),
+			method:  AddMethod::Index(0),
 			clear:   false,
 			play:    false,
 		};
@@ -291,7 +291,7 @@ mod tests {
 		//---------------------------------- Insert at last index (re-map to Insert::Back).
 		let add_many = AddMany {
 			sources: crate::tests::sources_44_55_66(),
-			insert:  InsertMethod::Index(engine.reader().get().queue.len()),
+			method:  AddMethod::Index(engine.reader().get().queue.len()),
 			clear:   false,
 			play:    false,
 		};
@@ -302,7 +302,7 @@ mod tests {
 		let queue_len = engine.reader().get().queue.len();
 		let add_many = AddMany {
 			sources: crate::tests::sources_77_88_99(),
-			insert:  InsertMethod::Index(queue_len),
+			method:  AddMethod::Index(queue_len),
 			clear:   false,
 			play:    false,
 		};

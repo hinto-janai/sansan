@@ -25,7 +25,7 @@ use crate::{
 		Volume,
 		Add,
 		AddMany,
-		InsertMethod,
+		AddMethod,
 		Seek,
 		SeekedTime,
 		SeekError,

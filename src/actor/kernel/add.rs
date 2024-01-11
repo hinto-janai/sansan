@@ -4,7 +4,7 @@
 use crate::{
 	actor::kernel::kernel::{Kernel,DiscardCurrentAudio,KernelToDecode},
 	state::{AudioStateSnapshot,ValidData},
-	signal::{add::{Add,InsertMethod}, AddMany},
+	signal::{add::{Add,AddMethod}, AddMany},
 	macros::try_send, source::Sources,
 };
 use crossbeam::channel::{Sender,Receiver};
@@ -83,7 +83,7 @@ mod tests {
 		let sources_len = sources.as_slice().len();
 		let add_many = AddMany {
 			sources,
-			insert:  InsertMethod::Back,
+			method:  AddMethod::Back,
 			clear:   false,
 			play:    true,
 		};
@@ -97,7 +97,7 @@ mod tests {
 		//---------------------------------- Append to the back.
 		let add = Add {
 			source: crate::tests::source(10),
-			insert: InsertMethod::Back,
+			method: AddMethod::Back,
 			clear:  false,
 			play:   false,
 		};
@@ -108,7 +108,7 @@ mod tests {
 		//---------------------------------- Insert in the front.
 		let add = Add {
 			source:  crate::tests::source(20),
-			insert:  InsertMethod::Front,
+			method:  AddMethod::Front,
 			clear:   false,
 			play:    false,
 		};
@@ -118,7 +118,7 @@ mod tests {
 		//---------------------------------- Insert in the middle.
 		let add = Add {
 			source:  crate::tests::source(30),
-			insert:  InsertMethod::Index(5),
+			method:  AddMethod::Index(5),
 			clear:   false,
 			play:    false,
 		};
@@ -128,7 +128,7 @@ mod tests {
 		//---------------------------------- Insert at index 0 (re-map to Insert::Front).
 		let add = Add {
 			source:  crate::tests::source(40),
-			insert:  InsertMethod::Index(0),
+			method:  AddMethod::Index(0),
 			clear:   false,
 			play:    false,
 		};
@@ -138,7 +138,7 @@ mod tests {
 		//---------------------------------- Insert at last index (re-map to Insert::Back).
 		let add = Add {
 			source:  crate::tests::source(50),
-			insert:  InsertMethod::Index(engine.reader().get().queue.len()),
+			method:  AddMethod::Index(engine.reader().get().queue.len()),
 			clear:   false,
 			play:    false,
 		};
@@ -149,7 +149,7 @@ mod tests {
 		let queue_len = engine.reader().get().queue.len();
 		let add = Add {
 			source:  crate::tests::source(60),
-			insert:  InsertMethod::Index(queue_len),
+			method:  AddMethod::Index(queue_len),
 			clear:   false,
 			play:    false,
 		};

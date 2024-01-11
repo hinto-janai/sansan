@@ -40,7 +40,7 @@ impl<Data: ValidData> Kernel<Data> {
 mod tests {
 	use super::*;
 	use crate::signal::SetIndex;
-	use crate::signal::add::{AddMany,InsertMethod};
+	use crate::signal::add::{AddMany,AddMethod};
 	use crate::state::{AudioState,Current};
 	use pretty_assertions::assert_eq;
 	use std::thread::sleep;
@@ -57,7 +57,7 @@ mod tests {
 		//---------------------------------- Insert 10 tracks in the queue, but don't set `Current`.
 		let audio_state = engine.add_many(AddMany {
 			sources: crate::tests::sources(),
-			insert: InsertMethod::Back,
+			method: AddMethod::Back,
 			clear: false,
 			play: false,
 		});

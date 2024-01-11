@@ -38,7 +38,7 @@ impl<Data: ValidData> Kernel<Data> {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::signal::add::{AddMany,InsertMethod};
+	use crate::signal::add::{AddMany,AddMethod};
 	use crate::state::{AudioState,Current};
 	use pretty_assertions::assert_eq;
 	use std::thread::sleep;
