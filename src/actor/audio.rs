@@ -232,6 +232,12 @@ where
 				// From `Decode`.
 				0 => {
 					let msg = select_recv!(c.from_decode);
+
+					// Tell `Decode` we just took an audio
+					// buffer and want a new one sent.
+					try_send!(c.to_decode, TookAudioBuffer);
+
+					// Play the buffer.
 					self.play_audio_buffer(msg, &c);
 				},
 
