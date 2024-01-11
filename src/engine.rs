@@ -407,14 +407,16 @@ where
 		let (k_to_gc,     gc_from_k) = unbounded();
 		spawn_actor!(
 			"Gc",
-			crate::actor::gc::Gc {
+			crate::actor::gc::InitArgs {
 				init_barrier:  init_barrier.clone(), // Option<Arc<_>>,
-				shutdown_wait: Arc::clone(&shutdown_wait),
-				shutdown,
-				from_audio:  gc_from_a,
-				from_decode: gc_from_d,
-				from_kernel: gc_from_k,
-				from_pool:   gc_from_p,
+				gc: crate::actor::gc::Gc {
+					shutdown_wait: Arc::clone(&shutdown_wait),
+					shutdown,
+					from_audio:  gc_from_a,
+					from_decode: gc_from_d,
+					from_kernel: gc_from_k,
+					from_pool:   gc_from_p,
+				},
 			},
 			Gc::<Data>::init
 		);
