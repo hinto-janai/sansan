@@ -171,6 +171,26 @@ impl Metadata {
 			MetadataInner::Cow { total_runtime, .. } => *total_runtime,
 		}
 	}
+
+	#[must_use]
+	/// TODO
+	pub fn all_none(&self) -> bool {
+		self.artist_name().is_none() &&
+		self.album_title().is_none() &&
+		self.track_title().is_none() &&
+		self.cover_path().is_none() &&
+		self.total_runtime().is_none()
+	}
+
+	#[must_use]
+	/// TODO
+	pub fn all_some(&self) -> bool {
+		self.artist_name().is_some() &&
+		self.album_title().is_some() &&
+		self.track_title().is_some() &&
+		self.cover_path().is_some() &&
+		self.total_runtime().is_some()
+	}
 }
 
 impl Default for Metadata {

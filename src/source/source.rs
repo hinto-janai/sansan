@@ -57,6 +57,16 @@ where
 		}
 	}
 
+	/// TODO
+	pub fn data_mut(&mut self) -> &mut Data {
+		match &mut self.0 {
+			SourceInner::ArcPath((_, data, _)) |
+			SourceInner::ArcByte((_, data, _)) |
+			SourceInner::CowPath((_, data, _)) |
+			SourceInner::CowByte((_, data, _)) => data,
+		}
+	}
+
 	#[inline]
 	/// TODO
 	pub const fn metadata(&self) -> &Metadata {
@@ -67,10 +77,21 @@ where
 			SourceInner::CowByte((_, _, meta)) => meta,
 		}
 	}
+
+	#[inline]
+	/// TODO
+	pub fn metadata_mut(&mut self) -> &mut Metadata {
+		match &mut self.0 {
+			SourceInner::ArcPath((_, _, meta)) |
+			SourceInner::ArcByte((_, _, meta)) |
+			SourceInner::CowPath((_, _, meta)) |
+			SourceInner::CowByte((_, _, meta)) => meta,
+		}
+	}
 }
 
 /// TODO
-macro_rules! impl_from_for_source {
+macro_rules! impl_from {
 	(
 			// Boilerplate to capture the input
 			// variable from the macro itself
@@ -106,7 +127,7 @@ macro_rules! impl_from_for_source {
 // These mappings exist instead of a generic
 // <T: AsRef<Path>> since that covers too much,
 // and we cannot specify the way we construct.
-impl_from_for_source! { |source|
+impl_from! { |source|
 	// Input         Enum       Source
 	Arc<Path>     => ArcPath => source,
 	&Arc<Path>    => ArcPath => Arc::clone(source),
