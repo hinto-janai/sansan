@@ -120,6 +120,7 @@
 	clippy::mem_forget,
 	clippy::else_if_without_else,
 	clippy::str_to_string,
+	clippy::branches_sharing_code,
 )]
 
 #![cfg_attr(debug_assertions, allow(clippy::todo))]

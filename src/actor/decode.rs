@@ -8,7 +8,7 @@ use crate::{
 	source::{Source, SourceDecode},
 	state::{AudioState, ValidData},
 	actor::{audio::TookAudioBuffer,kernel::KernelToDecode},
-	macros::{recv,send,try_send,try_recv,debug2,select_recv},
+	macros::{recv,send,try_send,try_recv,debug2,trace2,select_recv, error2},
 	error::{SourceError,DecodeError, SansanError},
 };
 use symphonia::core::{
@@ -163,6 +163,7 @@ impl<Data: ValidData> Decode<Data> {
 				};
 
 				if let Some(init_barrier) = init_barrier {
+					debug2!("Decode - waiting on init_barrier...");
 					init_barrier.wait();
 				}
 
@@ -175,6 +176,8 @@ impl<Data: ValidData> Decode<Data> {
 	#[inline(never)]
 	/// `Decode`'s main function.
 	fn main(mut self, channels: Channels<Data>) {
+		debug2!("Decode - main()");
+
 		// Create channels that we will
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
@@ -188,8 +191,14 @@ impl<Data: ValidData> Decode<Data> {
 			// Listen to other actors.
 			#[allow(clippy::match_bool)]
 			let signal = match self.done_decoding {
-				false => select.try_ready(), // Non-blocking
-				true  => Ok(select.ready()), // Blocking
+				// Non-blocking
+				false => select.try_ready(),
+
+				// Blocking
+				true => {
+					debug2!("Decode - waiting for msgs on select.ready()");
+					Ok(select.ready())
+				},
 			};
 
 			// Handle signals.
@@ -230,6 +239,7 @@ impl<Data: ValidData> Decode<Data> {
 				// This "end of stream" error is currently the only way
 				// a [FormatReader] can indicate the media is complete.
 				Err(symphonia::core::errors::Error::IoError(_)) => {
+					debug2!("Decode - done decoding");
 					self.done_decoding();
 					continue;
 				},
@@ -300,8 +310,10 @@ impl<Data: ValidData> Decode<Data> {
 	/// if they are ready, else, store locally.
 	fn send_or_store_audio(&mut self, to_audio: &Sender<ToAudio>, data: ToAudio) {
 		if self.audio_is_ready(to_audio) {
+			trace2!("Decode - send_or_store_audio(), sending");
 			try_send!(to_audio, data);
 		} else {
+			trace2!("Decode - send_or_store_audio(), storing");
 			self.buffer.push_back(data);
 		}
 	}
@@ -309,6 +321,8 @@ impl<Data: ValidData> Decode<Data> {
 	#[inline]
 	/// TODO
 	fn new_source(&mut self, source: Source<Data>, channels: &Channels<Data>) {
+		debug2!("Decode - new_source(), source: {source:?}");
+
 		match source.try_into() {
 			Ok(mut s) => {
 				self.swap_audio_buffer();
@@ -324,6 +338,8 @@ impl<Data: ValidData> Decode<Data> {
 	#[inline]
 	/// TODO
 	fn seek(&mut self, seek: signal::Seek, to_kernel_seek: &Sender<Result<SeekedTime, SeekError>>) {
+		debug2!("Decode - seek(), seek: {seek:?}");
+
 		// Re-use seek logic.
 		// This is in a separate inner function
 		// because it needs to be tested "functionally".
@@ -348,6 +364,8 @@ impl<Data: ValidData> Decode<Data> {
 	#[inline(never)]
 	/// TODO
 	fn handle_decode_error(channels: &Channels<Data>, error: DecodeError) {
+		error2!("Decode - decode error: {error:?}");
+
 		try_send!(channels.to_kernel_error_d, error);
 		if let Some(channel) = channels.from_kernel_error_d.as_ref() {
 			recv!(channel);
@@ -358,6 +376,8 @@ impl<Data: ValidData> Decode<Data> {
 	#[inline(never)]
 	/// TODO
 	fn handle_source_error(channels: &Channels<Data>, error: SourceError) {
+		error2!("Decode - source error: {error:?}");
+
 		try_send!(channels.to_kernel_error_s, error);
 		if let Some(channel) = channels.from_kernel_error_s.as_ref() {
 			recv!(channel);
@@ -373,6 +393,7 @@ impl<Data: ValidData> Decode<Data> {
 	#[inline]
 	/// TODO
 	fn discard_audio_and_stop(&mut self) {
+		trace2!("Decode - discard_audio_and_stop()");
 		self.swap_audio_buffer();
 		self.done_decoding();
 	}
