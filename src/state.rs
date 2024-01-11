@@ -1,9 +1,10 @@
+//! TODO
+
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	signal::{
-		Volume,Repeat,AtomicVolume,AtomicRepeat,
-	},
+	signal::{Volume,Repeat,AtomicVolume,AtomicRepeat},
 	source::{Source,Metadata},
+	valid_data::ValidData,
 };
 use someday::{Reader, Commit, CommitRef};
 use std::{
@@ -123,27 +124,6 @@ impl AtomicAudioState {
 		repeat: AtomicRepeat::DEFAULT,
 		volume: AtomicVolume::DEFAULT,
 	};
-}
-
-//---------------------------------------------------------------------------------------------------- Types
-cfg_if::cfg_if! {
-	if #[cfg(feature = "log")] {
-		use std::fmt::Debug;
-		/// TODO
-		pub trait ValidData: Clone + Debug + Send + Sync + 'static {}
-		impl<T> ValidData for T
-		where
-			T: Clone + Debug + Send + Sync + 'static
-		{}
-	} else {
-		/// TODO
-		pub trait ValidData: Clone + Send + Sync + 'static {}
-
-		impl<T> ValidData for T
-		where
-			T: Clone + Send + Sync + 'static
-		{}
-	}
 }
 
 //---------------------------------------------------------------------------------------------------- Current

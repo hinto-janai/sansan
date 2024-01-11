@@ -134,28 +134,16 @@
 compile_error!("sansan is only compatible with 64/32-bit CPUs");
 
 //---------------------------------------------------------------------------------------------------- Public API
-/// TODO
-pub mod state;
-// pub use state::{
-//     AudioStateReader,AudioState,
-//     AudioStateSnapshot,Current,
-// 	ValidData,
-// };
-
-///
 mod engine;
 pub use engine::Engine;
 
-/// TODO
-pub mod source;
-// pub use source::{
-	// Source,SourcePath,SourceBytes,
-	// SourceError,DecodeError,Metadata,
-// };
+mod valid_data;
+pub use valid_data::ValidData;
 
+pub mod state;
+pub mod source;
 pub mod config;
 pub mod signal;
-/// TODO
 pub mod error;
 
 //---------------------------------------------------------------------------------------------------- Private Usage

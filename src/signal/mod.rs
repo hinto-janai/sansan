@@ -1,4 +1,5 @@
 //! [`Engine`] signals
+
 #[allow(unused_imports)] // docs
 use crate::Engine;
 

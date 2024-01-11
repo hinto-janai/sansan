@@ -5,7 +5,8 @@ use std::thread::JoinHandle;
 use crossbeam::channel::{Receiver, Select, Sender};
 use crate::{
 	config::{Callback,Callbacks},
-	state::{AudioState,AudioStateReader,ValidData},
+	valid_data::ValidData,
+	state::{AudioState,AudioStateReader},
 	macros::{send,try_recv,debug2,trace2,try_send,select_recv},
 	error::SansanError,
 };

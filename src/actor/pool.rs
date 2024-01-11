@@ -6,7 +6,8 @@ use crossbeam::channel::{Receiver, Select, Sender};
 use crate::{
 	signal,
 	source::Source,
-	state::{Current,ValidData,QUEUE_LEN},
+	state::{Current,QUEUE_LEN},
+	valid_data::ValidData,
 	actor::audio::TookAudioBuffer,
 	actor::decode::DECODE_BUFFER_LEN,
 	macros::{recv,send,try_send,try_recv,debug2,trace2,select_recv},

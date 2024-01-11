@@ -6,9 +6,9 @@ use crossbeam::channel::{Sender, Receiver, Select};
 use rand::SeedableRng;
 use crate::{
 	macros::{send,recv,try_recv,try_send,debug2,select_recv},
+	valid_data::ValidData,
 	state::{
 		AudioState,
-		ValidData,
 		AtomicAudioState,
 		AudioStateSnapshot,
 		Current

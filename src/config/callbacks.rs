@@ -2,7 +2,8 @@
 
 //---------------------------------------------------------------------------------------------------- use
 use crate::{
-	state::{AudioState,ValidData},
+	state::AudioState,
+	valid_data::ValidData,
 	error::{OutputError,DecodeError,SourceError,SansanError},
 	signal::SeekError,
 };

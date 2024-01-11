@@ -3,7 +3,8 @@
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
 	actor::kernel::{Kernel,DiscardCurrentAudio,KernelToDecode},
-	state::{AudioStateSnapshot,ValidData,Current},
+	state::{AudioStateSnapshot,Current},
+	valid_data::ValidData,
 	signal::shuffle::Shuffle,
 	signal::seek::{Seek,SeekError,SeekedTime},
 	macros::try_send,

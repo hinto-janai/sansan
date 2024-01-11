@@ -1,4 +1,5 @@
 //! [`Engine`] configuration
+
 #[allow(unused_imports)] // docs
 use crate::Engine;
 

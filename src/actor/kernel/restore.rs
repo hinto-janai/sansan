@@ -3,7 +3,8 @@
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
 	actor::kernel::{Kernel,KernelToDecode,DiscardCurrentAudio},
-	state::{AudioState,AudioStateSnapshot,ValidData},
+	state::{AudioState,AudioStateSnapshot},
+	valid_data::ValidData,
 	macros::try_send,
 };
 use crossbeam::channel::Sender;

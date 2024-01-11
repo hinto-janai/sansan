@@ -6,7 +6,8 @@ use crate::{
 	error::SansanError,
 	config::callbacks::Callbacks,
 	engine::Engine,
-	state::{AudioState,ValidData},
+	state::AudioState,
+	valid_data::ValidData,
 };
 use strum::{
 	AsRefStr,

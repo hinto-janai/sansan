@@ -3,7 +3,8 @@
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
 	actor::kernel::kernel::{Kernel,DiscardCurrentAudio,KernelToDecode},
-	state::{AudioStateSnapshot,ValidData,Current},
+	state::{AudioStateSnapshot,Current},
+	valid_data::ValidData,
 	signal::remove::RemoveError,
 	signal::remove_range::RemoveRange,
 	macros::try_send,

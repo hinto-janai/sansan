@@ -8,7 +8,8 @@ use std::{
 use crate::{
 	actor::decode::DecodeToGc,
 	actor::pool::PoolToGc,
-	state::{AudioState,ValidData,Current},
+	state::{AudioState,Current},
+	valid_data::ValidData,
 	macros::{debug2,warn2,try_recv,select_recv},
 	source::SourceDecode,
 };

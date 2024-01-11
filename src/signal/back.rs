@@ -1,9 +1,12 @@
 //! TODO
 
 //---------------------------------------------------------------------------------------------------- use
-use crate::state::{AudioState,ValidData,Current};
-use crate::signal::SeekError;
-use crate::source::Source;
+use crate::{
+	state::{AudioState,Current},
+	signal::SeekError,
+	source::Source,
+	valid_data::ValidData,
+};
 use strum::{
 	AsRefStr,Display,EnumCount,EnumIter,
 	EnumString,EnumVariantNames,IntoStaticStr,

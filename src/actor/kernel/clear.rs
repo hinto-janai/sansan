@@ -3,7 +3,7 @@
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
 	actor::kernel::Kernel,
-	state::ValidData,
+	valid_data::ValidData,
 	signal::Clear,
 	state::AudioStateSnapshot,
 	macros::try_send,

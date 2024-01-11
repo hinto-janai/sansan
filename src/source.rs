@@ -1,5 +1,10 @@
+//! TODO
+
 //---------------------------------------------------------------------------------------------------- Use
-use crate::error::SourceError;
+use crate::{
+	error::SourceError,
+	valid_data::ValidData,
+};
 use std::{
 	time::Duration,
 	io::Cursor,
@@ -16,10 +21,7 @@ use symphonia::core::{
 	units::{Time,TimeBase},
 	codecs::{Decoder, DecoderOptions},
 };
-use symphonia::default::{
-	get_probe,get_codecs,
-};
-use crate::state::ValidData;
+use symphonia::default::{get_probe,get_codecs};
 
 #[allow(unused_imports)] // docs
 use crate::state::AudioState;
