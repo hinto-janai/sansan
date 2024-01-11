@@ -13,6 +13,12 @@ use crate::{
 	audio::output::AudioOutput,
 	audio::resampler::Resampler,
 	error::OutputError,
+	macros::{recv,send,try_send,try_recv,debug2,trace2,error2},
+	audio::constants::{
+		AUDIO_MILLISECOND_BUFFER_FALLBACK,
+		SAMPLE_RATE_FALLBACK,
+		AUDIO_SAMPLE_BUFFER_LEN,
+	},
 };
 use symphonia::core::audio::{AudioBuffer,SignalSpec, SampleBuffer,Signal};
 use cubeb::StereoFrame;
@@ -22,12 +28,6 @@ use std::borrow::Cow;
 use std::sync::{
 	Arc,
 	atomic::{AtomicBool,Ordering},
-};
-use crate::macros::{recv,send,try_send,try_recv,debug2,trace2};
-use crate::audio::constants::{
-	AUDIO_MILLISECOND_BUFFER_FALLBACK,
-	SAMPLE_RATE_FALLBACK,
-	AUDIO_SAMPLE_BUFFER_LEN,
 };
 
 //----------------------------------------------------------------------------------------------- Cubeb
