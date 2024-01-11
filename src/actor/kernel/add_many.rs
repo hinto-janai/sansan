@@ -135,11 +135,7 @@ impl<Data: ValidData> Kernel<Data> {
 
 			// New `Source`, we must reset our `Current`.
 			if let Some(source) = maybe_source.clone() {
-				w.current = Some(Current {
-					source,
-					index: 0,
-					elapsed: 0.0,
-				});
+				w.current = Some(Current::new(source));
 			} else if let Some(index) = maybe_index {
 				// INVARIANT: if we have a new index
 				// to update with, it means we have

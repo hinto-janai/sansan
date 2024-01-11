@@ -36,11 +36,7 @@ impl<Data: ValidData> Kernel<Data> {
 
 			self.new_source(to_audio, to_decode, source.clone());
 
-			let current = Some(Current {
-				source,
-				index: 0,
-				elapsed: 0.0,
-			});
+			let current = Some(Current::new(source));
 
 			self.w.add_commit_push(|w, _| {
 				w.current = current.clone();
