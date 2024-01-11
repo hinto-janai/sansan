@@ -13,7 +13,8 @@
 use crate::{
 	error::OutputError,
 	audio::resampler::Resampler,
-	signal::Volume
+	signal::Volume,
+	macros::{debug2},
 };
 use symphonia::core::audio::{
 	AudioBuffer,SignalSpec,Channels, Signal, AudioBufferRef, SampleBuffer,
@@ -99,6 +100,8 @@ where
 
 	/// `flush()` + `pause()`.
 	fn stop(&mut self) -> Result<(), OutputError> {
+		debug2!("AudioOutput - stop()");
+
 		self.flush();
 		self.pause()
 	}
@@ -115,6 +118,8 @@ where
 
 	/// Toggle playback.
 	fn toggle(&mut self) -> Result<(), OutputError> {
+		debug2!("AudioOutput - toggle()");
+
 		if self.is_playing() {
 			self.pause()
 		} else {
@@ -124,6 +129,8 @@ where
 
 	/// Create a "fake" dummy connection to the audio hardware/server.
 	fn dummy() -> Result<Self, OutputError> {
+
+		debug2!("AudioOutput - dummy()");
 		let spec = SignalSpec {
 			// INVARIANT: Must be non-zero.
 			rate: 44_100,

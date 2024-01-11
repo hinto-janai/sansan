@@ -9,13 +9,13 @@ use std::sync::{
 	Barrier,
 	atomic::{AtomicBool,Ordering},
 };
-use crate::error::OutputError;
+use crate::{error::OutputError, macros::error2};
 use crate::actor::kernel::DiscardCurrentAudio;
 use crate::audio::{
 	output::AudioOutput,
 	resampler::Resampler,
 };
-use crate::macros::{send,try_recv,debug2,try_send,select_recv,recv};
+use crate::macros::{send,try_recv,debug2,try_send,select_recv,recv,trace2};
 use crate::signal::Volume;
 use crate::state::AtomicAudioState;
 
@@ -175,6 +175,7 @@ where
 				};
 
 				if let Some(init_barrier) = init_barrier {
+					debug2!("Audio - waiting on init_barrier...");
 					init_barrier.wait();
 				}
 
@@ -187,6 +188,8 @@ where
 	#[inline(never)]
 	/// `Audio`'s main function.
 	fn main(mut self, c: Channels) {
+		debug2!("Audio - main()");
+
 		// Create channels that we will
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
@@ -219,6 +222,7 @@ where
 
 					// Else, hang until we receive
 					// a message from somebody.
+					debug2!("Audio - waiting for msgs on select.ready()");
 					select.ready()
 				},
 			};
@@ -270,6 +274,8 @@ where
 		msg: (AudioBuffer<f32>, symphonia::core::units::Time),
 		c: &Channels,
 	) {
+		trace2!("Audio - play_audio_buffer(), time: {:?}", msg.1);
+
 		let (audio, time) = msg;
 
 		let spec     = *audio.spec();
@@ -277,7 +283,11 @@ where
 
 		// If the spec/duration is different, we must re-open a
 		// matching audio output device or audio will get weird.
-		if spec != *self.output.spec() || duration != self.output.duration() {
+		let output_spec     = self.output.spec();
+		let output_duration = self.output.duration();
+		if spec != *output_spec || duration != output_duration {
+			debug2!("Audio - diff in spec ({spec:?} - {output_spec:?}) and/or duration ({duration} - {output_duration}), re-opening AudioOutput");
+
 			match AudioOutput::try_open(
 				"TODO".to_string(), // TODO: name
 				spec,
@@ -288,6 +298,7 @@ where
 				Ok(o)  => self.output = o,
 				// And if we couldn't, tell `Kernel` we errored.
 				Err(e) => {
+					error2!("Audio - couldn't re-open AudioOutput: {e:?}");
 					try_send!(c.to_kernel_error, e);
 					if let Some(channel) = c.from_kernel_error.as_ref() {
 						recv!(channel);
@@ -331,6 +342,8 @@ where
 		from_decode: &Receiver<(AudioBuffer<f32>, Time)>,
 		to_gc: &Sender<AudioBuffer<f32>>,
 	) {
+		debug2!("Audio - discard_audio()");
+
 		// While we are discarding audio, signal to [Decode]
 		// that we don't want any new [AudioBuffer]'s
 		// (since they'll just get discarded).
