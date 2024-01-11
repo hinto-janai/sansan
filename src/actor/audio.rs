@@ -263,10 +263,6 @@ where
 		}
 	}
 
-	//---------------------------------------------------------------------------------------------------- Message Routing
-	// These are the functions that map message
-	// enums to the their proper signal handler.
-
 	//---------------------------------------------------------------------------------------------------- Signal Handlers
 	// Signal Handlers.
 	//

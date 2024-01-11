@@ -1,5 +1,6 @@
 //! TODO
 
+pub(crate) mod constants;
 pub(crate) mod output;
 pub(crate) mod resampler;
 

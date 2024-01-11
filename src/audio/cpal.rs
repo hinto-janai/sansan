@@ -23,22 +23,12 @@ use std::sync::{
 	atomic::{AtomicBool,Ordering},
 };
 use crate::macros::{recv,send,try_send,try_recv,trace2,debug2,error2};
+use crate::audio::constants::{
+	AUDIO_MILLISECOND_BUFFER_FALLBACK,
+	SAMPLE_RATE_FALLBACK,
+	AUDIO_SAMPLE_BUFFER_LEN,
+};
 use cpal::traits::{DeviceTrait,StreamTrait,HostTrait};
-
-//----------------------------------------------------------------------------------------------- Constants
-/// The most common sample rate to fallback to if we cannot
-/// poll the audio devices "preferred" audio sample rate.
-const SAMPLE_RATE_FALLBACK: u32 = 44_100;
-
-/// The amount of milliseconds our audio buffer is between
-/// us and `cubeb`'s callback function (if the user does
-/// not provide a value).
-const AUDIO_MILLISECOND_BUFFER_FALLBACK: usize = 20;
-
-/// The amount of raw [f32] samples held in our [Vec<f32>] sample buffer.
-///
-/// Tracks seem to max out at `8192`, so do that * 2 to be safe.
-pub(crate) const AUDIO_SAMPLE_BUFFER_LEN: usize = 16_384;
 
 //----------------------------------------------------------------------------------------------- Cubeb
 /// TODO
@@ -293,12 +283,12 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 		};
 		debug2!("AudioOutput - config:\n{config:#?}");
 
-		// The `cubeb` <-> AudioOutput channel will hold up to 20ms of audio data by default.
+		// The `cubeb` <-> AudioOutput channel will hold up to 50ms of audio data by default.
 		let buffer_milliseconds = match buffer_milliseconds {
 			Some(u) => u as usize,
 			None => AUDIO_MILLISECOND_BUFFER_FALLBACK,
 		};
-		let channel_len = ((buffer_milliseconds * sample_rate as usize) / 1000) * channels;
+		let channel_len = ((buffer_milliseconds * sample_rate as usize) / 1000) * 2;
 		debug2!("AudioOutput - buffer_milliseconds: {buffer_milliseconds}, channel_len: {channel_len}");
 
 		let (sender, receiver)           = crossbeam::channel::bounded(channel_len);
