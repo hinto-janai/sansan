@@ -35,6 +35,17 @@ impl<Data> Current<Data>
 where
 	Data: ValidData
 {
+	/// Returns an `Option<Current>` with:
+	/// - a new `Source`
+	/// - 0th index
+	/// - 0.0 elapsed time
+	pub(crate) const fn new(source: Source<Data>) -> Self {
+		Self {
+			source,
+			index: 0,
+			elapsed: 0.0,
+		}
+	}
 }
 
 //---------------------------------------------------------------------------------------------------- TESTS

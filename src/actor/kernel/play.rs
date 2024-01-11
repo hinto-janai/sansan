@@ -2,8 +2,8 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	actor::kernel::Kernel,
-	state::AudioStateSnapshot,
+	actor::kernel::{Kernel,DiscardCurrentAudio,KernelToDecode},
+	state::{AudioStateSnapshot, Current},
 	valid_data::ValidData,
 	macros::try_send,
 };
@@ -15,22 +15,38 @@ impl<Data: ValidData> Kernel<Data> {
 	/// TODO
 	pub(super) fn play(
 		&mut self,
+		to_audio: &Sender<DiscardCurrentAudio>,
+		to_decode: &Sender<KernelToDecode<Data>>,
 		to_engine: &Sender<AudioStateSnapshot<Data>>,
 	) {
-		if !self.current_is_some() || self.playing() {
+		if self.playing() || self.queue_empty() {
 			try_send!(to_engine, self.audio_state_snapshot());
 			return;
 		}
 
+		// If we don't have a `Current`, `play()`'s
+		// behavior is that it starts the queue
+		// from the 0th track.
+		let maybe_source = if self.current_is_some() {
+			None
+		} else {
+			// INVARIANT: At this point, the queue is non-empty.
+			Some(self.w.queue[0].clone())
+		};
+
 		self.atomic_state.playing.store(true, Ordering::Release);
 
 		self.w.add_commit_push(|w, _| {
-			debug_assert!(w.current.is_some());
-			debug_assert!(!w.playing);
 			w.playing = true;
+			if let Some(source) = maybe_source.clone() {
+				w.current = Some(Current::new(source));
+			}
 		});
 
-		// TODO: tell audio/decode to start.
+		// Tell audio/decode to start if we're starting a new source.
+		if let Some(source) = maybe_source {
+			self.new_source(to_audio, to_decode, source);
+		}
 
 		try_send!(to_engine, self.audio_state_snapshot());
 	}

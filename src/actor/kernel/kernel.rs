@@ -272,8 +272,8 @@ where
 			// so `Kernel` must check all requests and return early (or with
 			// and error) if invalid.
 			match select.ready() {
-				0  =>                  { select_recv!(c.recv_toggle); self.toggle(&c.send_audio_state) },
-				1  =>                  { select_recv!(c.recv_play); self.play(&c.send_audio_state) },
+				0  =>                  { select_recv!(c.recv_toggle); self.toggle(&c.to_audio, &c.to_decode, &c.send_audio_state) },
+				1  =>                  { select_recv!(c.recv_play); self.play(&c.to_audio, &c.to_decode, &c.send_audio_state) },
 				2  =>                  { select_recv!(c.recv_pause); self.pause(&c.send_audio_state) },
 				3  =>                  { select_recv!(c.recv_stop); self.stop(&c.send_audio_state) },
 				4  =>                  { select_recv!(c.recv_next); self.next(&c.to_audio, &c.to_decode, &c.send_audio_state) },
