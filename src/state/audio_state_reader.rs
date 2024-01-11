@@ -2,18 +2,13 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	signal::{Volume,Repeat,AtomicVolume,AtomicRepeat},
-	source::{Source,Metadata},
 	valid_data::ValidData,
 	state::{AudioState,AudioStateSnapshot},
 };
-use someday::{Reader, Commit, CommitRef};
-use std::{
-	sync::Arc,
-	sync::atomic::AtomicBool,
-	path::Path,
-	collections::VecDeque, borrow::Borrow,
-};
+use someday::Reader;
+
+#[allow(unused_imports)] // docs
+use crate::Engine;
 
 //---------------------------------------------------------------------------------------------------- AudioStateReader
 /// TODO
@@ -29,11 +24,17 @@ where
 	#[must_use]
 	/// TODO
 	pub fn get(&self) -> AudioStateSnapshot<Data> {
-		AudioStateSnapshot(self.0.head_spin())
+		AudioStateSnapshot(self.0.head())
+	}
+
+	#[inline]
+	#[must_use]
+	/// How many [`AudioStateReader`]'s are there?
+	pub fn reader_count(&self) -> usize {
+		self.0.reader_count()
 	}
 }
 
 //---------------------------------------------------------------------------------------------------- TESTS
 #[cfg(test)]
-mod tests {
-}
+mod tests {}

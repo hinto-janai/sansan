@@ -604,6 +604,12 @@ where
 		AudioStateReader::clone(&self.audio)
 	}
 
+	#[must_use]
+	/// TODO
+	pub const fn reader_ref(&self) -> &AudioStateReader<Data> {
+		&self.audio
+	}
+
 	//---------------------------------------------------------------------------------------------------- Signals
 	// INVARIANT: The `Engine`'s channel <-> return system
 	// relies on the fact that only 1 thread is `.recv()`'ing
