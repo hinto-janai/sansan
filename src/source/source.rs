@@ -88,6 +88,19 @@ where
 			SourceInner::CowByte((_, _, meta)) => meta,
 		}
 	}
+
+	#[must_use]
+	/// TODO
+	pub fn dummy() -> Self
+	where
+		Data: Default,
+	{
+		///
+		const ARRAY: &[u8] = &[];
+		let cow   = Cow::Borrowed(ARRAY);
+		let inner = SourceInner::CowByte((cow, Data::default(), Metadata::DEFAULT));
+		Self(inner)
+	}
 }
 
 /// TODO

@@ -108,6 +108,16 @@ where
 		}
 	}
 
+	#[must_use]
+	/// TODO
+	pub fn dummy() -> Self
+	where
+		Data: Default,
+	{
+		let source = Source::dummy();
+		Self::from_1(source)
+	}
+
 	#[must_use] /// TODO
 	pub const fn from_1(source: Source<Data>) -> Self { Self(SourcesInner::One(source)) }
 	#[must_use] /// TODO

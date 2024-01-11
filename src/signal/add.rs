@@ -30,6 +30,34 @@ where
 	pub play: bool,
 }
 
+impl<Data: ValidData> From<Source<Data>> for Add<Data> {
+	/// Create an [`Add`] with default values from a [`Source`].
+	///
+	/// ```rust
+	/// # use sansan::{signal::*,source::*};
+	/// let source = Source::<()>::dummy();
+	/// let add    = Add::from(source.clone());
+	///
+	/// // Source is the same, default add values were used.
+	/// assert_eq!(
+	///     add,
+	///     Add {
+	///         source,
+	///         method: AddMethod::Back,
+	///         clear: false,
+	///         play: false,
+	///     }
+	/// );
+	fn from(source: Source<Data>) -> Self {
+		Self {
+			source,
+			method: AddMethod::Back,
+			clear: false,
+			play: false,
+		}
+	}
+}
+
 // //---------------------------------------------------------------------------------------------------- AddError
 // /// TODO
 // #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -70,6 +98,34 @@ impl<Data: ValidData> From<Add<Data>> for AddMany<Data> {
 			method: add.method,
 			clear: add.clear,
 			play: add.play,
+		}
+	}
+}
+
+impl<Data: ValidData> From<Sources<Data>> for AddMany<Data> {
+	/// Create an [`AddMany`] with default values from a [`Source`].
+	///
+	/// ```rust
+	/// # use sansan::{signal::*,source::*};
+	/// let sources = Sources::<()>::dummy();
+	/// let add     = AddMany::from(sources.clone());
+	///
+	/// // Source is the same, default add values were used.
+	/// assert_eq!(
+	///     add,
+	///     AddMany {
+	///         sources,
+	///         method: AddMethod::Back,
+	///         clear: false,
+	///         play: false,
+	///     }
+	/// );
+	fn from(sources: Sources<Data>) -> Self {
+		Self {
+			sources,
+			method: AddMethod::Back,
+			clear: false,
+			play: false,
 		}
 	}
 }
