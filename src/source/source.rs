@@ -12,7 +12,7 @@ use std::{
 	fs::File,
 	path::{Path,PathBuf},
 	sync::Arc,
-	borrow::Cow,
+	borrow::Cow, fmt::Debug,
 };
 use symphonia::core::{
 	formats::{FormatReader,FormatOptions},
@@ -159,7 +159,7 @@ impl_from! { |source|
 //---------------------------------------------------------------------------------------------------- SourceInner
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
-#[derive(Debug,Clone,PartialEq,PartialOrd)]
+#[derive(Clone,PartialEq,PartialOrd)]
 /// TODO
 pub(crate) enum SourceInner<Data: ValidData> {
 	/// TODO
@@ -170,4 +170,39 @@ pub(crate) enum SourceInner<Data: ValidData> {
 	CowPath((Cow<'static, Path>, Data, Metadata)),
 	/// TODO
 	CowByte((Cow<'static, [u8]>, Data, Metadata)),
+}
+
+impl<Data: ValidData + Debug> Debug for SourceInner<Data> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::ArcPath((path, data, metadata)) => {
+				f.debug_struct("ArcPath")
+					.field("path", path)
+					.field("data", data)
+					.field("metadata", metadata)
+					.finish()
+			},
+			Self::ArcByte((bytes, data, metadata)) => {
+				f.debug_struct("ArcByte")
+					.field("bytes", &bytes.len())
+					.field("data", data)
+					.field("metadata", metadata)
+					.finish()
+			},
+			Self::CowPath((path, data, metadata)) => {
+				f.debug_struct("CowPath")
+					.field("path", path)
+					.field("data", data)
+					.field("metadata", metadata)
+					.finish()
+			},
+			Self::CowByte((bytes, data, metadata)) => {
+				f.debug_struct("CowByte")
+					.field("bytes", &bytes.len())
+					.field("data", data)
+					.field("metadata", metadata)
+					.finish()
+			},
+		}
+	}
 }
