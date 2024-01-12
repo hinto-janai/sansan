@@ -58,7 +58,7 @@ where
 	Data: ValidData,
 {
 	/// Data and objects.
-	pub(super) audio: AudioStateReader<Data>,
+	pub(super) reader: AudioStateReader<Data>,
 	pub(super) config: LiveConfig,
 	pub(super) atomic_state: Arc<AtomicState>,
 

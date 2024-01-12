@@ -490,7 +490,7 @@ where
 		let volume = atomic_state.volume.get();
 		info2!("Engine - initialization complete");
 		Ok(Self {
-			audio: audio_state_reader,
+			reader: audio_state_reader,
 			config: live_config,
 			atomic_state,
 

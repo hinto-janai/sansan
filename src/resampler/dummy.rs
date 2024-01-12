@@ -7,7 +7,7 @@
 
 //----------------------------------------------------------------------------------------------- use
 use crate::{
-	audio::resampler::Resampler,
+	resampler::Resampler,
 	macros::{debug2,trace2},
 };
 use std::num::NonZeroUsize;

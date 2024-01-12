@@ -2,12 +2,10 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	signal::{Volume,Repeat,AtomicVolume,AtomicRepeat},
-	source::{Source,Metadata},
 	valid_data::ValidData,
 	state::audio_state::AudioState,
 };
-use someday::{Reader, Commit, CommitRef};
+use someday::{Commit, CommitRef};
 use std::{
 	fmt::{self,Debug},
 	borrow::Borrow,
@@ -24,21 +22,21 @@ impl<Data: ValidData> std::ops::Deref for AudioStateSnapshot<Data> {
 	type Target = AudioState<Data>;
 	#[inline]
 	fn deref(&self) -> &Self::Target {
-		&self.0
+		self.0.data()
 	}
 }
 
 impl<Data: ValidData> AsRef<AudioState<Data>> for AudioStateSnapshot<Data> {
 	#[inline]
 	fn as_ref(&self) -> &AudioState<Data> {
-		&self.0
+		self.0.data()
 	}
 }
 
 impl<Data: ValidData> Borrow<AudioState<Data>> for AudioStateSnapshot<Data> {
 	#[inline]
 	fn borrow(&self) -> &AudioState<Data> {
-		&self.0
+		self.0.data()
 	}
 }
 

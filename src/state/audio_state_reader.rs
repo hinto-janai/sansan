@@ -6,6 +6,7 @@ use crate::{
 	state::{AudioState,AudioStateSnapshot},
 };
 use someday::Reader;
+use std::num::NonZeroUsize;
 
 #[allow(unused_imports)] // docs
 use crate::Engine;
@@ -30,7 +31,7 @@ where
 	#[inline]
 	#[must_use]
 	/// How many [`AudioStateReader`]'s are there?
-	pub fn reader_count(&self) -> usize {
+	pub fn reader_count(&self) -> NonZeroUsize {
 		self.0.reader_count()
 	}
 }

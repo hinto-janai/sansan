@@ -25,16 +25,31 @@ where
 	Data: ValidData,
 {
 	//---------------------------------------------------------------------------------------------------- Reader
+	#[inline]
+	#[must_use]
+	/// TODO
+	pub fn audio_state_snapshot(&self) -> AudioStateSnapshot<Data> {
+		self.reader.get()
+	}
+
+	//---------------------------------------------------------------------------------------------------- Reader
 	#[must_use]
 	/// TODO
 	pub fn reader(&self) -> AudioStateReader<Data> {
-		AudioStateReader::clone(&self.audio)
+		AudioStateReader::clone(&self.reader)
 	}
 
 	#[must_use]
 	/// TODO
 	pub const fn reader_ref(&self) -> &AudioStateReader<Data> {
-		&self.audio
+		&self.reader
+	}
+
+	#[inline]
+	#[must_use]
+	/// How many [`AudioStateReader`]'s are there?
+	pub fn reader_count(&self) -> std::num::NonZeroUsize {
+		self.reader.reader_count()
 	}
 
 	//---------------------------------------------------------------------------------------------------- Config
