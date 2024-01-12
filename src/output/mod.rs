@@ -9,7 +9,7 @@ pub(crate) use output::AudioOutput;
 // - all backends are enabled
 // - no backend is enabled
 cfg_if::cfg_if! {
-	if #[cfg(test)] {
+	if #[cfg(any(test, feature = "dummy"))] {
 		mod dummy;
 		pub(crate) use dummy::DummyAudioOutput as AudioOutputStruct;
 	} else if #[cfg(feature = "cpal")] {
