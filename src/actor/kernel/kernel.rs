@@ -370,7 +370,7 @@ where
 	#[inline]
 	/// Handler to when `Audio` messages us.
 	fn wrote_audio_buffer(&mut self, time: WroteAudioBuffer) {
-		// Calculate total time elasped.
+		// Calculate total time elapsed.
 		let elapsed = time.seconds as f64 + time.frac;
 
 		// Update the `AudioState`.

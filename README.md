@@ -37,69 +37,10 @@ This example shows some basic usage of `sansan`:
 - Creating the `Engine`
 - Adding music to the queue
 - Sending signals to the `Engine` (play, next)
-- Reading live audio state without blocking
+- Reading/writing live audio state without blocking
 
-```rust,ignore
-use sansan::{*, signal::*};
-
-// Our music data (Paths and/or raw bytes)
-let track_1: &Path = "/path/to/audio.mp3";
-let track_2: &[u8] = include_bytes!("/path/to/audio.flac");
-
-// Create a music engine with default settings
-let mut engine = Engine::init(Config::DEFAULT);
-
-// Add the music to the back of the queue.
-engine.signal().add(Add { source: track_1.into() }).unwrap();
-engine.signal().add(Add { source: track_2.into() }).unwrap();
-
-// Start playing (this does not block the caller!)
-engine.signal().play();
-
-// Our music is now playing
-// on the default audio device.
-//
-// We can mutate/view the queue
-// and adjust settings freely without
-// blocking the real-time audio thread,
-// or us, the caller.
-
-// For example, let's take a look at the current audio state.
-//
-// We can hold onto this data for all of eternity
-// and it will not block [sansan] from progressing.
-let reader: AudioStateReader<()> = engine.audio_state_reader()
-let audio_state:  AudioState<()> = reader.get();
-assert_eq!(audio_state.playing, true);
-assert_eq!(audio_state.queue.len(), 2);
-
-// We can view live playback information.
-std::thread::sleep(std::time::Duration::from_secs(1));
-assert_eq!(
-	audio_state.current.unwrap().elapsed.as_pad(),
-	"00:00:01"
-);
-
-// We can mutate the queue - without blocking anyone.
-//
-// Let's remove the 2nd track in the queue.
-engine.signal().remove(Remove { index: 1 }).unwrap();
-
-// Re-acquire the "latest" audio state.
-let audio_state: AudioState<()> = reader.get();
-
-// Now the queue is only 1 length.
-assert_eq!(audio_state.queue.len(), 1);
-
-// Skip to the next song.
-engine.signal().next().unwrap();
-
-// Since there was only 1 track left,
-// and no repeat mode was on, the [Engine]
-// has stopped playing.
-let audio_state: AudioState<()> = reader.get();
-assert_eq!(audio_state.playing, false);
-assert_eq!(audio_state.queue.len(), 0);
+```rust
+// TODO
 ```
 
 ## Design

@@ -644,7 +644,7 @@ where
 	{
 		// Update the config.
 		f(&mut self.config);
-		// Update the atomic verison so the other actors see it.
+		// Update the atomic version so the other actors see it.
 		self.atomic_state.update_from_config(&self.config);
 	}
 
