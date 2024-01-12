@@ -1,4 +1,4 @@
-//! Audio state
+//! Audio state.
 
 mod constants;
 pub use constants::BACK_THRESHOLD;

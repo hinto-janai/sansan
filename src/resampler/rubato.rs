@@ -8,7 +8,7 @@
 //----------------------------------------------------------------------------------------------- use
 use rubato::FftFixedIn;
 use std::num::NonZeroUsize;
-use crate::audio::resampler::Resampler;
+use crate::resampler::Resampler;
 use crate::macros::{debug2,trace2};
 
 //----------------------------------------------------------------------------------------------- Rubato

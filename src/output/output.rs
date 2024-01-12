@@ -12,7 +12,7 @@
 //----------------------------------------------------------------------------------------------- use
 use crate::{
 	error::OutputError,
-	audio::resampler::Resampler,
+	resampler::Resampler,
 	signal::Volume,
 	macros::{debug2},
 };

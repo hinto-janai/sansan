@@ -2,10 +2,10 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
+	engine::{Engine, error::EngineInitError},
 	valid_data::ValidData,
-	macros::{recv,try_send,debug2,info2},
+	macros::{try_send,debug2,info2},
 	state::{
-		AudioStateSnapshot,
 		AudioStateReader,
 		AudioState,
 		AtomicState,
@@ -23,12 +23,6 @@ use crate::{
 		gc::Gc,
 		caller::Caller,
 	},
-	signal::{
-		Add,AddMany,Back,Clear,Previous,RemoveRange,Remove,
-		Repeat,Seek,SetIndex,Shuffle,Skip,Volume,AddMethod,
-		SeekError,Next,PreviousError,SkipError,
-		BackError,SetIndexError,RemoveError, BackThreshold,
-	}
 };
 use crossbeam::channel::{bounded,unbounded};
 use std::sync::{
@@ -36,10 +30,6 @@ use std::sync::{
 	Barrier,
 	atomic::AtomicBool,
 };
-
-// Prevent collision with [S] generic.
-use crossbeam::channel::Sender as S;
-use crossbeam::channel::Receiver as R;
 
 // Audio I/O backend.
 use crate::output::AudioOutputStruct;
@@ -59,73 +49,7 @@ use crate::resampler::ResamplerStruct;
 /// [6] Gc (Garbage Collector)
 ///
 /// TODO: finalize all actors
-pub(crate) const ACTOR_COUNT: usize = 7;
-
-//---------------------------------------------------------------------------------------------------- Engine
-/// The main handle to `sansan`'s audio system.
-///
-/// TODO
-#[allow(clippy::missing_docs_in_private_items)]
-#[derive(Debug)]
-pub struct Engine<Data>
-where
-	Data: ValidData,
-{
-	/// Data and objects.
-	audio: AudioStateReader<Data>,
-	config: LiveConfig,
-	atomic_state: Arc<AtomicState>,
-
-	// Internal mirrored state.
-	repeat: Repeat,
-	volume: Volume,
-
-	/// Signal to [Kernel] to tell all of our internal
-	/// actors (threads) to start shutting down.
-	shutdown: S<()>,
-	/// Same as above, but for [shutdown_hang()].
-	shutdown_hang: S<()>,
-	/// [Kernel] telling us the shutdown
-	/// process has been completed.
-	shutdown_done: R<()>,
-
-	/// This channel is shared between all signals that don't
-	/// have special output, i.e, they return `AudioStateSnapshot`.
-	recv_audio_state: R<AudioStateSnapshot<Data>>,
-
-	/// Signals that have no input and output `AudioStateSnapshot`
-	send_toggle:   S<()>,
-	send_play:     S<()>,
-	send_pause:    S<()>,
-	send_next:     S<()>,
-	send_previous: S<()>,
-	send_stop:     S<()>,
-
-	/// Signals that have input and output `AudioStateSnapshot`.
-	send_add:       S<Add<Data>>,
-	send_add_many:  S<AddMany<Data>>,
-	send_clear:     S<Clear>,
-	send_restore:   S<AudioState<Data>>,
-	send_repeat:    S<Repeat>,
-	send_volume:    S<Volume>,
-	send_shuffle:   S<Shuffle>,
-
-	/// Signals that return `Result<T, E>`
-	/// These don't use the common `recv_audio_state_snapshot`,
-	/// as they return unique values.
-	send_seek:         S<Seek>,
-	recv_seek:         R<Result<AudioStateSnapshot<Data>, SeekError>>,
-	send_skip:         S<Skip>,
-	recv_skip:         R<Result<AudioStateSnapshot<Data>, SkipError>>,
-	send_back:         S<Back>,
-	recv_back:         R<Result<AudioStateSnapshot<Data>, BackError>>,
-	send_set_index:    S<SetIndex>,
-	recv_set_index:    R<Result<AudioStateSnapshot<Data>, SetIndexError>>,
-	send_remove:       S<Remove>,
-	recv_remove:       R<Result<AudioStateSnapshot<Data>, RemoveError>>,
-	send_remove_range: S<RemoveRange>,
-	recv_remove_range: R<Result<AudioStateSnapshot<Data>, RemoveError>>,
-}
+const ACTOR_COUNT: usize = 7;
 
 //---------------------------------------------------------------------------------------------------- Engine Impl
 impl<Data> Engine<Data>
@@ -604,265 +528,6 @@ where
 			send_remove_range: e_send_remove_range,
 			recv_remove_range: e_recv_remove_range,
 		})
-	}
-
-	//---------------------------------------------------------------------------------------------------- Reader
-	#[must_use]
-	/// TODO
-	pub fn reader(&self) -> AudioStateReader<Data> {
-		AudioStateReader::clone(&self.audio)
-	}
-
-	#[must_use]
-	/// TODO
-	pub const fn reader_ref(&self) -> &AudioStateReader<Data> {
-		&self.audio
-	}
-
-	//---------------------------------------------------------------------------------------------------- Config
-	#[must_use]
-	/// TODO
-	pub const fn config(&self) -> &LiveConfig {
-		&self.config
-	}
-
-	/// TODO
-	pub fn config_update<F>(&mut self, mut f: F)
-	where
-		F: FnMut(&mut LiveConfig)
-	{
-		// Update the config.
-		f(&mut self.config);
-		// Update the atomic version so the other actors see it.
-		self.atomic_state.update_from_config(&self.config);
-	}
-
-	//---------------------------------------------------------------------------------------------------- Get
-	#[must_use]
-	/// TODO
-	pub const fn get_volume(&self) -> Volume {
-		self.volume
-	}
-
-	#[must_use]
-	/// TODO
-	pub const fn get_repeat(&self) -> Repeat {
-		self.repeat
-	}
-
-	//---------------------------------------------------------------------------------------------------- Signals
-	// INVARIANT: The `Engine`'s channel <-> return system
-	// relies on the fact that only 1 thread is `.recv()`'ing
-	// at any given moment, `&mut self` ensures this mutual exclusion.
-	//
-	// There is no "routing" so-to-speak so we must
-	// ensure the caller also `.recv()`'s the return value.
-	//
-	// SAFETY: The [Kernel] should always be listening.
-	// it is a logic error for [send()] or [recv()] to panic,
-	// as that would mean [Kernel] has disconnected, but the
-	// [Engine] is still alive, which doesn't make sense
-	// (unless [Kernel] panicked).
-	//
-	// Just in case [Kernel] panicked, we [unwrap()] as all
-	// bets are off since [Kernel] shouldn't be panicking.
-
-	// There are some local checks we can do here (as the `Engine`)
-	// so we don't have to go through the Request -> Response channel
-	// stuff, for example: if `repeat()` is called, but our current
-	// `Repeat` is the same, we can return here instead of sending
-	// a channel message to `Kernel`, however...
-	//
-	// We don't have free access to the `AudioState`, we must get
-	// a `head()` of the current `Reader`'s state which is probably
-	// as expensive as just sending a message, so...
-	// INVARIANT: `Kernel` must not assume all Requests are actionable.
-
-	/// TODO
-	pub fn toggle(&mut self) -> AudioStateSnapshot<Data> {
-		try_send!(self.send_toggle, ());
-		recv!(self.recv_audio_state)
-	}
-
-	/// TODO
-	pub fn play(&mut self) -> AudioStateSnapshot<Data> {
-		try_send!(self.send_play, ());
-		recv!(self.recv_audio_state)
-	}
-
-	/// TODO
-	pub fn pause(&mut self) -> AudioStateSnapshot<Data> {
-		try_send!(self.send_pause, ());
-		recv!(self.recv_audio_state)
-	}
-
-	#[allow(clippy::should_implement_trait)]
-	/// TODO
-	pub fn next(&mut self) -> AudioStateSnapshot<Data> {
-		try_send!(self.send_next, ());
-		recv!(self.recv_audio_state)
-	}
-
-	/// TODO
-	pub fn previous(&mut self) -> AudioStateSnapshot<Data> {
-		try_send!(self.send_previous, ());
-		recv!(self.recv_audio_state)
-	}
-
-	/// TODO
-	pub fn stop(&mut self) -> AudioStateSnapshot<Data> {
-		try_send!(self.send_stop, ());
-		recv!(self.recv_audio_state)
-	}
-
-	/// TODO
-	pub fn clear(&mut self, clear: Clear) -> AudioStateSnapshot<Data> {
-		try_send!(self.send_clear, clear);
-		recv!(self.recv_audio_state)
-	}
-
-	/// TODO
-	pub fn restore(&mut self, audio_state: AudioState<Data>) -> AudioStateSnapshot<Data> {
-		try_send!(self.send_restore, audio_state);
-		recv!(self.recv_audio_state)
-	}
-
-	/// TODO
-	pub fn repeat(&mut self, repeat: Repeat) -> AudioStateSnapshot<Data> {
-		self.repeat = repeat;
-		try_send!(self.send_repeat, repeat);
-		recv!(self.recv_audio_state)
-	}
-
-	/// TODO
-	pub fn volume(&mut self, volume: Volume) -> AudioStateSnapshot<Data> {
-		self.volume = volume;
-		try_send!(self.send_volume, volume);
-		recv!(self.recv_audio_state)
-	}
-
-	/// TODO
-	pub fn shuffle(&mut self, shuffle: Shuffle) -> AudioStateSnapshot<Data> {
-		try_send!(self.send_shuffle, shuffle);
-		recv!(self.recv_audio_state)
-	}
-
-	/// TODO
-	///
-	/// # Errors
-	/// TODO
-	pub fn add(&mut self, add: Add<Data>) -> AudioStateSnapshot<Data> {
-		try_send!(self.send_add, add);
-		recv!(self.recv_audio_state)
-	}
-
-	/// TODO
-	///
-	/// # Errors
-	/// TODO
-	pub fn add_many(&mut self, add_many: AddMany<Data>) -> AudioStateSnapshot<Data> {
-		try_send!(self.send_add_many, add_many);
-		recv!(self.recv_audio_state)
-	}
-
-	/// TODO
-	///
-	/// # Errors
-	/// TODO
-	pub fn seek(&mut self, seek: Seek) -> Result<AudioStateSnapshot<Data>, SeekError> {
-		try_send!(self.send_seek, seek);
-		recv!(self.recv_seek)
-	}
-
-	/// TODO
-	///
-	/// # Errors
-	/// TODO
-	pub fn skip(&mut self, skip: Skip) -> Result<AudioStateSnapshot<Data>, SkipError> {
-		try_send!(self.send_skip, skip);
-		recv!(self.recv_skip)
-	}
-
-	/// TODO
-	///
-	/// # Errors
-	/// TODO
-	pub fn back(&mut self, back: Back) -> Result<AudioStateSnapshot<Data>, BackError> {
-		try_send!(self.send_back, back);
-		recv!(self.recv_back)
-	}
-
-	/// TODO
-	///
-	/// # Errors
-	/// TODO
-	pub fn set_index(&mut self, set_index: SetIndex) -> Result<AudioStateSnapshot<Data>, SetIndexError> {
-		try_send!(self.send_set_index, set_index);
-		recv!(self.recv_set_index)
-	}
-
-	/// TODO
-	///
-	/// # Errors
-	/// TODO
-	pub fn remove(&mut self, remove: Remove) -> Result<AudioStateSnapshot<Data>, RemoveError> {
-		try_send!(self.send_remove, remove);
-		recv!(self.recv_remove)
-	}
-
-	/// TODO
-	///
-	/// # Errors
-	/// TODO
-	pub fn remove_range(&mut self, remove_range: impl std::ops::RangeBounds<usize>) -> Result<AudioStateSnapshot<Data>, RemoveError> {
-		try_send!(self.send_remove_range, remove_range.into());
-		recv!(self.recv_remove_range)
-	}
-}
-
-//---------------------------------------------------------------------------------------------------- Drop
-impl<Data: ValidData> Drop for Engine<Data> {
-	#[cold]
-	#[inline(never)]
-	#[allow(clippy::branches_sharing_code)]
-	fn drop(&mut self) {
-		if self.config.shutdown_blocking {
-			info2!("Engine - waiting on shutdown ...");
-			// Tell [Kernel] to shutdown,
-			// and to tell us when it's done.
-			self.shutdown_hang.try_send(()).unwrap();
-			// Hang until [Kernel] responds.
-			self.shutdown_done.recv().unwrap();
-			info2!("Engine - waiting on shutdown ... OK");
-		} else {
-			// Tell [Kernel] to shutdown,
-			// and to not notify us.
-			self.shutdown.try_send(()).unwrap();
-			info2!("Engine - async shutdown ... OK");
-		}
-	}
-}
-
-//---------------------------------------------------------------------------------------------------- EngineInitError
-#[derive(thiserror::Error)]
-#[derive(Debug)]
-///
-pub enum EngineInitError {
-	#[error("callback elapsed seconds - found: `{0}`, expected: an `is_normal()` float")]
-	/// Callback elapsed seconds was not an [`f64::is_normal`] float.
-	CallbackElapsed(f64),
-
-	#[error("previous threshold seconds - found: `{0}`, expected: an `is_normal()` float")]
-	/// Previous threshold seconds was not an [`f64::is_normal`] float.
-	PreviousThreshold(f64),
-
-	#[error("failed to spawn thread `{name}`: {error}")]
-	/// Failed to spawn an OS thread
-	ThreadSpawn {
-		/// Name of the thread that failed to spawn
-		name: &'static str,
-		/// Associated IO error
-		error: std::io::Error,
 	}
 }
 

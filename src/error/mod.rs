@@ -1,4 +1,4 @@
-//! General errors that can occur.
+//! General errors that can occur in `sansan`.
 
 mod decoder;
 pub use decoder::DecodeError;
