@@ -10,6 +10,7 @@ use crate::{
 	macros::{try_send,recv},
 };
 use crossbeam::channel::{Sender,Receiver};
+use std::sync::atomic::Ordering;
 
 //----------------------------------------------------------------------------------------------------
 impl<Data: ValidData> Kernel<Data> {
@@ -77,10 +78,18 @@ impl<Data: ValidData> Kernel<Data> {
 		});
 		// If no `Current`, then we're not `playing` anymore.
 		let playing = current.is_some();
+		let queue_end_clear = self.atomic_state.queue_end_clear.load(Ordering::Acquire);
 		// Set our `Current`.
 		self.w.add_commit_push(|w, _| {
 			w.current = current.clone();
 			w.playing = playing;
+
+			// If we stopped playing, that means the queue
+			// has ended. We conditionally clear the queue
+			// if the user wants to do so.
+			if !playing && queue_end_clear {
+				w.queue.clear();
+			}
 		});
 
 		// Forward potential `Source` to `Audio/Decode`
