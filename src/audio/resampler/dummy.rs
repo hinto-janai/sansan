@@ -12,9 +12,9 @@ use crate::{
 };
 use std::num::NonZeroUsize;
 
-//----------------------------------------------------------------------------------------------- Dummy
+//----------------------------------------------------------------------------------------------- DummyResampler
 /// Dummy resampler.
-pub(crate) struct Dummy {
+pub(crate) struct DummyResampler {
 	/// Input audio sample rate.
 	sample_rate_input: NonZeroUsize,
 
@@ -29,7 +29,7 @@ pub(crate) struct Dummy {
 }
 
 //----------------------------------------------------------------------------------------------- Resampler Impl
-impl Resampler for Dummy {
+impl Resampler for DummyResampler {
 	#[inline]
 	fn new(
 		sample_rate_input: NonZeroUsize,
@@ -72,7 +72,7 @@ mod tests {
 		let audio: Vec<AudioBuffer<f32>> = create_test_audio();
 
 		// Create resampler.
-		let mut resampler = super::Dummy::new(
+		let mut resampler = super::DummyResampler::new(
 			NonZeroUsize::new(SAMPLE_RATE).unwrap(),     // Original sample rate
 			NonZeroUsize::new(SAMPLE_RATE * 2).unwrap(), // Target is 2x the sample rate (88,200)
 			NonZeroUsize::new(128).unwrap(),             // 128 duration

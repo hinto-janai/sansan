@@ -228,21 +228,18 @@ where
 				$init_args:expr,     // InitArgs type for the actor
 				$($spawn_fn:tt)*     // Function to init the actor
 			) => {
-				// To prevent side-effects from other actors during tests
-				// (in `kernel/$SIGNAL.rs`), don't spawn the actors during
-				// test mode, although, forget the init_arg such that channel
-				// sends from `Kernel` still work and don't panic.
-				if cfg!(test) {
-					debug2!("Engine - test, skipping spawn of: {}", $actor_name);
-					std::mem::forget($init_args);
-				} else {
-					debug2!("Engine - spawning: {}", $actor_name);
-					if let Err(error) = $($spawn_fn)*($init_args) {
-						return Err(EngineInitError::ThreadSpawn {
-							name: $actor_name,
-							error,
-						});
-					}
+				// In `#[cfg(test]`, all actors get spawned as normal, however,
+				// `Audio` uses a dummy audio output and resampler struct such
+				// that it can "process" audio and actually go through it's real
+				// loop without actually needing to connect to any audio hardware/server.
+				//
+				// This means we can test `sansan` in CI as if it were actually being used.
+				debug2!("Engine - spawning: {}", $actor_name);
+				if let Err(error) = $($spawn_fn)*($init_args) {
+					return Err(EngineInitError::ThreadSpawn {
+						name: $actor_name,
+						error,
+					});
 				}
 			};
 		}

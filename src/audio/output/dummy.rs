@@ -38,9 +38,9 @@ use crate::audio::output::constants::{
 	AUDIO_SAMPLE_BUFFER_LEN,
 };
 
-//----------------------------------------------------------------------------------------------- Dummy
+//----------------------------------------------------------------------------------------------- DummyAudioOutput
 /// TODO
-pub(crate) struct Dummy<R: Resampler> {
+pub(crate) struct DummyAudioOutput<R: Resampler> {
 	/// We send audio data to this channel which
 	/// the audio stream will receive and write.
 	sender: Sender<f32>,
@@ -78,7 +78,7 @@ pub(crate) struct Dummy<R: Resampler> {
 }
 
 //----------------------------------------------------------------------------------------------- `AudioOutput` Impl
-impl<R: Resampler> AudioOutput for Dummy<R> {
+impl<R: Resampler> AudioOutput for DummyAudioOutput<R> {
 	fn write(
 		&mut self,
 		mut audio: AudioBuffer<f32>,

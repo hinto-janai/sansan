@@ -11,7 +11,7 @@ pub(crate) use output::AudioOutput;
 cfg_if::cfg_if! {
 	if #[cfg(test)] {
 		mod dummy;
-		pub(crate) use dummy::Dummy as AudioOutputStruct;
+		pub(crate) use dummy::DummyAudioOutput as AudioOutputStruct;
 	} else if #[cfg(feature = "cpal")] {
 		mod cpal;
 		pub(crate) use cpal::Cpal as AudioOutputStruct;
