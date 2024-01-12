@@ -23,7 +23,7 @@ use std::sync::{
 	atomic::{AtomicBool,Ordering},
 };
 use crate::macros::{recv,send,try_send,try_recv,trace2,debug2,error2};
-use crate::audio::constants::{
+use crate::audio::output::constants::{
 	AUDIO_MILLISECOND_BUFFER_FALLBACK,
 	SAMPLE_RATE_FALLBACK,
 	AUDIO_SAMPLE_BUFFER_LEN,

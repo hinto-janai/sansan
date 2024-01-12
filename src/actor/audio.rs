@@ -18,19 +18,11 @@ use crate::{
 	macros::{debug2,try_send,select_recv,recv,trace2},
 };
 
-// Audio I/O backends.
-cfg_if::cfg_if! {
-	if #[cfg(feature = "cubeb")] {
-		use crate::audio::cubeb::Cubeb as AudioOutputStruct;
-	} else if #[cfg(feature = "cpal")] {
-		use crate::audio::cpal::Cpal as AudioOutputStruct;
-	} else {
-		use crate::audio::cubeb::Cubeb as AudioOutputStruct;
-	}
-}
+// Audio I/O backend.
+use crate::audio::output::AudioOutputStruct;
 
-// Resampler backends.
-use crate::audio::rubato::Rubato as ResamplerStruct;
+// Resampler backend.
+use crate::audio::resampler::ResamplerStruct;
 
 //---------------------------------------------------------------------------------------------------- Constants
 /// `AUDIO_BUFFER_LEN` is the buffer size of the channel

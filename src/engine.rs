@@ -41,19 +41,11 @@ use std::sync::{
 use crossbeam::channel::Sender as S;
 use crossbeam::channel::Receiver as R;
 
-// Audio I/O backends.
-cfg_if::cfg_if! {
-	if #[cfg(feature = "cubeb")] {
-		use crate::audio::cubeb::Cubeb as AudioOutputStruct;
-	} else if #[cfg(feature = "cpal")] {
-		use crate::audio::cpal::Cpal as AudioOutputStruct;
-	} else {
-		use crate::audio::cubeb::Cubeb as AudioOutputStruct;
-	}
-}
+// Audio I/O backend.
+use crate::audio::output::AudioOutputStruct;
 
-// Resampler backends.
-use crate::audio::rubato::Rubato as ResamplerStruct;
+// Resampler backend.
+use crate::audio::resampler::ResamplerStruct;
 
 //---------------------------------------------------------------------------------------------------- Constants
 /// Total count of all the "actors" in our system.
