@@ -75,8 +75,13 @@ impl<Data: ValidData> Kernel<Data> {
 				elapsed: 0.0,
 			}
 		});
+		// If no `Current`, then we're not `playing` anymore.
+		let playing = current.is_some();
 		// Set our `Current`.
-		self.w.add_commit_push(|w, _| w.current = current.clone());
+		self.w.add_commit_push(|w, _| {
+			w.current = current.clone();
+			w.playing = playing;
+		});
 
 		// Forward potential `Source` to `Audio/Decode`
 		if let Some(current) = current {
