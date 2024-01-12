@@ -11,7 +11,7 @@ use std::sync::{
 };
 use crate::{
 	state::AtomicState,
-	audio::output::AudioOutput,
+	output::AudioOutput,
 	error::OutputError,
 	macros::error2,
 	actor::kernel::DiscardCurrentAudio,
@@ -19,10 +19,10 @@ use crate::{
 };
 
 // Audio I/O backend.
-use crate::audio::output::AudioOutputStruct;
+use crate::output::AudioOutputStruct;
 
 // Resampler backend.
-use crate::audio::resampler::ResamplerStruct;
+use crate::resampler::ResamplerStruct;
 
 //---------------------------------------------------------------------------------------------------- Constants
 /// `AUDIO_BUFFER_LEN` is the buffer size of the channel

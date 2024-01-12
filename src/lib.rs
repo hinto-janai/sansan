@@ -147,13 +147,11 @@ pub mod signal;
 pub mod error;
 
 //---------------------------------------------------------------------------------------------------- Private Usage
-mod audio;
-
 mod actor;
-// mod patch;
 mod macros;
-
 mod atomic;
+mod output;
+mod resampler;
 
 //---------------------------------------------------------------------------------------------------- Test Init Helpers
 // These are helper functions used for testing throughout the codebase.

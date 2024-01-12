@@ -42,10 +42,10 @@ use crossbeam::channel::Sender as S;
 use crossbeam::channel::Receiver as R;
 
 // Audio I/O backend.
-use crate::audio::output::AudioOutputStruct;
+use crate::output::AudioOutputStruct;
 
 // Resampler backend.
-use crate::audio::resampler::ResamplerStruct;
+use crate::resampler::ResamplerStruct;
 
 //---------------------------------------------------------------------------------------------------- Constants
 /// Total count of all the "actors" in our system.

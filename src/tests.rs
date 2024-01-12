@@ -11,7 +11,7 @@ use crate::{
 //---------------------------------------------------------------------------------------------------- Test Init Helpers
 /// Create a `Source` with a specified `usize` as the `Data`.
 pub(crate) fn source(data: usize) -> Source<usize> {
-	let path = std::path::Path::new("assets/audio/dialog-information.oga");
+	let path = std::path::Path::new("assets/audio/moonlight_sonata.mp3");
 	Source::from((path, data))
 }
 
