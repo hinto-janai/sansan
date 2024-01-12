@@ -9,7 +9,7 @@ use crate::{
 	valid_data::ValidData,
 	state::{
 		AudioState,
-		AtomicAudioState,
+		AtomicState,
 		AudioStateSnapshot,
 		Current
 	},
@@ -61,7 +61,7 @@ use strum::EnumCount;
 #[allow(clippy::missing_docs_in_private_items)]
 #[derive(Debug)]
 pub(crate) struct Kernel<Data: ValidData> {
-	pub(super) atomic_state:        Arc<AtomicAudioState>,
+	pub(super) atomic_state: Arc<AtomicState>,
 	/// The [W]riter half of the [Engine]'s [`AudioState`].
 	///
 	/// This originally was [audio_state] but this field is
@@ -69,7 +69,6 @@ pub(crate) struct Kernel<Data: ValidData> {
 	pub(super) w:               someday::Writer<AudioState<Data>>,
 	pub(super) shutdown_wait:   Arc<Barrier>,
 	pub(super) to_gc:           Sender<AudioState<Data>>,
-	pub(super) back_threshold:  f64,
 }
 
 //---------------------------------------------------------------------------------------------------- Msg
@@ -151,7 +150,6 @@ pub(crate) struct Channels<Data: ValidData> {
 	pub(crate) recv_volume:         Receiver<Volume>,
 	pub(crate) recv_shuffle:        Receiver<Shuffle>,
 	pub(crate) recv_restore:        Receiver<AudioState<Data>>,
-	pub(crate) recv_back_threshold: Receiver<BackThreshold>,
 
 	// Signals that return `Result<T, E>`
 	pub(crate) send_seek:         Sender<Result<AudioStateSnapshot<Data>, SeekError>>,
@@ -171,13 +169,12 @@ pub(crate) struct Channels<Data: ValidData> {
 //---------------------------------------------------------------------------------------------------- Kernel Impl
 #[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct InitArgs<Data: ValidData> {
-	pub(crate) init_barrier:        Option<Arc<Barrier>>,
-	pub(crate) atomic_state:        Arc<AtomicAudioState>,
-	pub(crate) shutdown_wait:       Arc<Barrier>,
-	pub(crate) w:                   someday::Writer<AudioState<Data>>,
-	pub(crate) channels:            Channels<Data>,
-	pub(crate) to_gc:               Sender<AudioState<Data>>,
-	pub(crate) back_threshold:  f64,
+	pub(crate) init_barrier:  Option<Arc<Barrier>>,
+	pub(crate) atomic_state:  Arc<AtomicState>,
+	pub(crate) shutdown_wait: Arc<Barrier>,
+	pub(crate) w:             someday::Writer<AudioState<Data>>,
+	pub(crate) channels:      Channels<Data>,
+	pub(crate) to_gc:         Sender<AudioState<Data>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Kernel Impl
@@ -200,7 +197,6 @@ where
 					w,
 					channels,
 					to_gc,
-					back_threshold,
 				} = args;
 
 				let this = Self {
@@ -208,7 +204,6 @@ where
 					w,
 					shutdown_wait,
 					to_gc,
-					back_threshold,
 				};
 
 				if let Some(init_barrier) = init_barrier {

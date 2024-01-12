@@ -9,15 +9,14 @@ use std::sync::{
 	Barrier,
 	atomic::{AtomicBool,Ordering},
 };
-use crate::{error::OutputError, macros::error2};
-use crate::actor::kernel::DiscardCurrentAudio;
-use crate::audio::{
-	output::AudioOutput,
-	resampler::Resampler,
+use crate::{
+	state::AtomicState,
+	audio::output::AudioOutput,
+	error::OutputError,
+	macros::error2,
+	actor::kernel::DiscardCurrentAudio,
+	macros::{debug2,try_send,select_recv,recv,trace2},
 };
-use crate::macros::{send,try_recv,debug2,try_send,select_recv,recv,trace2};
-use crate::signal::Volume;
-use crate::state::AtomicAudioState;
 
 // Audio I/O backends.
 cfg_if::cfg_if! {
@@ -54,12 +53,12 @@ pub(crate) struct Audio<Output>
 where
 	Output: AudioOutput,
 {
-	atomic_state:  Arc<AtomicAudioState>, // Shared atomic audio state with the rest of the actors
-	playing:       bool,                  // A local boolean so we don't have to atomic access each loop
-	elapsed:       f64,                   // Elapsed time, used for the elapsed callback (f64 is reset each call)
-	ready_to_recv: Arc<AtomicBool>,       // [Audio]'s way of telling [Decode] it is ready for samples
-	shutdown_wait: Arc<Barrier>,          // Shutdown barrier between all actors
-	output:        Output,                // Audio hardware/server connection
+	atomic_state:  Arc<AtomicState>, // Shared atomic audio state with the rest of the actors
+	playing:       bool,             // A local boolean so we don't have to atomic access each loop
+	elapsed:       f64,              // Elapsed time, used for the elapsed callback (f64 is reset each call)
+	ready_to_recv: Arc<AtomicBool>,  // [Audio]'s way of telling [Decode] it is ready for samples
+	shutdown_wait: Arc<Barrier>,     // Shutdown barrier between all actors
+	output:        Output,           // Audio hardware/server connection
 }
 
 //---------------------------------------------------------------------------------------------------- Channels
@@ -110,7 +109,7 @@ pub(crate) type WroteAudioBuffer = Time;
 #[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct InitArgs {
 	pub(crate) init_barrier:      Option<Arc<Barrier>>,
-	pub(crate) atomic_state:      Arc<AtomicAudioState>,
+	pub(crate) atomic_state:      Arc<AtomicState>,
 	pub(crate) ready_to_recv:     Arc<AtomicBool>,
 	pub(crate) shutdown_wait:     Arc<Barrier>,
 	pub(crate) shutdown:          Receiver<()>,

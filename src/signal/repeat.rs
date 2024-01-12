@@ -60,6 +60,11 @@ impl AtomicRepeat {
 	/// TODO
 	pub(crate) const DEFAULT: Self = Self(AtomicU8::new(Repeat::DEFAULT.to_u8()));
 
+	/// TODO
+	pub(crate) const fn new(repeat: Repeat) -> Self {
+		Self(AtomicU8::new(repeat.to_u8()))
+	}
+
 	#[inline]
 	/// TODO
 	pub(crate) fn load(&self, ordering: Ordering) -> Repeat {

@@ -38,6 +38,7 @@ macro_rules! impl_atomic_f {
 		$bits_050:literal,         // Bit pattern for 0.50
 		$bits_075:literal,         // Bit pattern for 0.75
 		$bits_1:literal,           // Bit pattern for 1.0
+		$bits_3:literal,           // Bit pattern for 3.0
 	) => {
         /// An atomic float.
         ///
@@ -54,6 +55,7 @@ macro_rules! impl_atomic_f {
         #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
         pub(crate) struct $atomic_float($atomic_unsigned);
 
+		#[allow(clippy::declare_interior_mutable_const)]
         impl $atomic_float {
             /// Representation of `0.0` as bits, can be inputted into [`Self::from_bits`].
             pub(crate) const BITS_0: $unsigned = $bits_0;
@@ -64,24 +66,22 @@ macro_rules! impl_atomic_f {
             /// Representation of `0.75` as bits, can be inputted into [`Self::from_bits`].
             pub(crate) const BITS_0_75: $unsigned = $bits_075;
             /// Representation of `1.0` as bits, can be inputted into [`Self::from_bits`].
-            pub(crate) const BITS_0_100: $unsigned = $bits_1;
-			#[allow(clippy::declare_interior_mutable_const)]
+            pub(crate) const BITS_1: $unsigned = $bits_1;
+            /// Representation of `3.0` as bits, can be inputted into [`Self::from_bits`].
+            pub(crate) const BITS_3: $unsigned = $bits_1;
             /// `Self` with `0.0` as the inner float.
             pub(crate) const SELF_0: Self = Self($atomic_unsigned::new($bits_0));
-			#[allow(clippy::declare_interior_mutable_const)]
             /// `Self` with `0.25` as the inner float.
             pub(crate) const SELF_0_25: Self = Self($atomic_unsigned::new($bits_025));
-			#[allow(clippy::declare_interior_mutable_const)]
             /// `Self` with `0.50` as the inner float.
             pub(crate) const SELF_0_50: Self = Self($atomic_unsigned::new($bits_050));
-			#[allow(clippy::declare_interior_mutable_const)]
             /// `Self` with `0.75` as the inner float.
             pub(crate) const SELF_0_75: Self = Self($atomic_unsigned::new($bits_075));
-			#[allow(clippy::declare_interior_mutable_const)]
             /// `Self` with `1.0` as the inner float.
-            pub(crate) const SELF_0_100: Self = Self($atomic_unsigned::new($bits_1));
+            pub(crate) const SELF_1: Self = Self($atomic_unsigned::new($bits_1));
+            /// `Self` with `3.0` as the inner float.
+            pub(crate) const SELF_3: Self = Self($atomic_unsigned::new($bits_3));
 
-            #[allow(clippy::declare_interior_mutable_const)]
             // FIXME:
             // Seems like `std` internals has some unstable cfg options that
             // allow interior mutable consts to be defined without clippy complaining:
@@ -346,6 +346,7 @@ impl_atomic_f! {
     4602678819172646912,
     4604930618986332160,
     4607182418800017408,
+    4613937818241073152,
 }
 
 impl_atomic_f! {
@@ -359,6 +360,7 @@ impl_atomic_f! {
     1056964608,
     1061158912,
     1065353216,
+    1077936128,
 }
 
 //---------------------------------------------------------------------------------------------------- TESTS
@@ -449,7 +451,8 @@ mod tests {
         assert_eq!(AtomicF32::from_bits(AtomicF32::BITS_0_25).get(), 0.25);
         assert_eq!(AtomicF32::from_bits(AtomicF32::BITS_0_50).get(), 0.50);
         assert_eq!(AtomicF32::from_bits(AtomicF32::BITS_0_75).get(), 0.75);
-        assert_eq!(AtomicF32::from_bits(AtomicF32::BITS_0_100).get(), 1.00);
+        assert_eq!(AtomicF32::from_bits(AtomicF32::BITS_1).get(), 1.00);
+        assert_eq!(AtomicF32::from_bits(AtomicF32::BITS_3).get(), 3.00);
     }
 
     #[test]
@@ -459,7 +462,8 @@ mod tests {
         assert_eq!(AtomicF64::from_bits(AtomicF64::BITS_0_25).get(), 0.25);
         assert_eq!(AtomicF64::from_bits(AtomicF64::BITS_0_50).get(), 0.50);
         assert_eq!(AtomicF64::from_bits(AtomicF64::BITS_0_75).get(), 0.75);
-        assert_eq!(AtomicF64::from_bits(AtomicF64::BITS_0_100).get(), 1.00);
+        assert_eq!(AtomicF64::from_bits(AtomicF64::BITS_1).get(), 1.00);
+        assert_eq!(AtomicF64::from_bits(AtomicF64::BITS_3).get(), 3.00);
     }
 
     #[test]

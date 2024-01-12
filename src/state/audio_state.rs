@@ -6,7 +6,6 @@ use crate::{
 	source::{Source,Metadata},
 	valid_data::ValidData,
 	state::current::Current,
-	state::constants::BACK_THRESHOLD
 };
 use someday::{Reader, Commit, CommitRef};
 use std::{
@@ -25,9 +24,6 @@ pub struct AudioState<Data>
 where
 	Data: ValidData,
 {
-	/// The current song queue.
-	pub queue: VecDeque<Source<Data>>,
-
 	/// Are we playing audio right now?
 	pub playing: bool,
 
@@ -37,18 +33,15 @@ where
 	/// Current volume level.
 	pub volume: Volume,
 
-	/// The track threshold when using `back()`/`previous()`.
-	pub back_threshold: f64,
-
-	/// TODO
-	pub queue_end_clear: bool,
-
 	/// The currently playing index in the queue.
 	///
 	/// INVARIANT TODO:
 	/// If this is `Some`, the queue _MUST_ be non-empty
 	/// and must contain the Source.
 	pub current: Option<Current<Data>>,
+
+	/// The current song queue.
+	pub queue: VecDeque<Source<Data>>,
 }
 
 //---------------------------------------------------------------------------------------------------- AudioState Impl
@@ -58,13 +51,11 @@ where
 {
 	/// TODO
 	pub const DEFAULT: Self = Self {
-		queue:           VecDeque::new(),
-		playing:         false,
-		repeat:          Repeat::Off,
-		volume:          Volume::DEFAULT,
-		back_threshold:  BACK_THRESHOLD,
-		queue_end_clear: true,
-		current:         None,
+		playing: false,
+		repeat:  Repeat::Off,
+		volume:  Volume::DEFAULT,
+		current: None,
+		queue:   VecDeque::new(),
 	};
 }
 

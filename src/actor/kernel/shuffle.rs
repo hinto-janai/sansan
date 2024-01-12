@@ -243,8 +243,6 @@ mod tests {
 			assert_eq!(resp.playing,         false);
 			assert_eq!(resp.repeat,          Repeat::Off);
 			assert_eq!(resp.volume,          Volume::DEFAULT);
-			assert_eq!(resp.back_threshold,  3.0);
-			assert_eq!(resp.queue_end_clear, true);
 			assert_eq!(resp.current,         Some(current));
 		}
 

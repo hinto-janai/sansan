@@ -4,7 +4,7 @@
 use std::marker::PhantomData;
 use crate::{
 	error::SansanError,
-	config::callback::Callbacks,
+	config::{Callbacks,LiveConfig},
 	engine::Engine,
 	state::AudioState,
 	valid_data::ValidData,
@@ -18,13 +18,13 @@ use strum::{
 	IntoStaticStr,
 };
 
-//---------------------------------------------------------------------------------------------------- Config
+//---------------------------------------------------------------------------------------------------- InitConfig
 // #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 // #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug)]
 /// TODO
-pub struct Config<Data>
+pub struct InitConfig<Data>
 where
 	Data: ValidData,
 {
@@ -35,33 +35,31 @@ where
 	pub callback_low_priority: bool,
 	/// TODO
 	pub init_blocking: bool,
-	/// TODO
-	pub shutdown_blocking: bool,
-
-	//------------------------------------------ Audio
-	/// TODO
-	pub restore: Option<AudioState<Data>>,
-	/// TODO
-	pub back_threshold: f64,
 
 	//------------------------------------------ Media Controls
 	/// TODO
 	pub media_controls: bool,
+
+	//------------------------------------------ Restore state/settings
+	/// TODO
+	pub audio_state: Option<AudioState<Data>>,
+	/// TODO
+	pub live_config: Option<LiveConfig>,
 }
 
-//---------------------------------------------------------------------------------------------------- Config Impl
-impl<Data> Config<Data>
+//---------------------------------------------------------------------------------------------------- InitConfig Impl
+impl<Data> InitConfig<Data>
 where
 	Data: ValidData,
 {
-	/// Return a reasonable default [`Config`].
+	/// Return a reasonable default [`InitConfig`].
 	///
 	/// For the generics:
 	/// - `Data`: 1st `()` means the [`AudioState`] will contain no extra data, or more accurately, `()` will be the extra data
 	/// - `Call`: 2nd `()` means our callback channel (if even provided) will be the `()` channel, or more accurately, it will do nothing
 	/// - `Error`: 3rd `()` means our error callback channel (if even provided) will also do nothing
 	///
-	/// This means, this [`Config`] makes the [`Engine`]
+	/// This means, this [`InitConfig`] makes the [`Engine`]
 	/// do nothing on channel-based callbacks, and will
 	/// also not report any errors that occur, since that
 	/// is also `()`.
@@ -71,13 +69,12 @@ where
 	///
 	/// ```rust
 	/// # use sansan::config::*;
-	/// Config::<()> {
+	/// InitConfig::<()> {
 	///     callbacks:             Callbacks::DEFAULT,
 	///     callback_low_priority: true,
 	///     init_blocking:         false,
-	///     shutdown_blocking:     false,
-	///     restore:               None,
-	///     back_threshold:    3.0,
+	///     audio_state:           None,
+	///     live_config:           None,
 	///     media_controls:        false,
 	/// };
 	/// ```
@@ -85,14 +82,13 @@ where
 		callbacks:             Callbacks::DEFAULT,
 		callback_low_priority: true,
 		init_blocking:         false,
-		shutdown_blocking:     false,
-		restore:               None,
-		back_threshold:        3.0,
 		media_controls:        false,
+		audio_state:           None,
+		live_config:           None,
 	};
 }
 
-impl<Data: ValidData> Default for Config<Data> {
+impl<Data: ValidData> Default for InitConfig<Data> {
 	fn default() -> Self {
 		Self::DEFAULT
 	}

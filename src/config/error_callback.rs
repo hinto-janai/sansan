@@ -7,7 +7,7 @@ use std::fmt;
 #[allow(unused_imports)] // docs
 use crate::{
 	Engine,
-	config::Config,
+	config::InitConfig,
 	source::Source,
 	state::AudioState,
 };
@@ -22,7 +22,7 @@ use crate::{
 ///
 /// When these errors occur, what should `sansan` do?
 ///
-/// These are solely used in [`Config`], where each particular
+/// These are solely used in [`InitConfig`], where each particular
 /// error point can be given a variant of [`ErrorCallback`] that
 /// determines what action `sansan` will take in the case.
 ///
@@ -38,7 +38,7 @@ use crate::{
 ///
 /// I.e, track progress will continue regardless of errors.
 ///
-/// For `audio_source_behavior` in [`Config`], this does the same as [`Self::Skip`]
+/// For `audio_source_behavior` in [`InitConfig`], this does the same as [`Self::Skip`]
 /// since we cannot "continue" a [`Source`] that does not work (i.e, missing file).
 ///
 /// This is the default behavior.

@@ -2,18 +2,16 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use std::thread::JoinHandle;
-use crossbeam::channel::{Receiver, Select, Sender};
+use crossbeam::channel::{Receiver, Select};
 use crate::{
-	config::{Callback,Callbacks},
+	config::Callback,
 	valid_data::ValidData,
 	state::{AudioState,AudioStateReader},
-	macros::{send,try_recv,debug2,trace2,try_send,select_recv},
-	error::SansanError,
+	macros::{debug2,trace2,select_recv},
 };
 use std::sync::{
 	Arc,
 	Barrier,
-	atomic::{AtomicBool,Ordering},
 };
 
 //---------------------------------------------------------------------------------------------------- Constants

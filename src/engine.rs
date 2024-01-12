@@ -2,9 +2,19 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	state::{AudioStateSnapshot,AudioStateReader,AudioState,AtomicAudioState},
 	valid_data::ValidData,
-	config::{Config,Callback,Callbacks,ErrorCallback},
+	macros::{recv,try_send,debug2,info2},
+	state::{
+		AudioStateSnapshot,
+		AudioStateReader,
+		AudioState,
+		AtomicState,
+	},
+	config::{
+		InitConfig,
+		Callbacks,
+		LiveConfig
+	},
 	actor::{
 		audio::{Audio,AUDIO_BUFFER_LEN},
 		decode::Decode,
@@ -13,7 +23,6 @@ use crate::{
 		gc::Gc,
 		caller::Caller,
 	},
-	macros::{send,recv,try_send,try_recv,debug2, error2, info2},
 	signal::{
 		Add,AddMany,Back,Clear,Previous,RemoveRange,Remove,
 		Repeat,Seek,SetIndex,Shuffle,Skip,Volume,AddMethod,
@@ -72,6 +81,12 @@ where
 {
 	/// Data and objects.
 	audio: AudioStateReader<Data>,
+	config: LiveConfig,
+	atomic_state: Arc<AtomicState>,
+
+	// Internal mirrored state.
+	repeat: Repeat,
+	volume: Volume,
 
 	/// Signal to [Kernel] to tell all of our internal
 	/// actors (threads) to start shutting down.
@@ -81,7 +96,6 @@ where
 	/// [Kernel] telling us the shutdown
 	/// process has been completed.
 	shutdown_done: R<()>,
-	shutdown_blocking: bool,
 
 	/// This channel is shared between all signals that don't
 	/// have special output, i.e, they return `AudioStateSnapshot`.
@@ -103,7 +117,6 @@ where
 	send_repeat:    S<Repeat>,
 	send_volume:    S<Volume>,
 	send_shuffle:   S<Shuffle>,
-	send_back_threshold: S<BackThreshold>,
 
 	/// Signals that return `Result<T, E>`
 	/// These don't use the common `recv_audio_state_snapshot`,
@@ -140,9 +153,12 @@ where
 	///
 	/// # Panics
 	/// TODO
-	pub fn init(mut config: Config<Data>) -> Result<Self, EngineInitError> {
+	pub fn init(mut config: InitConfig<Data>) -> Result<Self, EngineInitError> {
 		info2!("Engine - initializing...");
 		debug2!("Engine - init config:\n{config:#?}");
+
+		// Set a default `LiveConfig` if it doesn't exist.
+		let live_config = config.live_config.unwrap_or(LiveConfig::DEFAULT);
 
 		// Some initial assertions that must be upheld.
 		// These may or may not have been already checked
@@ -156,8 +172,8 @@ where
 			}
 
 			// Previous threshold must be a normal float.
-			if !config.back_threshold.is_normal() {
-				return Err(EngineInitError::PreviousThreshold(config.back_threshold));
+			if !live_config.back_threshold.is_normal() {
+				return Err(EngineInitError::PreviousThreshold(live_config.back_threshold));
 			}
 		}
 
@@ -190,7 +206,7 @@ where
 		debug2!("Engine - init config audio state: {:#?}", config.restore);
 
 		// Initialize the `AudioStateReader`.
-		// TODO: initialize with `Config`'s AudioState.
+		// TODO: initialize with `InitConfig`'s AudioState.
 		let (audio_state_reader, audio_state_writer) = someday::new(AudioState::DEFAULT);
 		let audio_state_reader = AudioStateReader(audio_state_reader);
 
@@ -203,7 +219,7 @@ where
 		// causing a panic.
 		let shutdown_wait = Arc::new(Barrier::new(effective_actor_count));
 
-		// Initialize the "AtomicAudioState".
+		// Initialize the "AtomicState".
 		//
 		// This is the state that lives as line as the [Engine]
 		// and is used for quick communications between the
@@ -211,7 +227,7 @@ where
 		// acquiring a channel message or locking would be a
 		// bit slower, so they're either atomic types, or
 		// wrapped in `atomic::Atomic<T>`.
-		let atomic_state = Arc::new(AtomicAudioState::DEFAULT);
+		let atomic_state = Arc::new(AtomicState::from(live_config));
 
 		/// Macro used to spawn all actor's in this function.
 		macro_rules! spawn_actor {
@@ -456,7 +472,6 @@ where
 		let (send_volume,   recv_volume)               = bounded(1);
 		let (send_next,     recv_next)                 = bounded(1);
 		let (send_previous, recv_previous)             = bounded(1);
-		let (send_back_threshold, recv_back_threshold) = bounded(1);
 		// These must be labeled.
 		// Although semantically [bounded(0)] makes sense since [Kernel]
 		// and [Signal] must meet up, [bounded(1)] is faster.
@@ -518,7 +533,6 @@ where
 			recv_shuffle,
 			recv_volume,
 			recv_restore,
-			recv_back_threshold,
 			recv_add:          k_recv_add,
 			recv_add_many:     k_recv_add_many,
 			send_seek:         k_send_seek,
@@ -537,12 +551,11 @@ where
 		// Don't use `spawn_actor!()`, we need `Kernel` alive for testing.
 		let init_args = crate::actor::kernel::InitArgs {
 			init_barrier,
-			atomic_state,
+			atomic_state:  Arc::clone(&atomic_state),
 			shutdown_wait: Arc::clone(&shutdown_wait),
 			w: audio_state_writer,
 			channels,
 			to_gc: k_to_gc,
-			back_threshold: config.back_threshold,
 		};
 		if let Err(error) = Kernel::<Data>::init(init_args) {
 			return Err(EngineInitError::ThreadSpawn {
@@ -555,18 +568,26 @@ where
 		//
 		// If we had `AudioState` to restore, load it first
 		// so `Kernel` immediately restores it upon spawn.
-		if let Some(audio_state) = config.restore.take() {
+		if let Some(audio_state) = config.audio_state.take() {
 			try_send!(send_restore, audio_state);
 		}
 
 		//-------------------------------------------------------------- Return
+		let repeat = atomic_state.repeat.get();
+		let volume = atomic_state.volume.get();
 		info2!("Engine - initialization complete");
 		Ok(Self {
 			audio: audio_state_reader,
+			config: live_config,
+			atomic_state,
+
+			repeat,
+			volume,
+
 			shutdown,
 			shutdown_hang,
 			shutdown_done,
-			shutdown_blocking: config.shutdown_blocking,
+
 			recv_audio_state,
 			send_toggle,
 			send_play,
@@ -579,7 +600,6 @@ where
 			send_volume,
 			send_next,
 			send_previous,
-			send_back_threshold,
 			send_add:          e_send_add,
 			send_add_many:     e_send_add_many,
 			send_seek:         e_send_seek,
@@ -597,7 +617,7 @@ where
 		})
 	}
 
-	//---------------------------------------------------------------------------------------------------- Regular Fn
+	//---------------------------------------------------------------------------------------------------- Reader
 	#[must_use]
 	/// TODO
 	pub fn reader(&self) -> AudioStateReader<Data> {
@@ -608,6 +628,37 @@ where
 	/// TODO
 	pub const fn reader_ref(&self) -> &AudioStateReader<Data> {
 		&self.audio
+	}
+
+	//---------------------------------------------------------------------------------------------------- Config
+	#[must_use]
+	/// TODO
+	pub const fn config(&self) -> &LiveConfig {
+		&self.config
+	}
+
+	/// TODO
+	pub fn config_update<F>(&mut self, mut f: F)
+	where
+		F: FnMut(&mut LiveConfig)
+	{
+		// Update the config.
+		f(&mut self.config);
+		// Update the atomic verison so the other actors see it.
+		self.atomic_state.update_from_config(&self.config);
+	}
+
+	//---------------------------------------------------------------------------------------------------- Get
+	#[must_use]
+	/// TODO
+	pub const fn get_volume(&self) -> Volume {
+		self.volume
+	}
+
+	#[must_use]
+	/// TODO
+	pub const fn get_repeat(&self) -> Repeat {
+		self.repeat
 	}
 
 	//---------------------------------------------------------------------------------------------------- Signals
@@ -689,12 +740,14 @@ where
 
 	/// TODO
 	pub fn repeat(&mut self, repeat: Repeat) -> AudioStateSnapshot<Data> {
+		self.repeat = repeat;
 		try_send!(self.send_repeat, repeat);
 		recv!(self.recv_audio_state)
 	}
 
 	/// TODO
 	pub fn volume(&mut self, volume: Volume) -> AudioStateSnapshot<Data> {
+		self.volume = volume;
 		try_send!(self.send_volume, volume);
 		recv!(self.recv_audio_state)
 	}
@@ -702,13 +755,6 @@ where
 	/// TODO
 	pub fn shuffle(&mut self, shuffle: Shuffle) -> AudioStateSnapshot<Data> {
 		try_send!(self.send_shuffle, shuffle);
-		recv!(self.recv_audio_state)
-	}
-
-	/// TODO
-	/// Document `!f64::is_normal()` behavior.
-	pub fn back_threshold(&mut self, back_threshold: BackThreshold) -> AudioStateSnapshot<Data> {
-		try_send!(self.send_back_threshold, back_threshold);
 		recv!(self.recv_audio_state)
 	}
 
@@ -791,7 +837,7 @@ impl<Data: ValidData> Drop for Engine<Data> {
 	#[inline(never)]
 	#[allow(clippy::branches_sharing_code)]
 	fn drop(&mut self) {
-		if self.shutdown_blocking {
+		if self.config.shutdown_blocking {
 			info2!("Engine - waiting on shutdown ...");
 			// Tell [Kernel] to shutdown,
 			// and to tell us when it's done.
@@ -803,7 +849,7 @@ impl<Data: ValidData> Drop for Engine<Data> {
 			// Tell [Kernel] to shutdown,
 			// and to not notify us.
 			self.shutdown.try_send(()).unwrap();
-			info2!("Engine - async shutdown .. OK");
+			info2!("Engine - async shutdown ... OK");
 		}
 	}
 }

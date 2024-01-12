@@ -75,8 +75,6 @@ mod tests {
 			assert_eq!(a.queue.get(i),    None);
 			assert_eq!(a.repeat,          Repeat::Off);
 			assert_eq!(a.volume,          Volume::DEFAULT);
-			assert_eq!(a.back_threshold,  3.0);
-			assert_eq!(a.queue_end_clear, true);
 			assert_eq!(a.current.as_ref().unwrap().index, index);
 		}
 

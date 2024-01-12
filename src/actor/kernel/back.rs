@@ -45,9 +45,10 @@ impl<Data: ValidData> Kernel<Data> {
 		// Get the previous `Source` index.
 		let index = match self.w.current.as_ref() {
 			Some(current) => {
+				let back_threshold = self.atomic_state.back_threshold.get();
 				// If we're past the back threshold then the
 				// track should restart instead of going back.
-				if self.w.back_threshold.is_normal() && current.elapsed > self.w.back_threshold {
+				if back_threshold.is_normal() && current.elapsed > back_threshold {
 					current.index
 				} else {
 					// If the float is not normal (0.0, NaN, inf), then always go back.

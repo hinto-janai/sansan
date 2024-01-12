@@ -3,7 +3,7 @@
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
 	engine::Engine,
-	config::Config,
+	config::InitConfig,
 	source::{Source,Sources},
 	state::{AudioState,Current},
 };
@@ -23,9 +23,9 @@ pub(crate) fn sources() -> Sources<usize> {
 	])
 }
 
-/// Init the `Engine` with a default `Config`.
+/// Init the `Engine` with a default `InitConfig`.
 pub(crate) fn init() -> Engine::<usize> {
-	Engine::<usize>::init(Config::DEFAULT).unwrap()
+	Engine::<usize>::init(InitConfig::DEFAULT).unwrap()
 }
 
 /// Init the `Engine` with 10 sources in the queue and a modified audio state.

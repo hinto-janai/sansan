@@ -47,13 +47,11 @@ impl<Data: ValidData + Debug> Debug for AudioStateSnapshot<Data> {
 		// Deref into an `AudioState` _once_ before debug printing.
 		let audio_state: &AudioState<Data> = self;
 		f.debug_struct("AudioStateSnapshot")
-		.field("queue",           &audio_state.queue)
-		.field("playing",         &audio_state.playing)
-		.field("repeat",          &audio_state.repeat)
-		.field("volume",          &audio_state.volume)
-		.field("back_threshold",  &audio_state.back_threshold)
-		.field("queue_end_clear", &audio_state.queue_end_clear)
-		.field("current",         &audio_state.current)
+		.field("queue",   &audio_state.queue)
+		.field("playing", &audio_state.playing)
+		.field("repeat",  &audio_state.repeat)
+		.field("volume",  &audio_state.volume)
+		.field("current", &audio_state.current)
 		.finish()
 	}
 }
