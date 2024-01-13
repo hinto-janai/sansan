@@ -9,6 +9,7 @@ use crate::{
 	macros::try_send,
 };
 use crossbeam::channel::{Sender,Receiver};
+use std::sync::atomic::Ordering;
 
 //----------------------------------------------------------------------------------------------------
 impl<Data: ValidData> Kernel<Data> {
@@ -177,6 +178,9 @@ impl<Data: ValidData> Kernel<Data> {
 		// Forward potentially new `Source`.
 		if let Some(source) = maybe_source {
 			self.new_source(to_audio, to_decode, source);
+			if add_many.play {
+				self.atomic_state.playing.store(true, Ordering::Release);
+			}
 		}
 
 		try_send!(to_engine, self.audio_state_snapshot());
