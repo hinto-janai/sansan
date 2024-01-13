@@ -33,6 +33,7 @@ impl<Data: ValidData> Kernel<Data> {
 		debug_assert!(self.w.playing);
 
 		self.atomic_state.playing.store(false, Ordering::Release);
+
 		self.w.add_commit_push(|w, _| {
 			w.playing = false;
 		});

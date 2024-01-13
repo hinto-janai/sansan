@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	actor::kernel::kernel::{Kernel,DiscardCurrentAudio,KernelToDecode},
+	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode},
 	state::{AudioStateSnapshot,Current},
 	valid_data::ValidData,
 	signal::skip::{Skip,SkipError},
@@ -18,7 +18,7 @@ impl<Data: ValidData> Kernel<Data> {
 	pub(super) fn skip_inner(
 		&mut self,
 		skip: Skip,
-		to_audio: &Sender<DiscardCurrentAudio>,
+		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 	) {
 		// INVARIANT: `self.queue_empty()` must be handled by the caller.
@@ -102,7 +102,7 @@ impl<Data: ValidData> Kernel<Data> {
 	pub(super) fn skip(
 		&mut self,
 		skip: Skip,
-		to_audio: &Sender<DiscardCurrentAudio>,
+		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 		to_engine: &Sender<Result<AudioStateSnapshot<Data>, SkipError>>
 	) {

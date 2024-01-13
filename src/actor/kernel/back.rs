@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	actor::kernel::kernel::{Kernel,DiscardCurrentAudio,KernelToDecode},
+	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode},
 	state::{AudioStateSnapshot,Current},
 	valid_data::ValidData,
 	signal::back::{Back,BackError},
@@ -16,7 +16,7 @@ impl<Data: ValidData> Kernel<Data> {
 	pub(super) fn back(
 		&mut self,
 		back: Back,
-		to_audio: &Sender<DiscardCurrentAudio>,
+		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 		to_engine: &Sender<Result<AudioStateSnapshot<Data>, BackError>>,
 	) {
@@ -34,7 +34,7 @@ impl<Data: ValidData> Kernel<Data> {
 	pub(super) fn back_inner(
 		&mut self,
 		back: Back,
-		to_audio: &Sender<DiscardCurrentAudio>,
+		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 	) {
 		// INVARIANT: `self.queue_empty()` must be handled by the caller.

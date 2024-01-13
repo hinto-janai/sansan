@@ -3,7 +3,7 @@
 mod kernel;
 pub(crate) use kernel::{
 	Kernel,
-	DiscardCurrentAudio,
+	KernelToAudio,
 	Channels,
 	InitArgs,
 	KernelToDecode,

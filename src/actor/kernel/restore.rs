@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	actor::kernel::{Kernel,KernelToDecode,DiscardCurrentAudio},
+	actor::kernel::{Kernel,KernelToDecode,KernelToAudio},
 	state::{AudioState,AudioStateSnapshot},
 	valid_data::ValidData,
 	macros::try_send,
@@ -16,7 +16,7 @@ impl<Data: ValidData> Kernel<Data> {
 	pub(super) fn restore(
 		&mut self,
 		audio_state: AudioState<Data>,
-		to_audio: &Sender<DiscardCurrentAudio>,
+		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 		to_engine: &Sender<AudioStateSnapshot<Data>>,
 	) {

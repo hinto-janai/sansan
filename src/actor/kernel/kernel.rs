@@ -88,8 +88,13 @@ pub(crate) enum KernelToDecode<Data: ValidData> {
 	DiscardAudioAndStop,
 }
 
-/// Discard all of your current audio buffers.
-pub(crate) struct DiscardCurrentAudio;
+/// TODO
+pub(crate) enum KernelToAudio {
+	/// A signal to start the `Audio` playback loop.
+	StartPlaying,
+	/// Discard all of your current audio buffers.
+	DiscardCurrentAudio,
+}
 
 //---------------------------------------------------------------------------------------------------- Recv
 /// TL;DR - this structs exists because [self] borrowing rules are too strict
@@ -114,7 +119,7 @@ pub(crate) struct Channels<Data: ValidData> {
 	pub(crate) shutdown_actor: Box<[Sender<()>]>,
 
 	// [Audio]
-	pub(crate) to_audio:         Sender<DiscardCurrentAudio>,
+	pub(crate) to_audio:         Sender<KernelToAudio>,
 	pub(crate) from_audio:       Receiver<WroteAudioBuffer>,
 	pub(crate) to_audio_error:   Option<(Sender<()>, ErrorCallback)>,
 	pub(crate) from_audio_error: Receiver<OutputError>,
@@ -386,7 +391,7 @@ where
 	/// TODO
 	pub(super) fn reset_source(
 		&self,
-		to_audio: &Sender<DiscardCurrentAudio>,
+		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 		source: Source<Data>,
 	) {
@@ -398,7 +403,7 @@ where
 		//
 		// [Audio] is responsible for setting it back to [true].
 		self.atomic_state.audio_ready_to_recv.store(false, Ordering::Release);
-		try_send!(to_audio, DiscardCurrentAudio);
+		try_send!(to_audio, KernelToAudio::DiscardCurrentAudio);
 
 		// Tell `Decode` to discard data.
 		try_send!(to_decode, KernelToDecode::DiscardAudioAndStop);

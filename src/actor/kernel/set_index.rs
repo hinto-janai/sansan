@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	actor::kernel::kernel::{Kernel,DiscardCurrentAudio,KernelToDecode},
+	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode},
 	state::{AudioStateSnapshot,Current},
 	valid_data::ValidData,
 	signal::set_index::{SetIndex,SetIndexError},
@@ -17,7 +17,7 @@ impl<Data: ValidData> Kernel<Data> {
 	pub(super) fn set_index(
 		&mut self,
 		set_index: SetIndex,
-		to_audio: &Sender<DiscardCurrentAudio>,
+		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 		to_engine: &Sender<Result<AudioStateSnapshot<Data>, SetIndexError>>,
 	) {

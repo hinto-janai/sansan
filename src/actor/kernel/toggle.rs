@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	actor::kernel::{Kernel,DiscardCurrentAudio,KernelToDecode},
+	actor::kernel::{Kernel,KernelToAudio,KernelToDecode},
 	state::AudioStateSnapshot,
 	valid_data::ValidData,
 };
@@ -13,7 +13,7 @@ impl<Data: ValidData> Kernel<Data> {
 	/// TODO
 	pub(super) fn toggle(
 		&mut self,
-		to_audio: &Sender<DiscardCurrentAudio>,
+		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 		to_engine: &Sender<AudioStateSnapshot<Data>>,
 	) {

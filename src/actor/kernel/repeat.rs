@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	actor::kernel::kernel::{Kernel,DiscardCurrentAudio,KernelToDecode},
+	actor::kernel::kernel::Kernel,
 	state::{AudioStateSnapshot,Current},
 	valid_data::ValidData,
 	signal::repeat::Repeat,

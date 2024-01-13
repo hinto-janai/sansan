@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	actor::kernel::kernel::{Kernel,DiscardCurrentAudio,KernelToDecode},
+	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode},
 	state::AudioStateSnapshot,
 	valid_data::ValidData,
 	signal::{add::{Add,AddMethod}, AddMany},
@@ -16,7 +16,7 @@ impl<Data: ValidData> Kernel<Data> {
 	pub(super) fn add(
 		&mut self,
 		add: Add<Data>,
-		to_audio: &Sender<DiscardCurrentAudio>,
+		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 		to_engine: &Sender<AudioStateSnapshot<Data>>
 	) {

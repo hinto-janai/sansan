@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	actor::kernel::{Kernel,DiscardCurrentAudio,KernelToDecode},
+	actor::kernel::{Kernel,KernelToAudio,KernelToDecode},
 	state::{AudioStateSnapshot, Current},
 	valid_data::ValidData,
 	macros::try_send,
@@ -15,7 +15,7 @@ impl<Data: ValidData> Kernel<Data> {
 	/// TODO
 	pub(super) fn play(
 		&mut self,
-		to_audio: &Sender<DiscardCurrentAudio>,
+		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 		to_engine: &Sender<AudioStateSnapshot<Data>>,
 	) {
@@ -35,6 +35,7 @@ impl<Data: ValidData> Kernel<Data> {
 		};
 
 		self.atomic_state.playing.store(true, Ordering::Release);
+		try_send!(to_audio, KernelToAudio::StartPlaying);
 
 		self.w.add_commit_push(|w, _| {
 			w.playing = true;

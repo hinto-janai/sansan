@@ -14,7 +14,7 @@ use crate::{
 	output::AudioOutput,
 	error::OutputError,
 	macros::error2,
-	actor::kernel::DiscardCurrentAudio,
+	actor::kernel::KernelToAudio,
 	macros::{debug2,try_send,select_recv,recv,trace2},
 };
 
@@ -64,7 +64,7 @@ struct Channels {
 	from_decode: Receiver<(AudioBuffer<f32>, Time)>,
 
 	to_kernel:   Sender<WroteAudioBuffer>,
-	from_kernel: Receiver<DiscardCurrentAudio>,
+	from_kernel: Receiver<KernelToAudio>,
 
 	to_kernel_error:   Sender<OutputError>,
 	// If this is `Some`, we must hang on the channel until `Kernel`
@@ -107,7 +107,7 @@ pub(crate) struct InitArgs {
 	pub(crate) to_caller_elapsed: Option<(Sender<()>, f64)>,
 	pub(crate) from_decode:       Receiver<(AudioBuffer<f32>, Time)>,
 	pub(crate) to_kernel:         Sender<WroteAudioBuffer>,
-	pub(crate) from_kernel:       Receiver<DiscardCurrentAudio>,
+	pub(crate) from_kernel:       Receiver<KernelToAudio>,
 	pub(crate) to_kernel_error:   Sender<OutputError>,
 	pub(crate) from_kernel_error: Option<Receiver<()>>,
 }
@@ -182,15 +182,21 @@ where
 		// Create channels that we will be selecting/listening to for all time.
 		let mut select  = Select::new();
 
-		assert_eq!(0, select.recv(&c.from_decode));
-		assert_eq!(1, select.recv(&c.from_kernel));
-		assert_eq!(2, select.recv(&c.shutdown));
+		assert_eq!(0, select.recv(&c.from_kernel));
+		assert_eq!(1, select.recv(&c.shutdown));
 
 		loop {
 			// Attempt to receive signal from other actors.
 			let select_index = if self.atomic_state.playing.load(Ordering::Acquire) {
+				if let Ok(audio) = c.from_decode.try_recv() {
+					self.play_audio_buffer(audio, &c);
+				}
 				select.try_ready()
 			} else {
+				if let Err(e) = self.output.stop() {
+					todo!();
+				}
+
 				// Else, hang until we receive a message from somebody.
 				debug2!("Audio - waiting for msgs on select.ready()");
 				Ok(select.ready())
@@ -202,20 +208,22 @@ where
 
 			// Route signal to its appropriate handler function [fn_*()].
 			match select_index {
-				// From `Decode`.
-				0 => {
-					let msg = select_recv!(c.from_decode);
-					self.play_audio_buffer(msg, &c);
-				},
-
 				// From `Kernel`.
-				1 => {
+				0 => {
 					let msg = select_recv!(c.from_kernel);
-					self.discard_audio(&c.from_decode, &c.to_gc);
+					match msg {
+						KernelToAudio::StartPlaying => {
+							if let Err(e) = self.output.play() {
+								todo!();
+							}
+							continue;
+						},
+						KernelToAudio::DiscardCurrentAudio => self.discard_audio(&c.from_decode, &c.to_gc),
+					}
 				},
 
 				// Shutdown.
-				2 => {
+				1 => {
 					select_recv!(c.shutdown);
 					debug2!("Audio - shutting down");
 					// Wait until all threads are ready to shutdown.

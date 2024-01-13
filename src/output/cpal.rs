@@ -175,17 +175,9 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 	fn flush(&mut self) {
 		debug2!("AudioOutput - flush()");
 
-		if !self.playing {
-			return;
+		while !self.sender.is_empty() {
+			std::thread::yield_now();
 		}
-
-		// We're playing, which means `cubeb` is calling
-		// the callback over and over again, which means
-		// it will eventually play all audio data.
-		//
-		// `cubeb` will tell us when it has drained,
-		// so hang until it has.
-		recv!(self.drained);
 	}
 
 	fn discard(&mut self) {
@@ -319,9 +311,9 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 
 			// TODO: test if we need this.
 			// Mute any remaining samples.
-			let written = output.len();
-			output[written..].fill(0.0);
-			trace2!("AudioOutput - data callback, written: {written}");
+			// let written = output.len();
+			// output[written..].fill(0.0);
+			// trace2!("AudioOutput - data callback, written: {written}");
 		};
 		// The callback `cpal` will call when errors occur.
 		let error_callback = move |error: cpal::StreamError| {
@@ -361,9 +353,6 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 			))
 		};
 
-		// Start the output stream.
-		stream.play()?;
-
 		Ok(Self {
 			stream,
 			error: error_recv,
@@ -382,7 +371,7 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 
 	fn play(&mut self) -> Result<(), OutputError> {
 		debug2!("AudioOutput - play()");
-		match self.stream.pause() {
+		match self.stream.play() {
 			Ok(()) => { self.playing = true; Ok(()) },
 			Err(e) => Err(OutputError::Unknown(Cow::Owned(format!("cpal play error: {e:?}")))),
 		}
