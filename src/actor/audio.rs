@@ -152,8 +152,7 @@ where
 				};
 
 				// TODO:
-				// obtain audio output depending on user config.
-				// hang, try again, etc.
+				// obtain audio output depending on user config, hang, try again, etc.
 				let output: AudioOutputStruct<ResamplerStruct> = AudioOutputStruct::dummy().unwrap();
 
 				let this = Audio {

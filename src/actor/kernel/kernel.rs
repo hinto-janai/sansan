@@ -79,9 +79,6 @@ pub(crate) struct Kernel<Data: ValidData> {
 pub(crate) enum KernelToDecode<Data: ValidData> {
 	/// Convert this [Source] into a real
 	/// [SourceDecode] and start decoding it.
-	///
-	/// This also implicitly also means we
-	/// should drop our old audio buffers.
 	NewSource(Source<Data>),
 	/// Seek to this timestamp in the currently
 	/// playing track and start decoding from there
@@ -387,34 +384,43 @@ where
 
 	#[inline]
 	/// TODO
-	pub(super) fn new_source(
+	pub(super) fn reset_source(
 		&self,
 		to_audio: &Sender<DiscardCurrentAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 		source: Source<Data>,
 	) {
-		self.tell_audio_to_discard(to_audio);
-		Self::tell_decode_to_discard(to_decode);
-		try_send!(to_decode, KernelToDecode::NewSource(source));
-	}
-
-	#[inline]
-	/// TODO
-	pub(super) fn tell_audio_to_discard(&self, to_audio: &Sender<DiscardCurrentAudio>) {
+		// Tell `Audio` to discard its current audio data.
+		//
 		// INVARIANT:
 		// This is set by [Kernel] since it
 		// _knows_ when we're discarding first.
 		//
-		// [Audio] is responsible for setting it
-		// back to [true].
+		// [Audio] is responsible for setting it back to [true].
 		self.atomic_state.audio_ready_to_recv.store(false, Ordering::Release);
 		try_send!(to_audio, DiscardCurrentAudio);
+
+		// Tell `Decode` to discard data.
+		try_send!(to_decode, KernelToDecode::DiscardAudioAndStop);
+
+		// Send over the new `Source` to be decoded.
+		try_send!(to_decode, KernelToDecode::NewSource(source));
 	}
 
 	#[inline]
-	/// TODO
-	pub(super) fn tell_decode_to_discard(to_decode: &Sender<KernelToDecode<Data>>) {
-		try_send!(to_decode, KernelToDecode::DiscardAudioAndStop);
+	/// Unlike `new_source()`, this function has the implication that
+	/// we're not "resetting" a track, we're simply starting up the next
+	/// one, as such:
+	///
+	/// - `Audio` should not wipe any current data
+	/// - `Audio` it should continue playing
+	/// - `Decode` should not wipe any current data
+	/// - `Decode` should get started decoding this new `Source` ASAP
+	pub(super) fn new_source(
+		to_decode: &Sender<KernelToDecode<Data>>,
+		source: Source<Data>,
+	) {
+		try_send!(to_decode, KernelToDecode::NewSource(source));
 	}
 
 	#[inline]

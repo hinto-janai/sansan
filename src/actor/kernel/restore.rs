@@ -50,7 +50,7 @@ impl<Data: ValidData> Kernel<Data> {
 		self.w.push_clone();
 
 		if let Some(source) = maybe_source {
-			self.new_source(to_audio, to_decode, source);
+			Self::new_source(to_decode, source);
 		}
 
 		try_send!(to_engine, self.audio_state_snapshot());

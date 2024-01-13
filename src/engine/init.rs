@@ -241,7 +241,7 @@ where
 		};
 
 		// Shared values [Audio] <-> [Kernel].
-		let audio_ready_to_recv = Arc::new(AtomicBool::new(false));
+		let audio_ready_to_recv = Arc::new(AtomicBool::new(true));
 
 		let (a_shutdown, shutdown) = bounded(1);
 		let (a_to_gc, gc_from_a)   = unbounded();

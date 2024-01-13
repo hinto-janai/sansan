@@ -162,7 +162,7 @@ impl<Data: ValidData> Kernel<Data> {
 		if index_wiped {
 			if let Some(index) = maybe_source_index {
 				let source = self.w.queue[index].clone();
-				self.new_source(to_audio, to_decode, source);
+				self.reset_source(to_audio, to_decode, source);
 			}
 		} else {
 			// The queue finished, we must set atomic state.

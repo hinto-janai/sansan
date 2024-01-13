@@ -45,7 +45,7 @@ impl<Data: ValidData> Kernel<Data> {
 
 		// Tell audio/decode to start if we're starting a new source.
 		if let Some(source) = maybe_source {
-			self.new_source(to_audio, to_decode, source);
+			Self::new_source(to_decode, source);
 		}
 
 		try_send!(to_engine, self.audio_state_snapshot());

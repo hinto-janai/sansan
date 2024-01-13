@@ -21,7 +21,7 @@ use std::{
 	sync::{
 		Arc,
 		Barrier,
-		atomic::AtomicBool,
+		atomic::{AtomicBool,Ordering},
 	},
 	collections::VecDeque,
 };
@@ -272,14 +272,14 @@ impl<Data: ValidData> Decode<Data> {
 	/// Send decoded audio data to [Audio]
 	/// if they are ready, else, store locally.
 	fn send_audio(&mut self, to_audio: &Sender<ToAudio>, data: ToAudio) {
-		trace2!("Decode - send_or_store_audio(), sending");
+		trace2!("Decode - send_or_store_audio()");
 
 		// Store the buffer first.
 		self.buffer.push_back(data);
 
 		// While audio is ready to accept more,
 		// send all the audio buffers we have.
-		while self.audio_is_ready(to_audio) {
+		while self.audio_ready_to_recv.load(Ordering::Acquire) {
 			if let Some(data) = self.buffer.pop_front() {
 				try_send!(to_audio, data);
 			} else {
@@ -372,12 +372,5 @@ impl<Data: ValidData> Decode<Data> {
 	/// TODO
 	fn done_decoding(&mut self) {
 		self.done_decoding = true;
-	}
-
-	#[inline]
-	/// If [Audio] is in a state that is
-	/// willing to accept new audio buffers.
-	fn audio_is_ready(&self, to_audio: &Sender<ToAudio>) -> bool {
-		!to_audio.is_full() && self.audio_ready_to_recv.load(std::sync::atomic::Ordering::Acquire)
 	}
 }

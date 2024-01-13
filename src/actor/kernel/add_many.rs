@@ -177,7 +177,7 @@ impl<Data: ValidData> Kernel<Data> {
 
 		// Forward potentially new `Source`.
 		if let Some(source) = maybe_source {
-			self.new_source(to_audio, to_decode, source);
+			Self::new_source(to_decode, source);
 			if add_many.play {
 				self.atomic_state.playing.store(true, Ordering::Release);
 			}

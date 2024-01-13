@@ -68,7 +68,7 @@ impl<Data: ValidData> Kernel<Data> {
 			elapsed: 0.0,
 		};
 
-		self.new_source(to_audio, to_decode, source);
+		self.reset_source(to_audio, to_decode, source);
 
 		self.w.add_commit_push(|w, _| {
 			w.current = Some(current.clone());

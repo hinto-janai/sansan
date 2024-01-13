@@ -32,7 +32,7 @@ impl<Data: ValidData> Kernel<Data> {
 		};
 		let source = source.clone();
 
-		self.new_source(to_audio, to_decode, source.clone());
+		self.reset_source(to_audio, to_decode, source.clone());
 
 		let play = set_index.play == Some(true);
 		self.atomic_state.playing.store(play, Ordering::Release);

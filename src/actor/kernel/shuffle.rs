@@ -34,7 +34,7 @@ impl<Data: ValidData> Kernel<Data> {
 		if queue_len == 1 {
 			let source = self.w.queue[0].clone();
 
-			self.new_source(to_audio, to_decode, source.clone());
+			self.reset_source(to_audio, to_decode, source.clone());
 
 			let current = Some(Current::new(source));
 
@@ -152,7 +152,7 @@ impl<Data: ValidData> Kernel<Data> {
 		// set our [current] to queue[0], so we must forward
 		// it to [Decode].
 		if let Some(source) = maybe_source {
-			self.new_source(to_audio, to_decode, source);
+			self.reset_source(to_audio, to_decode, source);
 		}
 		// INVARIANT: must be [`push_clone()`]
 		// since `Shuffle` is non-deterministic.

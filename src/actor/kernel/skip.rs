@@ -94,7 +94,7 @@ impl<Data: ValidData> Kernel<Data> {
 
 		// Forward potential `Source` to `Audio/Decode`
 		if let Some(current) = current {
-			self.new_source(to_audio, to_decode, current.source);
+			self.reset_source(to_audio, to_decode, current.source);
 		}
 	}
 
