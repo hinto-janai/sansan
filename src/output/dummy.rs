@@ -145,6 +145,22 @@ impl<R: Resampler> AudioOutput for DummyAudioOutput<R> {
 			send!(self.sender, *sample);
 		};
 
+		// Calculate the amount of nominal time to sleep for each `write()` call.
+		// This is a dummy audio output device, although, we'd like to preserve
+		// the behavior where `write()` hangs while waiting for the current
+		// audio buffer to play.
+		//
+		// The formula seems to be (duration * 1_000_000 / sample_rate), e.g:
+		//
+		// (1152 * 1_000_000) / 48_000 = 24_000 microseconds.
+		//
+		// To account for oversleeping and other stuff,
+		// set the multiplier slightly lower.
+		#[allow(clippy::cast_lossless)]
+		let micro = (self.duration * 995_000) / self.spec.rate as u64;
+		let sleep_time = Duration::from_micros(micro);
+		sleep(sleep_time);
+
 		// Send garbage to GC.
 		try_send!(to_gc, audio);
 		// INVARIANT:
@@ -276,9 +292,8 @@ impl<R: Resampler> AudioOutput for DummyAudioOutput<R> {
 			// Call the data callback, while we're playing.
 			while playing_clone.load(Ordering::Acquire) {
 				data_callback();
-				// Simulate 1 audio frame playback time.
-				sleep(Duration::from_millis(8));
 			}
+
 			// Hang until we're "playing".
 			play_recv.recv().unwrap();
 		});

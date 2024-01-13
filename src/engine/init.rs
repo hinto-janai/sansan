@@ -119,7 +119,7 @@ where
 			None
 		};
 
-		debug2!("Engine - init config audio state: {:#?}", config.restore);
+		debug2!("Engine - init config audio state: {:#?}", config.audio_state);
 
 		// Initialize the `AudioStateReader`.
 		// TODO: initialize with `InitConfig`'s AudioState.
