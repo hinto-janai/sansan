@@ -214,7 +214,6 @@ where
 					cb_repeat:     callbacks.repeat,
 					cb_elapsed:    callbacks.elapsed.map(|(cb, _)| cb),
 					low_priority:  config.callback_low_priority,
-					audio_state:   AudioStateReader::clone(&audio_state_reader),
 					shutdown_wait: Arc::clone(&shutdown_wait),
 					shutdown,
 					next,
@@ -222,7 +221,7 @@ where
 					repeat,
 					elapsed,
 				},
-				Caller::<Data>::init
+				Caller::init
 			);
 		}
 

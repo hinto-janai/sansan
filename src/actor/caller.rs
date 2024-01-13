@@ -19,12 +19,11 @@ use std::sync::{
 //---------------------------------------------------------------------------------------------------- Caller
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
-pub(crate) struct Caller<Data: ValidData> {
+pub(crate) struct Caller {
 	cb_next:       Option<Callback>,
 	cb_queue_end:  Option<Callback>,
 	cb_repeat:     Option<Callback>,
 	cb_elapsed:    Option<Callback>,
-	audio_state:   AudioStateReader<Data>,
 	shutdown_wait: Arc<Barrier>,
 }
 
@@ -42,14 +41,13 @@ struct Channels {
 //---------------------------------------------------------------------------------------------------- Caller Impl
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
-pub(crate) struct InitArgs<Data: ValidData> {
+pub(crate) struct InitArgs {
 	pub(crate) init_barrier:  Option<Arc<Barrier>>,
 	pub(crate) cb_next:       Option<Callback>,
 	pub(crate) cb_queue_end:  Option<Callback>,
 	pub(crate) cb_repeat:     Option<Callback>,
 	pub(crate) cb_elapsed:    Option<Callback>,
 	pub(crate) low_priority:  bool,
-	pub(crate) audio_state:   AudioStateReader<Data>,
 	pub(crate) shutdown_wait: Arc<Barrier>,
 	pub(crate) shutdown:      Receiver<()>,
 	pub(crate) next:          Receiver<()>,
@@ -59,12 +57,12 @@ pub(crate) struct InitArgs<Data: ValidData> {
 }
 
 //---------------------------------------------------------------------------------------------------- Caller Impl
-impl<Data: ValidData> Caller<Data> {
+impl Caller {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]
 	/// Initialize `Caller`.
-	pub(crate) fn init(args: InitArgs<Data>) -> Result<JoinHandle<()>, std::io::Error> {
+	pub(crate) fn init(args: InitArgs) -> Result<JoinHandle<()>, std::io::Error> {
 		std::thread::Builder::new()
 			.name("Caller".into())
 			.spawn(move || {
@@ -75,7 +73,6 @@ impl<Data: ValidData> Caller<Data> {
 					cb_repeat,
 					cb_elapsed,
 					low_priority,
-					audio_state,
 					shutdown_wait,
 					shutdown,
 					next,
@@ -97,7 +94,6 @@ impl<Data: ValidData> Caller<Data> {
 					cb_queue_end,
 					cb_repeat,
 					cb_elapsed,
-					audio_state,
 					shutdown_wait,
 				};
 
@@ -163,32 +159,29 @@ impl<Data: ValidData> Caller<Data> {
 	/// TODO
 	fn next(&mut self) {
 		trace2!("Caller - next()");
-		Self::call(&self.audio_state.get(), &mut self.cb_next);
+		Self::call(&mut self.cb_next);
 	}
 
 	/// TODO
 	fn queue_end(&mut self) {
 		trace2!("Caller - queue_end()");
-		Self::call(&self.audio_state.get(), &mut self.cb_queue_end);
+		Self::call(&mut self.cb_queue_end);
 	}
 
 	/// TODO
 	fn repeat(&mut self) {
 		trace2!("Caller - repeat()");
-		Self::call(&self.audio_state.get(), &mut self.cb_repeat);
+		Self::call(&mut self.cb_repeat);
 	}
 
 	/// TODO
 	fn elapsed(&mut self) {
 		trace2!("Caller - elapsed()");
-		Self::call(&self.audio_state.get(), &mut self.cb_elapsed);
+		Self::call(&mut self.cb_elapsed);
 	}
 
 	/// TODO
-	fn call(
-		audio_state: &AudioState<Data>,
-		callback: &mut Option<Callback>
-	) {
+	fn call(callback: &mut Option<Callback>) {
 		if let Some(cb) = callback.as_mut() {
 			cb();
 		}
