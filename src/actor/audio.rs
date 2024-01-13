@@ -46,7 +46,6 @@ where
 	Output: AudioOutput,
 {
 	atomic_state:  Arc<AtomicState>, // Shared atomic audio state with the rest of the actors
-	playing:       bool,             // A local boolean so we don't have to atomic access each loop
 	elapsed:       f64,              // Elapsed time, used for the elapsed callback (f64 is reset each call)
 	ready_to_recv: Arc<AtomicBool>,  // [Audio]'s way of telling [Decode] it is ready for samples
 	shutdown_wait: Arc<Barrier>,     // Shutdown barrier between all actors
@@ -62,7 +61,6 @@ struct Channels {
 	to_gc:             Sender<AudioBuffer<f32>>,
 	to_caller_elapsed: Option<(Sender<()>, f64)>,
 
-	to_decode:   Sender<TookAudioBuffer>,
 	from_decode: Receiver<(AudioBuffer<f32>, Time)>,
 
 	to_kernel:   Sender<WroteAudioBuffer>,
@@ -107,7 +105,6 @@ pub(crate) struct InitArgs {
 	pub(crate) shutdown:          Receiver<()>,
 	pub(crate) to_gc:             Sender<AudioBuffer<f32>>,
 	pub(crate) to_caller_elapsed: Option<(Sender<()>, f64)>,
-	pub(crate) to_decode:         Sender<TookAudioBuffer>,
 	pub(crate) from_decode:       Receiver<(AudioBuffer<f32>, Time)>,
 	pub(crate) to_kernel:         Sender<WroteAudioBuffer>,
 	pub(crate) from_kernel:       Receiver<DiscardCurrentAudio>,
@@ -136,7 +133,6 @@ where
 					shutdown,
 					to_gc,
 					to_caller_elapsed,
-					to_decode,
 					from_decode,
 					to_kernel,
 					from_kernel,
@@ -148,7 +144,6 @@ where
 					shutdown,
 					to_gc,
 					to_caller_elapsed,
-					to_decode,
 					from_decode,
 					to_kernel,
 					from_kernel,
@@ -163,7 +158,6 @@ where
 
 				let this = Audio {
 					atomic_state,
-					playing: false,
 					elapsed: 0.0,
 					ready_to_recv,
 					shutdown_wait,
@@ -186,8 +180,7 @@ where
 	fn main(mut self, c: Channels) {
 		debug2!("Audio - main()");
 
-		// Create channels that we will
-		// be selecting/listening to for all time.
+		// Create channels that we will be selecting/listening to for all time.
 		let mut select  = Select::new();
 
 		assert_eq!(0, select.recv(&c.from_decode));
@@ -195,32 +188,17 @@ where
 		assert_eq!(2, select.recv(&c.shutdown));
 
 		loop {
-			self.playing = self.atomic_state.playing.load(Ordering::Acquire);
-
-			// If we're playing, check if we have samples to play.
-			if self.playing {
-				if let Ok(msg) = c.from_decode.try_recv() {
-					self.play_audio_buffer(msg, &c);
-				}
-			}
-
-			#[allow(clippy::single_match_else)]
 			// Attempt to receive signal from other actors.
-			let select_index = match select.try_ready() {
-				Ok(s) => s,
-				Err(_) => {
-					// If we're playing, continue to
-					// next iteration of loop so that
-					// we continue playing.
-					if self.playing {
-						continue;
-					}
+			let select_index = if self.atomic_state.playing.load(Ordering::Acquire) {
+				select.try_ready()
+			} else {
+				// Else, hang until we receive a message from somebody.
+				debug2!("Audio - waiting for msgs on select.ready()");
+				Ok(select.ready())
+			};
 
-					// Else, hang until we receive
-					// a message from somebody.
-					debug2!("Audio - waiting for msgs on select.ready()");
-					select.ready()
-				},
+			let Ok(select_index) = select_index else {
+				continue;
 			};
 
 			// Route signal to its appropriate handler function [fn_*()].
@@ -228,12 +206,6 @@ where
 				// From `Decode`.
 				0 => {
 					let msg = select_recv!(c.from_decode);
-
-					// Tell `Decode` we just took an audio
-					// buffer and want a new one sent.
-					try_send!(c.to_decode, TookAudioBuffer);
-
-					// Play the buffer.
 					self.play_audio_buffer(msg, &c);
 				},
 

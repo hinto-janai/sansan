@@ -231,8 +231,7 @@ where
 		// Variables are prefix/suffixed accordingly:
 		// - [Audio]  == [a]
 		// - [Decode] == [d]
-		let (d_to_a, a_from_d) = bounded(AUDIO_BUFFER_LEN);
-		let (a_to_d, d_from_a) = unbounded();
+		let (d_to_a, a_from_d) = unbounded();
 		let (a_to_k, k_from_a) = unbounded();
 		let (k_to_a, a_from_k) = unbounded();
 		let (err_a_to_k, err_k_from_a) = unbounded();
@@ -258,7 +257,6 @@ where
 				shutdown_wait:     Arc::clone(&shutdown_wait),
 				to_gc:             a_to_gc,
 				to_caller_elapsed,
-				to_decode:         a_to_d,
 				from_decode:       a_from_d,
 				to_kernel:         a_to_k,
 				from_kernel:       a_from_k,
@@ -303,7 +301,6 @@ where
 				to_pool:             d_to_p,
 				from_pool:           d_from_p,
 				to_audio:            d_to_a,
-				from_audio:          d_from_a,
 				to_kernel_seek:      d_to_k_seek,
 				to_kernel_source:    d_to_k_source,
 				from_kernel:         d_from_k,

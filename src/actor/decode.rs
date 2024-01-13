@@ -65,7 +65,6 @@ struct Channels<Data: ValidData> {
 	shutdown:         Receiver<()>,
 	to_gc:            Sender<DecodeToGc>,
 	to_audio:         Sender<ToAudio>,
-	from_audio:       Receiver<TookAudioBuffer>,
 	to_kernel_seek:   Sender<Result<SeekedTime, SeekError>>,
 	to_kernel_source: Sender<Result<(), SourceError>>,
 	from_kernel:      Receiver<KernelToDecode<Data>>,
@@ -99,7 +98,6 @@ pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) to_pool:             Sender<VecDeque<ToAudio>>,
 	pub(crate) from_pool:           Receiver<VecDeque<ToAudio>>,
 	pub(crate) to_audio:            Sender<ToAudio>,
-	pub(crate) from_audio:          Receiver<TookAudioBuffer>,
 	pub(crate) to_kernel_seek:      Sender<Result<SeekedTime, SeekError>>,
 	pub(crate) to_kernel_source:    Sender<Result<(), SourceError>>,
 	pub(crate) from_kernel:         Receiver<KernelToDecode<Data>>,
@@ -128,7 +126,6 @@ impl<Data: ValidData> Decode<Data> {
 					to_pool,
 					from_pool,
 					to_audio,
-					from_audio,
 					to_kernel_seek,
 					to_kernel_source,
 					from_kernel,
@@ -142,7 +139,6 @@ impl<Data: ValidData> Decode<Data> {
 					shutdown,
 					to_gc,
 					to_audio,
-					from_audio,
 					to_kernel_seek,
 					to_kernel_source,
 					from_kernel,
@@ -183,23 +179,19 @@ impl<Data: ValidData> Decode<Data> {
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
 
-		assert_eq!(0, select.recv(&channels.from_audio));
-		assert_eq!(1, select.recv(&channels.from_kernel));
-		assert_eq!(2, select.recv(&channels.shutdown));
+		assert_eq!(0, select.recv(&channels.from_kernel));
+		assert_eq!(1, select.recv(&channels.shutdown));
 
 		// The "Decode" loop.
 		loop {
 			// Listen to other actors.
-			#[allow(clippy::match_bool)]
-			let signal = match self.done_decoding {
-				// Non-blocking
-				false => select.try_ready(),
-
+			let signal = if self.done_decoding {
 				// Blocking
-				true => {
-					trace2!("Decode - waiting for msgs on select.ready()");
-					Ok(select.ready())
-				},
+				trace2!("Decode - waiting for msgs on select.ready()");
+				Ok(select.ready())
+			} else {
+				// Non-blocking
+				select.try_ready()
 			};
 
 			// Handle signals.
@@ -209,11 +201,14 @@ impl<Data: ValidData> Decode<Data> {
 			if let Ok(signal) = signal {
 				match signal {
 					0 => {
-						select_recv!(&channels.from_audio);
-						self.send_audio_if_ready(&channels.to_audio);
+						let msg = select_recv!(&channels.from_kernel);
+						match msg {
+							KernelToDecode::NewSource(source)   => self.new_source(source, &channels),
+							KernelToDecode::Seek(seek)          => self.seek(seek, &channels.to_kernel_seek),
+							KernelToDecode::DiscardAudioAndStop => self.discard_audio_and_stop(),
+						}
 					},
-					1 => self.msg_from_kernel(&channels, select_recv!(&channels.from_kernel)),
-					2 => {
+					1 => {
 						debug2!("Debug - shutting down");
 						channels.shutdown.try_recv().unwrap();
 						debug2!("Debug - waiting on others...");
@@ -264,7 +259,7 @@ impl<Data: ValidData> Decode<Data> {
 					self.set_current_audio_time(time);
 
 					// Send to [Audio] if we can, else store locally.
-					self.send_or_store_audio(&channels.to_audio, (audio, time));
+					self.send_audio(&channels.to_audio, (audio, time));
 				}
 
 				Err(e) => Self::handle_decode_error(&channels, DecodeError::from(e)),
@@ -275,20 +270,6 @@ impl<Data: ValidData> Decode<Data> {
 		}
 	}
 
-	//---------------------------------------------------------------------------------------------------- Message Routing
-	// These are the functions that map message
-	// enums to the their proper signal handler.
-
-	#[inline]
-	/// Handle message's from `Kernel`.
-	fn msg_from_kernel(&mut self, channels: &Channels<Data>, msg: KernelToDecode<Data>) {
-		match msg {
-			KernelToDecode::NewSource(source)   => self.new_source(source, channels),
-			KernelToDecode::Seek(seek)          => self.seek(seek, &channels.to_kernel_seek),
-			KernelToDecode::DiscardAudioAndStop => self.discard_audio_and_stop(),
-		}
-	}
-
 	//---------------------------------------------------------------------------------------------------- Signal Handlers
 	// Function Handlers.
 	//
@@ -296,35 +277,22 @@ impl<Data: ValidData> Decode<Data> {
 	// to exact messages/signals from the other actors.
 
 	#[inline]
-	/// If [Audio]'s is ready, take out the
-	/// oldest buffer and send it.
-	fn send_audio_if_ready(&mut self, to_audio: &Sender<ToAudio>) {
-		if self.audio_is_ready(to_audio) {
-			if let Some(data) = self.buffer.pop_front() {
-				try_send!(to_audio, data);
-			}
-		}
-	}
-
-	#[inline]
 	/// Send decoded audio data to [Audio]
 	/// if they are ready, else, store locally.
-	fn send_or_store_audio(&mut self, to_audio: &Sender<ToAudio>, data: ToAudio) {
-		if self.audio_is_ready(to_audio) {
-			trace2!("Decode - send_or_store_audio(), sending");
+	fn send_audio(&mut self, to_audio: &Sender<ToAudio>, data: ToAudio) {
+		trace2!("Decode - send_or_store_audio(), sending");
 
-			if let Some(old_data) = self.buffer.pop_front() {
-				// We had some old audio left over, send that
-				// first and store the latest one for later.
-				try_send!(to_audio, old_data);
-				self.buffer.push_back(data);
-			} else {
-				// We had no stored audio data, send our input directly.
+		// Store the buffer first.
+		self.buffer.push_back(data);
+
+		// While audio is ready to accept more,
+		// send all the audio buffers we have.
+		while self.audio_is_ready(to_audio) {
+			if let Some(data) = self.buffer.pop_front() {
 				try_send!(to_audio, data);
+			} else {
+				return;
 			}
-		} else {
-			trace2!("Decode - send_or_store_audio(), storing");
-			self.buffer.push_back(data);
 		}
 	}
 
