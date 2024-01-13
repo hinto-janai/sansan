@@ -53,8 +53,6 @@ pub(crate) struct Decode<Data: ValidData> {
 	buffer:              VecDeque<ToAudio>,           // Local decoded packets, ready to send to [Audio]
 	source:              SourceDecode,                 // Our current [Source] that we are decoding
 	done_decoding:       bool,                        // Whether we have finished decoding our current [Source]
-	to_pool:             Sender<VecDeque<ToAudio>>,   // Old buffer send to [Pool]
-	from_pool:           Receiver<VecDeque<ToAudio>>, // New buffer recv from [Pool]
 	shutdown_wait:       Arc<Barrier>,                // Shutdown barrier between all actors
 	_p:                  PhantomData<Data>,
 }
@@ -95,8 +93,6 @@ pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) shutdown_wait:       Arc<Barrier>,
 	pub(crate) shutdown:            Receiver<()>,
 	pub(crate) to_gc:               Sender<DecodeToGc>,
-	pub(crate) to_pool:             Sender<VecDeque<ToAudio>>,
-	pub(crate) from_pool:           Receiver<VecDeque<ToAudio>>,
 	pub(crate) to_audio:            Sender<ToAudio>,
 	pub(crate) to_kernel_seek:      Sender<Result<SeekedTime, SeekError>>,
 	pub(crate) to_kernel_source:    Sender<Result<(), SourceError>>,
@@ -123,8 +119,6 @@ impl<Data: ValidData> Decode<Data> {
 					shutdown_wait,
 					shutdown,
 					to_gc,
-					to_pool,
-					from_pool,
 					to_audio,
 					to_kernel_seek,
 					to_kernel_source,
@@ -153,8 +147,6 @@ impl<Data: ValidData> Decode<Data> {
 					buffer: VecDeque::with_capacity(DECODE_BUFFER_LEN),
 					source: SourceDecode::dummy(),
 					done_decoding: true,
-					to_pool,
-					from_pool,
 					shutdown_wait,
 					_p: PhantomData,
 				};
@@ -303,7 +295,7 @@ impl<Data: ValidData> Decode<Data> {
 
 		match source.try_into() {
 			Ok(mut s) => {
-				self.swap_audio_buffer();
+				self.buffer.clear();
 				std::mem::swap(&mut self.source, &mut s);
 				try_send!(channels.to_gc, DecodeToGc::Source(s));
 				self.done_decoding = false;
@@ -372,29 +364,8 @@ impl<Data: ValidData> Decode<Data> {
 	/// TODO
 	fn discard_audio_and_stop(&mut self) {
 		trace2!("Decode - discard_audio_and_stop()");
-		self.swap_audio_buffer();
+		self.buffer.clear();
 		self.done_decoding();
-	}
-
-	#[inline]
-	/// Swap our current audio buffer
-	/// with a fresh empty one from `Pool`.
-	fn swap_audio_buffer(&mut self) {
-		// INVARIANT:
-		// Pool must send 1 buffer on init such
-		// that this will immediately receive
-		// something on the very first call.
-		//
-		// These are also [recv] + [send] instead
-		// of the [try_*] variants since [Pool] may
-		// not have taken out the older buffers yet.
-		let mut buffer = recv!(self.from_pool);
-
-		// Swap our buffer with the fresh one.
-		std::mem::swap(&mut self.buffer, &mut buffer);
-
-		// Send the old one back for cleaning.
-		send!(self.to_pool, buffer);
 	}
 
 	#[inline]
