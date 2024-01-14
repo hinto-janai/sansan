@@ -19,6 +19,7 @@ use crate::{
 		audio::{Audio,AUDIO_BUFFER_LEN},
 		decode::Decode,
 		kernel::Kernel,
+		pool::Pool,
 		gc::Gc,
 		caller::Caller,
 	},
@@ -42,12 +43,13 @@ use crate::resampler::ResamplerStruct;
 /// [0] Audio
 /// [1] Decode
 /// [2] Kernel
-/// [3] Caller
-/// [4] Mc (Media Control)
-/// [5] Gc (Garbage Collector)
+/// [3] Pool
+/// [4] Caller
+/// [5] Mc (Media Control)
+/// [6] Gc (Garbage Collector)
 ///
 /// TODO: finalize all actors
-const ACTOR_COUNT: usize = 6;
+const ACTOR_COUNT: usize = 7;
 
 //---------------------------------------------------------------------------------------------------- Engine Impl
 impl<Data> Engine<Data>
@@ -229,7 +231,8 @@ where
 		// Variables are prefix/suffixed accordingly:
 		// - [Audio]  == [a]
 		// - [Decode] == [d]
-		let (d_to_a, a_from_d) = unbounded();
+		let (d_to_a, a_from_d) = bounded(AUDIO_BUFFER_LEN);
+		let (a_to_d, d_from_a) = unbounded();
 		let (a_to_k, k_from_a) = unbounded();
 		let (k_to_a, a_from_k) = unbounded();
 		let (err_a_to_k, err_k_from_a) = unbounded();
@@ -255,6 +258,7 @@ where
 				shutdown_wait:     Arc::clone(&shutdown_wait),
 				to_gc:             a_to_gc,
 				to_caller_elapsed,
+				to_decode:         a_to_d,
 				from_decode:       a_from_d,
 				to_kernel:         a_to_k,
 				from_kernel:       a_from_k,
@@ -270,6 +274,8 @@ where
 		let (k_to_d,        d_from_k)        = unbounded();
 		let (d_to_gc,       gc_from_d)       = unbounded();
 		let (d_shutdown,    shutdown)        = bounded(1);
+		let (d_to_p,        p_from_d)        = bounded(1);
+		let (p_to_d,        d_from_p)        = bounded(1);
 
 		let (err_decode_d_to_k, err_decode_k_from_d) = unbounded();
 		let (err_decode_k_to_d, err_decode_d_from_k) = if let Some(cb) = callbacks.error_decode {
@@ -294,7 +300,10 @@ where
 				shutdown_wait:       Arc::clone(&shutdown_wait),
 				shutdown,
 				to_gc:               d_to_gc,
+				to_pool:             d_to_p,
+				from_pool:           d_from_p,
 				to_audio:            d_to_a,
+				from_audio:          d_from_a,
 				to_kernel_seek:      d_to_k_seek,
 				to_kernel_source:    d_to_k_source,
 				from_kernel:         d_from_k,
@@ -304,6 +313,22 @@ where
 				from_kernel_error_s: err_source_d_from_k,
 			},
 			Decode::init
+		);
+
+		//-------------------------------------------------------------- Spawn [Pool]
+		let (p_shutdown, shutdown) = bounded(1);
+		let (p_to_gc, gc_from_p) = unbounded();
+		spawn_actor!(
+			"Pool",
+			crate::actor::pool::InitArgs {
+				init_barrier:  init_barrier.clone(), // Option<Arc<_>>,
+				shutdown_wait: Arc::clone(&shutdown_wait),
+				shutdown,
+				to_decode:   p_to_d,
+				from_decode: p_from_d,
+				to_gc:       p_to_gc,
+			},
+			Pool::<Data>::init
 		);
 
 		//-------------------------------------------------------------- Spawn [Gc]
@@ -319,6 +344,7 @@ where
 					from_audio:  gc_from_a,
 					from_decode: gc_from_d,
 					from_kernel: gc_from_k,
+					from_pool:   gc_from_p,
 				},
 			},
 			Gc::<Data>::init
@@ -393,6 +419,7 @@ where
 				a_shutdown,
 				d_shutdown,
 				gc_shutdown,
+				p_shutdown,
 				c_shutdown,
 			]),
 			recv_toggle,
