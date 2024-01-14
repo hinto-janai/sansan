@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode},
+	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::{AudioStateSnapshot,Current},
 	valid_data::ValidData,
 	signal::set_index::{SetIndex,SetIndexError},
@@ -17,6 +17,7 @@ impl<Data: ValidData> Kernel<Data> {
 	pub(super) fn set_index(
 		&mut self,
 		set_index: SetIndex,
+		to_gc: &Sender<KernelToGc<Data>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 		to_engine: &Sender<Result<AudioStateSnapshot<Data>, SetIndexError>>,
@@ -35,15 +36,23 @@ impl<Data: ValidData> Kernel<Data> {
 		self.reset_source(to_audio, to_decode, source.clone());
 
 		let play = set_index.play == Some(true);
-		self.atomic_state.playing.store(play, Ordering::Release);
+		if play {
+			self.atomic_state.playing.store(play, Ordering::Release);
+		}
 
 		self.w.add_commit_push(|w, _| {
-			w.playing = play;
-			w.current = Some(Current {
-				source: source.clone(),
-				index: set_index.index,
-				elapsed: 0.0,
-			});
+			if play {
+				w.playing = play;
+			}
+			Self::replace_current(
+				&mut w.current,
+				Some(Current {
+					source: source.clone(),
+					index: set_index.index,
+					elapsed: 0.0,
+				}),
+				to_gc,
+			);
 		});
 
 		try_send!(to_engine, Ok(self.audio_state_snapshot()));

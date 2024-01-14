@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode},
+	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::{AudioStateSnapshot,Current},
 	valid_data::ValidData,
 	signal::skip::{Skip,SkipError},
@@ -18,6 +18,7 @@ impl<Data: ValidData> Kernel<Data> {
 	pub(super) fn skip_inner(
 		&mut self,
 		skip: Skip,
+		to_gc: &Sender<KernelToGc<Data>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 	) {
@@ -78,6 +79,7 @@ impl<Data: ValidData> Kernel<Data> {
 		});
 		// If no `Current`, then we're not `playing` anymore.
 		let playing = current.is_some();
+		self.atomic_state.playing.store(playing, Ordering::Release);
 		let queue_end_clear = self.atomic_state.queue_end_clear.load(Ordering::Acquire);
 		// Set our `Current`.
 		self.w.add_commit_push(|w, _| {
@@ -88,7 +90,9 @@ impl<Data: ValidData> Kernel<Data> {
 			// has ended. We conditionally clear the queue
 			// if the user wants to do so.
 			if !playing && queue_end_clear {
-				w.queue.clear();
+				for source in w.queue.drain(..) {
+					try_send!(to_gc, KernelToGc::Source(source));
+				}
 			}
 		});
 
@@ -102,6 +106,7 @@ impl<Data: ValidData> Kernel<Data> {
 	pub(super) fn skip(
 		&mut self,
 		skip: Skip,
+		to_gc: &Sender<KernelToGc<Data>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 		to_engine: &Sender<Result<AudioStateSnapshot<Data>, SkipError>>
@@ -116,7 +121,7 @@ impl<Data: ValidData> Kernel<Data> {
 			return;
 		}
 
-		self.skip_inner(skip, to_audio, to_decode);
+		self.skip_inner(skip, to_gc, to_audio, to_decode);
 
 		try_send!(to_engine, Ok(self.audio_state_snapshot()));
 	}

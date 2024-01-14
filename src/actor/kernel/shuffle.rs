@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	actor::kernel::{Kernel,KernelToAudio,KernelToDecode},
+	actor::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::{AudioStateSnapshot,Current},
 	valid_data::ValidData,
 	signal::shuffle::Shuffle,
@@ -17,6 +17,7 @@ impl<Data: ValidData> Kernel<Data> {
 	pub(super) fn shuffle(
 		&mut self,
 		shuffle: Shuffle,
+		to_gc: &Sender<KernelToGc<Data>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 		to_engine: &Sender<AudioStateSnapshot<Data>>,
@@ -36,10 +37,8 @@ impl<Data: ValidData> Kernel<Data> {
 
 			self.reset_source(to_audio, to_decode, source.clone());
 
-			let current = Some(Current::new(source));
-
 			self.w.add_commit_push(|w, _| {
-				w.current = current.clone();
+				Self::replace_current(&mut w.current, Some(Current::new(source.clone())), to_gc);
 			});
 
 			try_send!(to_engine, self.audio_state_snapshot());
@@ -53,7 +52,11 @@ impl<Data: ValidData> Kernel<Data> {
 		// [current] to the returned [Source].
 		//
 		// We must forward this [Source] to [Decode].
-		let (_, maybe_source) = self.w.add_commit(move |w, _| {
+		//
+		// INVARIANT: must be [`push_clone()`]
+		// since `Shuffle` is non-deterministic.
+		self.w.push_clone();
+		let (_, maybe_source, _) = self.w.add_commit_push_clone(move |w, _| {
 			use rand::prelude::{Rng,SeedableRng,SliceRandom};
 
 			// Deterministic seed when testing.
@@ -75,13 +78,17 @@ impl<Data: ValidData> Kernel<Data> {
 					queue.shuffle(&mut rng);
 
 					// Return the new 0th `Track` if we had one before.
-					if let Some(c) = w.current.as_mut() {
+					if w.current.is_some() {
 						let source = w.queue[0].clone();
-						*c = Current {
-							source: source.clone(),
-							index: 0,
-							elapsed: 0.0,
-						};
+						Self::replace_current(
+							&mut w.current,
+							Some(Current {
+								source: source.clone(),
+								index: 0,
+								elapsed: 0.0,
+							}),
+							to_gc
+						);
 						Some(source)
 					} else {
 						None
@@ -133,13 +140,17 @@ impl<Data: ValidData> Kernel<Data> {
 				// is now in that index.
 				Shuffle::Full => {
 					queue.shuffle(&mut rng);
-					if let Some(c) = w.current.as_mut() {
-						let source = w.queue[c.index].clone();
-						*c = Current {
+					if let Some(index) = w.current.as_ref().map(|c| c.index) {
+						let source = w.queue[index].clone();
+						Self::replace_current(
+							&mut w.current,
+							Some(Current {
 							source: source.clone(),
-							index: c.index,
+							index,
 							elapsed: 0.0,
-						};
+							}),
+							to_gc,
+						);
 						Some(source)
 					} else {
 						None
@@ -154,9 +165,6 @@ impl<Data: ValidData> Kernel<Data> {
 		if let Some(source) = maybe_source {
 			self.reset_source(to_audio, to_decode, source);
 		}
-		// INVARIANT: must be [`push_clone()`]
-		// since `Shuffle` is non-deterministic.
-		self.w.push_clone();
 
 		try_send!(to_engine, self.audio_state_snapshot());
 	}

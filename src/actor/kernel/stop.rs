@@ -8,6 +8,7 @@ use crate::{
 	macros::try_send,
 };
 use crossbeam::channel::Sender;
+use std::sync::atomic::Ordering;
 
 //----------------------------------------------------------------------------------------------------
 impl<Data: ValidData> Kernel<Data> {
@@ -20,6 +21,8 @@ impl<Data: ValidData> Kernel<Data> {
 			try_send!(to_engine, self.audio_state_snapshot());
 			return;
 		}
+
+		self.atomic_state.playing.store(false, Ordering::Release);
 
 		self.w.add_commit_push(|w, _| {
 			w.queue.clear();

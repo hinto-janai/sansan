@@ -35,6 +35,11 @@ impl<Data: ValidData> Kernel<Data> {
 			Some(self.w.queue[0].clone())
 		};
 
+		// Tell audio/decode to start if we're starting a new source.
+		if let Some(source) = maybe_source.clone() {
+			Self::new_source(to_decode, source);
+		}
+
 		self.atomic_state.playing.store(true, Ordering::Release);
 		try_send!(to_audio, KernelToAudio::StartPlaying);
 
@@ -44,11 +49,6 @@ impl<Data: ValidData> Kernel<Data> {
 				Self::replace_current(&mut w.current, Some(Current::new(source)), to_gc);
 			}
 		});
-
-		// Tell audio/decode to start if we're starting a new source.
-		if let Some(source) = maybe_source {
-			Self::new_source(to_decode, source);
-		}
 
 		try_send!(to_engine, self.audio_state_snapshot());
 	}
