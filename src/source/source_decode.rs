@@ -34,25 +34,25 @@ use crate::state::AudioState;
 // Most of these are the default values, but as `const`.
 
 /// TODO
-const FORMAT_OPTIONS: FormatOptions = FormatOptions {
+pub(crate) const FORMAT_OPTIONS: FormatOptions = FormatOptions {
 	enable_gapless: true,
 	prebuild_seek_index: false,
 	seek_index_fill_rate: 20,
 };
 
 /// TODO
-const METADATA_OPTIONS: MetadataOptions = MetadataOptions {
+pub(crate) const METADATA_OPTIONS: MetadataOptions = MetadataOptions {
 	limit_metadata_bytes: Limit::Default,
 	limit_visual_bytes: Limit::Default,
 };
 
 /// TODO
-const DECODER_OPTIONS: DecoderOptions = DecoderOptions {
+pub(crate) const DECODER_OPTIONS: DecoderOptions = DecoderOptions {
 	verify: false,
 };
 
 /// TODO
-const MEDIA_SOURCE_STREAM_OPTIONS: MediaSourceStreamOptions = MediaSourceStreamOptions {
+pub(crate) const MEDIA_SOURCE_STREAM_OPTIONS: MediaSourceStreamOptions = MediaSourceStreamOptions {
 	buffer_len: 64 * 1024,
 };
 

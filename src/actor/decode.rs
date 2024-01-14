@@ -5,7 +5,7 @@ use std::{thread::JoinHandle, marker::PhantomData};
 use crossbeam::channel::{Receiver, Select, Sender};
 use crate::{
 	signal::{self,SeekError,SeekedTime},
-	source::{Source, SourceDecode},
+	source::{Source, source_decode::SourceDecode},
 	state::AudioState,
 	valid_data::ValidData,
 	actor::{audio::TookAudioBuffer,kernel::KernelToDecode},

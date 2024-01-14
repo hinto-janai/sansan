@@ -3,7 +3,8 @@
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
 	signal::{Volume,Repeat,AtomicVolume,AtomicRepeat},
-	source::{Source,Metadata},
+	source::Source,
+	meta::Metadata,
 	valid_data::ValidData,
 	state::current::Current,
 };

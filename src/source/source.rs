@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	source::Metadata,
+	meta::Metadata,
 	error::SourceError,
 	valid_data::ValidData,
 };

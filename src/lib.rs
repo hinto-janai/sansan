@@ -121,6 +121,7 @@
 	clippy::else_if_without_else,
 	clippy::str_to_string,
 	clippy::branches_sharing_code,
+	clippy::impl_trait_in_params,
 )]
 
 #![cfg_attr(debug_assertions, allow(clippy::todo))]
@@ -145,6 +146,7 @@ pub mod source;
 pub mod config;
 pub mod signal;
 pub mod error;
+pub mod meta;
 
 //---------------------------------------------------------------------------------------------------- Private Usage
 mod actor;

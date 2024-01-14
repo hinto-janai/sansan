@@ -10,7 +10,7 @@ use crate::{
 	state::{AudioState,Current},
 	valid_data::ValidData,
 	macros::{debug2,warn2,try_recv,select_recv},
-	source::SourceDecode,
+	source::source_decode::SourceDecode,
 };
 use crossbeam::channel::{Receiver, Select};
 use symphonia::core::audio::AudioBuffer;
