@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	actor::kernel::Kernel,
+	actor::kernel::{Kernel,KernelToGc},
 	valid_data::ValidData,
 	signal::Clear,
 	state::AudioStateSnapshot,
@@ -16,6 +16,7 @@ impl<Data: ValidData> Kernel<Data> {
 	pub(super) fn clear(
 		&mut self,
 		clear: Clear,
+		to_gc: &Sender<KernelToGc<Data>>,
 		to_engine: &Sender<AudioStateSnapshot<Data>>,
 	) {
 		match clear {
@@ -31,8 +32,14 @@ impl<Data: ValidData> Kernel<Data> {
 
 		self.w.add_commit_push(|w, _| {
 			match clear {
-				Clear::Queue => w.queue.clear(),
-				Clear::Current => w.current = None,
+				Clear::Queue => {
+					for source in w.queue.drain(..) {
+						try_send!(to_gc, KernelToGc::Source(source));
+					}
+				}
+				Clear::Current => {
+					Self::replace_current(&mut w.current, None, to_gc);
+				}
 			}
 		});
 

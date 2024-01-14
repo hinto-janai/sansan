@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode},
+	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::{AudioStateSnapshot,Current},
 	valid_data::ValidData,
 	signal::back::{Back,BackError},
@@ -16,6 +16,7 @@ impl<Data: ValidData> Kernel<Data> {
 	pub(super) fn back(
 		&mut self,
 		back: Back,
+		to_gc: &Sender<KernelToGc<Data>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 		to_engine: &Sender<Result<AudioStateSnapshot<Data>, BackError>>,
@@ -25,7 +26,7 @@ impl<Data: ValidData> Kernel<Data> {
 			return;
 		}
 
-		self.back_inner(back, to_audio, to_decode);
+		self.back_inner(back, to_gc, to_audio, to_decode);
 
 		try_send!(to_engine, Ok(self.audio_state_snapshot()));
 	}
@@ -34,6 +35,7 @@ impl<Data: ValidData> Kernel<Data> {
 	pub(super) fn back_inner(
 		&mut self,
 		back: Back,
+		to_gc: &Sender<KernelToGc<Data>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 	) {
@@ -71,7 +73,7 @@ impl<Data: ValidData> Kernel<Data> {
 		self.reset_source(to_audio, to_decode, source);
 
 		self.w.add_commit_push(|w, _| {
-			w.current = Some(current.clone());
+			Self::replace_current(&mut w.current, Some(current.clone()), to_gc);
 		});
 	}
 }

@@ -416,6 +416,7 @@ where
 			to_decode_error_s:   err_source_k_to_d,
 			from_decode_error_d: err_decode_k_from_d,
 			from_decode_error_s: err_source_k_from_d,
+			to_gc:               k_to_gc,
 			send_audio_state,
 			recv_clear,
 			recv_repeat,
@@ -444,7 +445,6 @@ where
 			shutdown_wait: Arc::clone(&shutdown_wait),
 			w: audio_state_writer,
 			channels,
-			to_gc: k_to_gc,
 		};
 		if let Err(error) = Kernel::<Data>::init(init_args) {
 			return Err(EngineInitError::ThreadSpawn {

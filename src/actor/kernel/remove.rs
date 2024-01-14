@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode},
+	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::{AudioStateSnapshot,Current},
 	valid_data::ValidData,
 	signal::remove::{Remove,RemoveError},
@@ -21,6 +21,7 @@ impl<Data: ValidData> Kernel<Data> {
 	pub(super) fn remove(
 		&mut self,
 		remove: Remove,
+		to_gc: &Sender<KernelToGc<Data>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 		to_engine: &Sender<Result<AudioStateSnapshot<Data>, RemoveError>>,
@@ -34,6 +35,7 @@ impl<Data: ValidData> Kernel<Data> {
 				start_bound: Bound::Included(remove.index),
 				end_bound: Bound::Included(remove.index),
 			},
+			to_gc,
 			to_audio,
 			to_decode,
 			to_engine

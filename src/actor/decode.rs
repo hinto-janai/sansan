@@ -393,7 +393,7 @@ impl<Data: ValidData> Decode<Data> {
 	#[inline]
 	/// Clear our current audio buffer by sending all objects to `Gc`.
 	fn clear_audio_buffer(&mut self, to_gc: &Sender<DecodeToGc>) {
-		while let Some((audio_buffer, _time)) = self.buffer.pop_back() {
+		for (audio_buffer, _time) in self.buffer.drain(..) {
 			try_send!(to_gc, DecodeToGc::AudioBuffer(audio_buffer));
 		}
 	}

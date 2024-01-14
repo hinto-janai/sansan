@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	actor::kernel::{Kernel,KernelToDecode,KernelToAudio},
+	actor::kernel::{Kernel,KernelToDecode,KernelToAudio,KernelToGc},
 	state::{AudioState,AudioStateSnapshot},
 	valid_data::ValidData,
 	macros::try_send,
@@ -16,38 +16,53 @@ impl<Data: ValidData> Kernel<Data> {
 	pub(super) fn restore(
 		&mut self,
 		audio_state: AudioState<Data>,
+		to_gc: &Sender<KernelToGc<Data>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 		to_engine: &Sender<AudioStateSnapshot<Data>>,
 	) {
-		// Update atomic audio state.
-		self.atomic_state.playing.store(audio_state.playing, Ordering::Release);
-		self.atomic_state.repeat.set(audio_state.repeat);
-		self.atomic_state.volume.set(audio_state.volume);
+		// Save atomic state before losing ownership.
+		let atomic_state_repeat  = audio_state.repeat;
+		let atomic_state_volume  = audio_state.volume;
+		let atomic_state_playing = audio_state.playing;
 
-		// This function returns an `Option<Source>` when the restore
+		// Overwrite our state and send the old to `Gc`.
+		let old_audio_state = self.w.overwrite(audio_state);
+		try_send!(to_gc, KernelToGc::AudioState(old_audio_state.data));
+
+		// This scope returns an `Option<Source>` when the restore
 		// operation has made it such that we are setting our [current]
 		// to the returned [Source].
 		//
 		// We must forward this [Source] to [Decode].
-		let (_, maybe_source) = self.w.add_commit(move |w, _| {
-			*w = audio_state.clone();
-
+		let maybe_source = 'scope: {
 			// Continue with sanity checks on `Current`.
-			let Some(current) = w.current.as_mut() else {
+			let Some(current) = self.w.current.as_ref() else {
 				// There was no `Current`, return.
-				return None;
+				break 'scope None;
 			};
 
-			// If the `Current` index doesn't exist in our queue, return.
-			if w.queue.get(current.index).is_none() {
-				w.current = None;
-				return None;
+			// If the `Current` index doesn't exist in our queue,
+			// fix the `Current` and return.
+			if self.w.queue.get(current.index).is_none() {
+				self.w.add_commit_push(|w, _| {
+					Self::replace_current(&mut w.current, None, to_gc);
+				});
+				break 'scope None;
 			}
 
 			Some(current.source.clone())
-		});
-		self.w.push_clone();
+		};
+
+		// Update atomic audio state.
+		self.atomic_state.repeat.set(atomic_state_repeat);
+		self.atomic_state.volume.set(atomic_state_volume);
+		if self.current_is_some() {
+			self.atomic_state.playing.store(atomic_state_playing, Ordering::Release);
+		} else {
+			// We can't be playing if there is no `Current`.
+			self.atomic_state.playing.store(false, Ordering::Release);
+		}
 
 		if let Some(source) = maybe_source {
 			Self::new_source(to_decode, source);

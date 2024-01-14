@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode},
+	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::{AudioStateSnapshot,Current},
 	valid_data::ValidData,
 	signal::remove::RemoveError,
@@ -26,6 +26,7 @@ impl<Data: ValidData> Kernel<Data> {
 	pub(super) fn remove_range(
 		&mut self,
 		remove_range: RemoveRange,
+		to_gc: &Sender<KernelToGc<Data>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 		to_engine: &Sender<Result<AudioStateSnapshot<Data>, RemoveError>>
@@ -173,16 +174,25 @@ impl<Data: ValidData> Kernel<Data> {
 		self.w.add_commit_push(|w, _| {
 			// INVARIANT: we check above this index
 			// exists, this should never panic.
-			w.queue.drain(start..=end);
+			for source in w.queue.drain(start..=end) {
+				try_send!(to_gc, KernelToGc::Source(source));
+			}
 
 			if let Some(index) = maybe_source_index {
 				// There was a _new_ `Source` to play.
 				if index_wiped {
-					w.current = Some(Current {
-						source: w.queue[index].clone(),
-						index,
-						elapsed: 0.0
-					});
+					if let Some(current) = w.current.take() {
+						try_send!(to_gc, KernelToGc::Source(current.source));
+					}
+					Self::replace_current(
+						&mut w.current,
+						Some(Current {
+							source: w.queue[index].clone(),
+							index,
+							elapsed: 0.0
+						}),
+						to_gc
+					);
 				} else {
 					// INVARIANT: we know at this point our `current` is `Some`.
 					//
@@ -191,7 +201,7 @@ impl<Data: ValidData> Kernel<Data> {
 					w.current.as_mut().unwrap().index = index;
 				}
 			} else {
-				w.current = None;
+				Self::replace_current(&mut w.current, None, to_gc);
 				w.playing = false;
 			}
 		});

@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	actor::kernel::{Kernel,KernelToAudio,KernelToDecode},
+	actor::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::{AudioStateSnapshot, Current},
 	valid_data::ValidData,
 	macros::try_send,
@@ -15,6 +15,7 @@ impl<Data: ValidData> Kernel<Data> {
 	/// TODO
 	pub(super) fn play(
 		&mut self,
+		to_gc: &Sender<KernelToGc<Data>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 		to_engine: &Sender<AudioStateSnapshot<Data>>,
@@ -40,7 +41,7 @@ impl<Data: ValidData> Kernel<Data> {
 		self.w.add_commit_push(|w, _| {
 			w.playing = true;
 			if let Some(source) = maybe_source.clone() {
-				w.current = Some(Current::new(source));
+				Self::replace_current(&mut w.current, Some(Current::new(source)), to_gc);
 			}
 		});
 

@@ -68,7 +68,6 @@ pub(crate) struct Kernel<Data: ValidData> {
 	/// accessed a lot, so it is just [w], for [w]riter.
 	pub(super) w:               someday::Writer<AudioState<Data>>,
 	pub(super) shutdown_wait:   Arc<Barrier>,
-	pub(super) to_gc:           Sender<AudioState<Data>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Msg
@@ -94,6 +93,14 @@ pub(crate) enum KernelToAudio {
 	StartPlaying,
 	/// Discard all of your current audio buffers.
 	DiscardCurrentAudio,
+}
+
+/// TODO
+pub(crate) enum KernelToGc<Data: ValidData> {
+	/// TODO
+	Source(Source<Data>),
+	/// TODO
+	AudioState(AudioState<Data>),
 }
 
 //---------------------------------------------------------------------------------------------------- Recv
@@ -132,6 +139,9 @@ pub(crate) struct Channels<Data: ValidData> {
 	pub(crate) from_decode_error_d: Receiver<DecodeError>,
 	pub(crate) to_decode_error_s:   Option<(Sender<()>, ErrorCallback)>,
 	pub(crate) from_decode_error_s: Receiver<SourceError>,
+
+	// [Gc]
+	pub(crate) to_gc: Sender<KernelToGc<Data>>,
 
 	// Shared common return channel for signals that don't have special output.
 	pub(crate) send_audio_state: Sender<AudioStateSnapshot<Data>>,
@@ -176,7 +186,6 @@ pub(crate) struct InitArgs<Data: ValidData> {
 	pub(crate) shutdown_wait: Arc<Barrier>,
 	pub(crate) w:             someday::Writer<AudioState<Data>>,
 	pub(crate) channels:      Channels<Data>,
-	pub(crate) to_gc:         Sender<AudioState<Data>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Kernel Impl
@@ -198,14 +207,12 @@ where
 					shutdown_wait,
 					w,
 					channels,
-					to_gc,
 				} = args;
 
 				let this = Self {
 					atomic_state,
 					w,
 					shutdown_wait,
-					to_gc,
 				};
 
 				if let Some(init_barrier) = init_barrier {
@@ -281,25 +288,25 @@ where
 				},
 
 				// Signals.
-				1  =>                  { select_recv!(c.recv_toggle); self.toggle(&c.to_audio, &c.to_decode, &c.send_audio_state) },
-				2  =>                  { select_recv!(c.recv_play); self.play(&c.to_audio, &c.to_decode, &c.send_audio_state) },
+				1  =>                  { select_recv!(c.recv_toggle); self.toggle(&c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state) },
+				2  =>                  { select_recv!(c.recv_play); self.play(&c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state) },
 				3  =>                  { select_recv!(c.recv_pause); self.pause(&c.send_audio_state) },
 				4  =>                  { select_recv!(c.recv_stop); self.stop(&c.send_audio_state) },
 				5  =>                  { select_recv!(c.recv_next); self.next(&c.to_audio, &c.to_decode, &c.send_audio_state) },
-				6  =>                  { select_recv!(c.recv_previous); self.previous(&c.to_audio, &c.to_decode, &c.send_audio_state) },
-				7  => self.clear       ( select_recv!(c.recv_clear), &c.send_audio_state),
+				6  =>                  { select_recv!(c.recv_previous); self.previous(&c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state) },
+				7  => self.clear       ( select_recv!(c.recv_clear), &c.to_gc, &c.send_audio_state),
 				8  => self.shuffle     ( select_recv!(c.recv_shuffle), &c.to_audio, &c.to_decode, &c.send_audio_state),
 				9  => self.repeat      ( select_recv!(c.recv_repeat), &c.send_audio_state),
 				10 => self.volume      ( select_recv!(c.recv_volume), &c.send_audio_state),
-				11 => self.restore     ( select_recv!(c.recv_restore), &c.to_audio, &c.to_decode, &c.send_audio_state),
-				12 => self.add         ( select_recv!(c.recv_add), &c.to_audio, &c.to_decode, &c.send_audio_state),
-				13 => self.add_many    ( select_recv!(c.recv_add_many), &c.to_audio, &c.to_decode, &c.send_audio_state),
+				11 => self.restore     ( select_recv!(c.recv_restore), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state),
+				12 => self.add         ( select_recv!(c.recv_add), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state),
+				13 => self.add_many    ( select_recv!(c.recv_add_many), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state),
 				14 => self.seek        ( select_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),
 				15 => self.skip        ( select_recv!(c.recv_skip), &c.to_audio, &c.to_decode, &c.send_skip),
-				16 => self.back        ( select_recv!(c.recv_back), &c.to_audio, &c.to_decode, &c.send_back),
+				16 => self.back        ( select_recv!(c.recv_back), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_back),
 				17 => self.set_index   ( select_recv!(c.recv_set_index), &c.to_audio, &c.to_decode, &c.send_set_index),
-				18 => self.remove      ( select_recv!(c.recv_remove), &c.to_audio, &c.to_decode, &c.send_remove),
-				19 => self.remove_range( select_recv!(c.recv_remove_range), &c.to_audio, &c.to_decode, &c.send_remove_range),
+				18 => self.remove      ( select_recv!(c.recv_remove), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_remove),
+				19 => self.remove_range( select_recv!(c.recv_remove_range), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_remove_range),
 
 				// Errors.
 				20 => self.handle_error(select_recv!(c.from_audio_error).into(), c.to_audio_error.as_mut()),
@@ -450,6 +457,20 @@ where
 	/// TODO
 	pub(super) fn audio_state_snapshot(&self) -> AudioStateSnapshot<Data> {
 		AudioStateSnapshot(self.w.head_remote_ref())
+	}
+
+	#[inline]
+	/// Replace the `AudioState`'s `Current` without dropping
+	/// the `Source` in-scope, but instead sending it to `Gc`.
+	pub(super) fn replace_current(
+		current: &mut Option<Current<Data>>,
+		new_current: Option<Current<Data>>,
+		to_gc: &Sender<KernelToGc<Data>>
+	) {
+		let old_current = std::mem::replace(current, new_current);
+		if let Some(current) = old_current {
+			try_send!(to_gc, KernelToGc::Source(current.source));
+		}
 	}
 }
 

@@ -6,6 +6,7 @@ use std::{
 	thread::JoinHandle, marker::PhantomData,
 };
 use crate::{
+	actor::kernel::KernelToGc,
 	actor::decode::DecodeToGc,
 	state::{AudioState,Current},
 	valid_data::ValidData,
@@ -23,7 +24,7 @@ pub(crate) struct Gc<Data: ValidData> {
 	pub(crate) shutdown:      Receiver<()>,
 	pub(crate) from_audio:    Receiver<AudioBuffer<f32>>,
 	pub(crate) from_decode:   Receiver<DecodeToGc>,
-	pub(crate) from_kernel:   Receiver<AudioState<Data>>,
+	pub(crate) from_kernel:   Receiver<KernelToGc<Data>>,
 }
 
 //---------------------------------------------------------------------------------------------------- InitArgs

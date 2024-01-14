@@ -7,6 +7,7 @@ pub(crate) use kernel::{
 	Channels,
 	InitArgs,
 	KernelToDecode,
+	KernelToGc,
 };
 
 // Signal handlers.

@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode},
+	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::{AudioStateSnapshot,Current},
 	valid_data::ValidData,
 	signal::add::{AddMany,AddMethod},
@@ -22,6 +22,7 @@ impl<Data: ValidData> Kernel<Data> {
 	pub(super) fn add_many(
 		&mut self,
 		add_many: AddMany<Data>,
+		to_gc: &Sender<KernelToGc<Data>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Data>>,
 		to_engine: &Sender<AudioStateSnapshot<Data>>
@@ -126,7 +127,9 @@ impl<Data: ValidData> Kernel<Data> {
 		self.w.add_commit_push(|w, _| {
 			// Clear before-hand.
 			if add_many.clear {
-				w.queue.clear();
+				for source in w.queue.drain(..) {
+					try_send!(to_gc, KernelToGc::Source(source));
+				}
 			}
 
 			// Set state.
@@ -136,7 +139,7 @@ impl<Data: ValidData> Kernel<Data> {
 
 			// New `Source`, we must reset our `Current`.
 			if let Some(source) = maybe_source.clone() {
-				w.current = Some(Current::new(source));
+				Self::replace_current(&mut w.current, Some(Current::new(source)), to_gc);
 			} else if let Some(index) = maybe_index {
 				// INVARIANT: if we have a new index
 				// to update with, it means we have
