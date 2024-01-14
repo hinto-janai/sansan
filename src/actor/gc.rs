@@ -7,7 +7,6 @@ use std::{
 };
 use crate::{
 	actor::decode::DecodeToGc,
-	actor::pool::PoolToGc,
 	state::{AudioState,Current},
 	valid_data::ValidData,
 	macros::{debug2,warn2,try_recv,select_recv},
@@ -25,7 +24,6 @@ pub(crate) struct Gc<Data: ValidData> {
 	pub(crate) from_audio:    Receiver<AudioBuffer<f32>>,
 	pub(crate) from_decode:   Receiver<DecodeToGc>,
 	pub(crate) from_kernel:   Receiver<AudioState<Data>>,
-	pub(crate) from_pool:     Receiver<PoolToGc<Data>>,
 }
 
 //---------------------------------------------------------------------------------------------------- InitArgs
@@ -65,9 +63,8 @@ impl<Data: ValidData> Gc<Data> {
 
 		assert_eq!(0, select.recv(&self.from_audio));
 		assert_eq!(1, select.recv(&self.from_decode));
-		assert_eq!(2, select.recv(&self.from_pool));
-		assert_eq!(3, select.recv(&self.from_kernel));
-		assert_eq!(4, select.recv(&self.shutdown));
+		assert_eq!(2, select.recv(&self.from_kernel));
+		assert_eq!(3, select.recv(&self.shutdown));
 
 		// Reduce [Gc] to the lowest thread priority.
 		lpt::lpt();
@@ -77,9 +74,8 @@ impl<Data: ValidData> Gc<Data> {
 			match select.ready() {
 				0 => drop(select_recv!(self.from_audio)),
 				1 => drop(select_recv!(self.from_decode)),
-				2 => drop(select_recv!(self.from_pool)),
-				3 => drop(select_recv!(self.from_kernel)),
-				4 => {
+				2 => drop(select_recv!(self.from_kernel)),
+				3 => {
 					select_recv!(self.shutdown);
 					debug2!("Gc - shutting down");
 					debug2!("Gc - waiting on others...");

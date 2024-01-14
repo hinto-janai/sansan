@@ -19,7 +19,6 @@ use crate::{
 		audio::{Audio,AUDIO_BUFFER_LEN},
 		decode::Decode,
 		kernel::Kernel,
-		pool::Pool,
 		gc::Gc,
 		caller::Caller,
 	},
