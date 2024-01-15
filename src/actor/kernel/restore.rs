@@ -45,14 +45,19 @@ impl<Data: ValidData> Kernel<Data> {
 			// If the `Current` index doesn't exist in our queue,
 			// fix the `Current` and return.
 			if self.w.queue.get(current.index).is_none() {
-				self.w.add_commit_push(|w, _| {
-					Self::replace_current(&mut w.current, None, to_gc);
-				});
 				break 'scope None;
 			}
 
 			Some(current.source.clone())
 		};
+
+		if maybe_source.is_some() {
+			self.w.push();
+		} else {
+			self.w.add_commit_push(|w, _| {
+				Self::replace_current(&mut w.current, None, to_gc);
+			});
+		}
 
 		// Update atomic audio state.
 		self.atomic_state.repeat.set(atomic_state_repeat);

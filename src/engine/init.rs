@@ -48,7 +48,7 @@ use crate::resampler::ResamplerStruct;
 /// [6] Gc (Garbage Collector)
 ///
 /// TODO: finalize all actors
-const ACTOR_COUNT: usize = 7;
+const ACTOR_COUNT: usize = 6;
 
 //---------------------------------------------------------------------------------------------------- Engine Impl
 impl<Data> Engine<Data>

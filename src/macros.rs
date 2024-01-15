@@ -106,8 +106,8 @@ macro_rules! trace2 {
     ($($arg:tt)+) => {{
         #[cfg(feature = "log")]
         ::log::trace!($($arg)+);
-        #[cfg(test)]
-        ::std::println!("TRACE | {}", ::std::format_args!($($arg)+));
+        // #[cfg(test)]
+        // ::std::println!("TRACE | {}", ::std::format_args!($($arg)+));
     }};
 }
 pub(crate) use trace2;

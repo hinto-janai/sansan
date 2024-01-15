@@ -295,7 +295,11 @@ impl<R: Resampler> AudioOutput for DummyAudioOutput<R> {
 			}
 
 			// Hang until we're "playing".
-			play_recv.recv().unwrap();
+			if play_recv.recv().is_err() {
+				// Exit thread if channel is disconnected,
+				// it means the `Engine` was dropped.
+				return;
+			}
 		});
 
 		// Ok, we have an audio stream,
