@@ -14,7 +14,7 @@ macro_rules! generate_docs {
 }
 
 cfg_if::cfg_if! {
-	if #[cfg(feature = "log")] {
+	if #[cfg(any(test, feature = "log"))] {
 		generate_docs! {
 			pub trait ValidData: Clone + Debug + Send + Sync + 'static {}
 			impl<T> ValidData for T
