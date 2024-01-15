@@ -243,6 +243,8 @@ mod tests {
 			assert_eq!(a.repeat,          Repeat::Off);
 			assert_eq!(a.volume,          Volume::DEFAULT);
 			assert_eq!(a.current.as_ref().unwrap().index, index);
+			assert!(a.playing);
+			assert!(engine.atomic_state().playing.load(Ordering::Acquire));
 		}
 
 		// Test comment notation for below.
@@ -260,8 +262,6 @@ mod tests {
 		//                           [0]
 		//                            v
 		assert(engine, add_many, 0, &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
-		assert!(reader.get().playing);
-		assert!(engine.atomic_state().playing.load(Ordering::Acquire));
 
 		//---------------------------------- Insert in the front.
 		let add_many = AddMany {
@@ -272,8 +272,6 @@ mod tests {
 		};
 		//                            v          [3]
 		assert(engine, add_many, 3, &[10, 20, 30, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
-		assert!(reader.get().playing);
-		assert!(engine.atomic_state().playing.load(Ordering::Acquire));
 
 		//---------------------------------- Insert in the middle.
 		let add_many = AddMany {

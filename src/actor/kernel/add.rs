@@ -32,6 +32,7 @@ impl<Data: ValidData> Kernel<Data> {
 mod tests {
 	use super::*;
 	use pretty_assertions::assert_eq;
+	use std::sync::atomic::Ordering;
 	use crate::{
 		engine::Engine,
 		signal::{repeat::Repeat,volume::Volume,add::AddMany},
@@ -42,7 +43,10 @@ mod tests {
 		let mut e = crate::tests::init();
 		let sources = crate::tests::sources();
 		let engine = &mut e;
-		assert!(engine.reader().get().queue.is_empty());
+		let reader = engine.reader();
+		assert!(reader.get().queue.is_empty());
+		assert!(!reader.get().playing);
+		assert!(!engine.atomic_state().playing.load(Ordering::Acquire));
 
 		// Testing function used after each operation.
 		fn assert(
@@ -77,6 +81,8 @@ mod tests {
 			assert_eq!(a.repeat,          Repeat::Off);
 			assert_eq!(a.volume,          Volume::DEFAULT);
 			assert_eq!(a.current.as_ref().unwrap().index, index);
+			assert!(a.playing);
+			assert!(engine.atomic_state().playing.load(Ordering::Acquire));
 		}
 
 		//---------------------------------- Set up state.

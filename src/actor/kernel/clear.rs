@@ -9,6 +9,7 @@ use crate::{
 	macros::try_send,
 };
 use crossbeam::channel::Sender;
+use std::sync::atomic::Ordering;
 
 //----------------------------------------------------------------------------------------------------
 impl<Data: ValidData> Kernel<Data> {
@@ -30,12 +31,16 @@ impl<Data: ValidData> Kernel<Data> {
 			},
 		}
 
+		// Both methods clear the `Current`, so we stop playing.
+		self.atomic_state.playing.store(false, Ordering::Release);
+
 		self.w.add_commit_push(|w, _| {
 			match clear {
 				Clear::Queue => {
 					for source in w.queue.drain(..) {
 						try_send!(to_gc, KernelToGc::Source(source));
 					}
+					Self::replace_current(&mut w.current, None, to_gc);
 				}
 				Clear::Current => {
 					Self::replace_current(&mut w.current, None, to_gc);
