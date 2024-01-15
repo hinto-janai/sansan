@@ -68,7 +68,7 @@ macro_rules! impl_atomic_f {
             /// Representation of `1.0` as bits, can be inputted into [`Self::from_bits`].
             pub(crate) const BITS_1: $unsigned = $bits_1;
             /// Representation of `3.0` as bits, can be inputted into [`Self::from_bits`].
-            pub(crate) const BITS_3: $unsigned = $bits_1;
+            pub(crate) const BITS_3: $unsigned = $bits_3;
             /// `Self` with `0.0` as the inner float.
             pub(crate) const SELF_0: Self = Self($atomic_unsigned::new($bits_0));
             /// `Self` with `0.25` as the inner float.
