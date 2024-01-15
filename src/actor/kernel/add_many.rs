@@ -208,6 +208,7 @@ mod tests {
 		let engine = &mut e;
 		let reader = engine.reader();
 		assert!(reader.get().queue.is_empty());
+		assert!(!engine.atomic_state().playing.load(Ordering::Acquire));
 
 		// Testing function used after each operation.
 		fn assert(
@@ -259,6 +260,8 @@ mod tests {
 		//                           [0]
 		//                            v
 		assert(engine, add_many, 0, &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+		assert!(reader.get().playing);
+		assert!(engine.atomic_state().playing.load(Ordering::Acquire));
 
 		//---------------------------------- Insert in the front.
 		let add_many = AddMany {
@@ -269,6 +272,8 @@ mod tests {
 		};
 		//                            v          [3]
 		assert(engine, add_many, 3, &[10, 20, 30, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+		assert!(reader.get().playing);
+		assert!(engine.atomic_state().playing.load(Ordering::Acquire));
 
 		//---------------------------------- Insert in the middle.
 		let add_many = AddMany {
