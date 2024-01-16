@@ -31,7 +31,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 #[cfg(test)]
 mod tests {
 	use crate::signal::SetIndex;
-	use crate::state::AudioState;
+	use crate::state::{AudioState,Current};
 	use pretty_assertions::assert_eq;
 
 	#[test]
@@ -60,19 +60,26 @@ mod tests {
 		assert_eq!(resp.current.as_ref(), None);
 		assert_eq!(resp.playing, false);
 
-		//---------------------------------- No `Current`, early return
+		//---------------------------------- No `Current`, set to 1st queue element.
 		let resp = engine.toggle();
-		assert_eq!(resp.playing, false);
+		assert_eq!(
+			resp.current.as_ref().unwrap(),
+			&Current {
+				source: crate::tests::source(0),
+				index: 0,
+				elapsed: 0.0,
+			}
+		);
+		assert_eq!(resp.playing, true);
 
 		//---------------------------------- Set `Current`
-		let resp = engine.set_index(SetIndex { index: 0, play: None }).unwrap();
-		assert_eq!(resp.current.as_ref().unwrap().index, 0);
-		assert_eq!(resp.playing, false);
+		let resp = engine.set_index(SetIndex { index: 5, play: None }).unwrap();
+		assert_eq!(resp.current.as_ref().unwrap().index, 5);
 
 		//---------------------------------- Toggle
 		let resp = engine.toggle();
-		assert_eq!(resp.playing, true);
-		let resp = engine.toggle();
 		assert_eq!(resp.playing, false);
+		let resp = engine.toggle();
+		assert_eq!(resp.playing, true);
 	}
 }
