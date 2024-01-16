@@ -5,7 +5,7 @@ use crate::{
 	signal::{Volume,Repeat,AtomicVolume,AtomicRepeat},
 	source::Source,
 	meta::Metadata,
-	valid_data::ValidData,
+	valid_data::ExtraData,
 };
 use someday::{Reader, Commit, CommitRef};
 use std::{
@@ -22,7 +22,7 @@ use std::{
 #[derive(Clone,Debug,PartialEq)]
 pub struct Current<Data>
 where
-	Data: ValidData
+	Data: ExtraData
 {
 	/// TODO
 	pub source: Source<Data>,
@@ -34,7 +34,7 @@ where
 
 impl<Data> Current<Data>
 where
-	Data: ValidData
+	Data: ExtraData
 {
 	/// Returns an `Option<Current>` with:
 	/// - a new `Source`

@@ -4,7 +4,7 @@
 use crate::{
 	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::{AudioStateSnapshot,Current},
-	valid_data::ValidData,
+	valid_data::ExtraData,
 	signal::remove::{Remove,RemoveError},
 	signal::remove_range::RemoveRange,
 	macros::try_send,
@@ -16,7 +16,7 @@ use std::{
 };
 
 //----------------------------------------------------------------------------------------------------
-impl<Data: ValidData> Kernel<Data> {
+impl<Data: ExtraData> Kernel<Data> {
 	/// TODO
 	pub(super) fn remove(
 		&mut self,

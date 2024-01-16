@@ -4,7 +4,7 @@
 use crate::{
 	meta::Metadata,
 	error::SourceError,
-	valid_data::ValidData,
+	valid_data::ExtraData,
 };
 use std::{
 	time::Duration,
@@ -40,11 +40,11 @@ use crate::state::AudioStateReader;
 /// the [`AudioState`] queue.
 ///
 /// TODO
-pub struct Source<Data: ValidData>(pub(super) SourceInner<Data>);
+pub struct Source<Data: ExtraData>(pub(super) SourceInner<Data>);
 
 impl<Data> Source<Data>
 where
-	Data: ValidData
+	Data: ExtraData
 {
 	#[inline]
 	/// TODO
@@ -117,19 +117,19 @@ macro_rules! impl_from {
 		)*
 	) => {
 		$(
-			impl<Data: ValidData> From<($($input)+, Data, Metadata)> for Source<Data> {
+			impl<Data: ExtraData> From<($($input)+, Data, Metadata)> for Source<Data> {
 				fn from(from: ($($input)+, Data, Metadata)) -> Self {
 					let ($source, source1, source2) = from;
 					Self(SourceInner::$enum(($map, source1, source2)))
 				}
 			}
-			impl<Data: ValidData> From<($($input)+, Data)> for Source<Data> {
+			impl<Data: ExtraData> From<($($input)+, Data)> for Source<Data> {
 				fn from(from: ($($input)+, Data)) -> Self {
 					let ($source, source1) = from;
 					Self(SourceInner::$enum(($map, source1, Metadata::DEFAULT)))
 				}
 			}
-			impl<Data: ValidData + Default> From<$($input)+> for Source<Data> {
+			impl<Data: ExtraData + Default> From<$($input)+> for Source<Data> {
 				fn from($source: $($input)+) -> Self {
 					Self(SourceInner::$enum(($map, Data::default(), Metadata::DEFAULT)))
 				}
@@ -161,7 +161,7 @@ impl_from! { |source|
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,PartialEq,PartialOrd)]
 /// TODO
-pub(crate) enum SourceInner<Data: ValidData> {
+pub(crate) enum SourceInner<Data: ExtraData> {
 	/// TODO
 	ArcPath((Arc<Path>, Data, Metadata)),
 	/// TODO
@@ -172,7 +172,7 @@ pub(crate) enum SourceInner<Data: ValidData> {
 	CowByte((Cow<'static, [u8]>, Data, Metadata)),
 }
 
-impl<Data: ValidData + Debug> Debug for SourceInner<Data> {
+impl<Data: ExtraData + Debug> Debug for SourceInner<Data> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::ArcPath((path, data, metadata)) => {

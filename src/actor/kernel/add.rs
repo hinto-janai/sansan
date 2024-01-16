@@ -4,14 +4,14 @@
 use crate::{
 	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::AudioStateSnapshot,
-	valid_data::ValidData,
+	valid_data::ExtraData,
 	signal::{add::{Add,AddMethod}, AddMany},
 	macros::try_send, source::Sources,
 };
 use crossbeam::channel::{Sender,Receiver};
 
 //----------------------------------------------------------------------------------------------------
-impl<Data: ValidData> Kernel<Data> {
+impl<Data: ExtraData> Kernel<Data> {
 	/// TODO
 	pub(super) fn add(
 		&mut self,

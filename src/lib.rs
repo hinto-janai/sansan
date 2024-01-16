@@ -1,7 +1,6 @@
 //! Real-time music engine.
 //!
-//! This is the API reference for [`sansan`](https://github.com/hinto-janai/sansan),
-//! meant to solely document inputs/outputs and other note-worthy things.
+//! This is the API reference for [`sansan`](https://github.com/hinto-janai/sansan).
 //!
 //! See [`sansan.cat`](https://sansan.cat) for a user-guide and
 //! [`examples/`](https://github.com/hinto-janai/sansan/tree/main/examples)
@@ -139,7 +138,7 @@ mod engine;
 pub use engine::Engine;
 
 mod valid_data;
-pub use valid_data::ValidData;
+pub use valid_data::ExtraData;
 
 pub mod state;
 pub mod source;

@@ -19,7 +19,7 @@ pub(crate) struct Next {
 // // must clean the audio state up, and tell everyone else.
 // //
 // // `Some(Source)` means there is a new source to play.
-// impl<Data: ValidData> ApplyReturn<Signal<Data>, Next, Option<Source<Data>>> for AudioState<Data> {
+// impl<Data: ExtraData> ApplyReturn<Signal<Data>, Next, Option<Source<Data>>> for AudioState<Data> {
 // 	fn apply_return(s: &mut Next, w: &mut Self, _: &Self) -> Option<Source<Data>> {
 // 		// INVARIANT:
 // 		// [Kernel] only checks that

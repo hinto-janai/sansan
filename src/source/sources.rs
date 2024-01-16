@@ -4,7 +4,7 @@
 use crate::{
 	source::Source,
 	error::SourceError,
-	valid_data::ValidData,
+	valid_data::ExtraData,
 };
 use std::{
 	time::Duration,
@@ -34,11 +34,11 @@ use crate::state::AudioState;
 /// TODO
 pub struct Sources<Data>(SourcesInner<Data>)
 where
-	Data: ValidData;
+	Data: ExtraData;
 
 impl<Data> Sources<Data>
 where
-	Data: ValidData,
+	Data: ExtraData,
 {
 	/// TODO
 	pub fn as_slice(&self) -> &[Source<Data>] {
@@ -184,7 +184,7 @@ where
 	pub const fn from_32(source: [Source<Data>; 32]) -> Self { Self(SourcesInner::Array32(source)) }
 }
 
-impl<'a, Data: ValidData> IntoIterator for &'a Sources<Data> {
+impl<'a, Data: ExtraData> IntoIterator for &'a Sources<Data> {
 	type Item = &'a Source<Data>;
 	type IntoIter = std::slice::Iter<'a, Source<Data>>;
 	fn into_iter(self) -> Self::IntoIter {
@@ -193,7 +193,7 @@ impl<'a, Data: ValidData> IntoIterator for &'a Sources<Data> {
 }
 
 /// From 1 Source.
-impl<Data: ValidData> From<Source<Data>> for Sources<Data> {
+impl<Data: ExtraData> From<Source<Data>> for Sources<Data> {
 	fn from(value: Source<Data>) -> Self {
 		Self::from_1(value)
 	}
@@ -207,7 +207,7 @@ macro_rules! impl_from_array {
 		$(,)?
 	)*) => {
 		$(
-			impl<Data: ValidData> From<[Source<Data>; $array_len]> for Sources<Data> {
+			impl<Data: ExtraData> From<[Source<Data>; $array_len]> for Sources<Data> {
 				fn from(value: [Source<Data>; $array_len]) -> Self {
 					Self::$constructor(value)
 				}
@@ -252,7 +252,7 @@ impl_from_array! {
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug,Clone,PartialEq,PartialOrd)]
 /// TODO
-pub(crate) enum SourcesInner<Data: ValidData> {
+pub(crate) enum SourcesInner<Data: ExtraData> {
 	/// TODO
 	One(Source<Data>),
 	/// TODO

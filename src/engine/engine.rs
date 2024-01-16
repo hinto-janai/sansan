@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	valid_data::ValidData,
+	valid_data::ExtraData,
 	macros::{recv,try_send,debug2,info2},
 	state::{
 		AudioStateSnapshot,
@@ -54,7 +54,7 @@ use crate::resampler::ResamplerStruct;
 #[derive(Debug)]
 pub struct Engine<Data>
 where
-	Data: ValidData,
+	Data: ExtraData,
 {
 	/// Data and objects.
 	pub(super) reader: AudioStateReader<Data>,

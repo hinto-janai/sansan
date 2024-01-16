@@ -6,7 +6,7 @@ use crate::{
 	config::InitConfig,
 	source::{Source,Sources},
 	state::{AudioState,Current,AtomicState},
-	valid_data::ValidData,
+	valid_data::ExtraData,
 };
 
 //---------------------------------------------------------------------------------------------------- Test Init Helpers

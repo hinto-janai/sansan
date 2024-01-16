@@ -6,7 +6,7 @@ use crossbeam::channel::{Sender, Receiver, Select};
 use rand::SeedableRng;
 use crate::{
 	macros::{send,recv,try_recv,try_send,debug2,select_recv, trace2},
-	valid_data::ValidData,
+	valid_data::ExtraData,
 	state::{
 		AudioState,
 		AtomicState,
@@ -60,7 +60,7 @@ use strum::EnumCount;
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
 #[derive(Debug)]
-pub(crate) struct Kernel<Data: ValidData> {
+pub(crate) struct Kernel<Data: ExtraData> {
 	pub(super) atomic_state: Arc<AtomicState>,
 	/// The [W]riter half of the [Engine]'s [`AudioState`].
 	///
@@ -75,7 +75,7 @@ pub(crate) struct Kernel<Data: ValidData> {
 // send to the other actors.
 
 /// TODO
-pub(crate) enum KernelToDecode<Data: ValidData> {
+pub(crate) enum KernelToDecode<Data: ExtraData> {
 	/// Convert this [Source] into a real
 	/// [SourceDecode] and start decoding it.
 	NewSource(Source<Data>),
@@ -96,7 +96,7 @@ pub(crate) enum KernelToAudio {
 }
 
 /// TODO
-pub(crate) enum KernelToGc<Data: ValidData> {
+pub(crate) enum KernelToGc<Data: ExtraData> {
 	/// TODO
 	Source(Source<Data>),
 	/// TODO
@@ -116,7 +116,7 @@ pub(crate) enum KernelToGc<Data: ValidData> {
 /// receive channels are in this one-off [Recv] instead of within
 /// [Kernel] as fields.
 #[allow(clippy::missing_docs_in_private_items)]
-pub(crate) struct Channels<Data: ValidData> {
+pub(crate) struct Channels<Data: ExtraData> {
 	// Shutdown signal.
 	pub(crate) shutdown: Receiver<()>,
 	pub(crate) shutdown_hang: Receiver<()>,
@@ -180,7 +180,7 @@ pub(crate) struct Channels<Data: ValidData> {
 
 //---------------------------------------------------------------------------------------------------- Kernel Impl
 #[allow(clippy::missing_docs_in_private_items)]
-pub(crate) struct InitArgs<Data: ValidData> {
+pub(crate) struct InitArgs<Data: ExtraData> {
 	pub(crate) init_barrier:  Option<Arc<Barrier>>,
 	pub(crate) atomic_state:  Arc<AtomicState>,
 	pub(crate) shutdown_wait: Arc<Barrier>,
@@ -191,7 +191,7 @@ pub(crate) struct InitArgs<Data: ValidData> {
 //---------------------------------------------------------------------------------------------------- Kernel Impl
 impl<Data> Kernel<Data>
 where
-	Data: ValidData
+	Data: ExtraData
 {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]

@@ -3,7 +3,7 @@
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
 	engine::{Engine, error::EngineInitError},
-	valid_data::ValidData,
+	valid_data::ExtraData,
 	macros::{try_send,debug2,info2},
 	state::{
 		AudioStateReader,
@@ -53,7 +53,7 @@ const ACTOR_COUNT: usize = 6;
 //---------------------------------------------------------------------------------------------------- Engine Impl
 impl<Data> Engine<Data>
 where
-	Data: ValidData,
+	Data: ExtraData,
 {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]

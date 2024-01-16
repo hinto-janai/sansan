@@ -1,4 +1,4 @@
-//! Audio signals to send to the [`Engine`].
+//! Signals to send to the [`Engine`].
 
 #[allow(unused_imports)] // docs
 use crate::Engine;

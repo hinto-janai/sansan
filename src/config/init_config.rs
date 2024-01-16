@@ -7,7 +7,7 @@ use crate::{
 	config::{Callbacks,LiveConfig},
 	engine::Engine,
 	state::AudioState,
-	valid_data::ValidData,
+	valid_data::ExtraData,
 };
 use strum::{
 	AsRefStr,
@@ -26,7 +26,7 @@ use strum::{
 /// TODO
 pub struct InitConfig<Data>
 where
-	Data: ValidData,
+	Data: ExtraData,
 {
 	//------------------------------------------ Engine
 	/// TODO
@@ -50,7 +50,7 @@ where
 //---------------------------------------------------------------------------------------------------- InitConfig Impl
 impl<Data> InitConfig<Data>
 where
-	Data: ValidData,
+	Data: ExtraData,
 {
 	/// Return a reasonable default [`InitConfig`].
 	///
@@ -88,7 +88,7 @@ where
 	};
 }
 
-impl<Data: ValidData> Default for InitConfig<Data> {
+impl<Data: ExtraData> Default for InitConfig<Data> {
 	fn default() -> Self {
 		Self::DEFAULT
 	}

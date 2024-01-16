@@ -4,14 +4,14 @@
 use crate::{
 	actor::kernel::{Kernel,KernelToDecode,KernelToAudio,KernelToGc},
 	state::{AudioState,AudioStateSnapshot},
-	valid_data::ValidData,
+	valid_data::ExtraData,
 	macros::try_send,
 };
 use crossbeam::channel::Sender;
 use std::sync::atomic::Ordering;
 
 //----------------------------------------------------------------------------------------------------
-impl<Data: ValidData> Kernel<Data> {
+impl<Data: ExtraData> Kernel<Data> {
 	/// TODO
 	pub(super) fn restore(
 		&mut self,

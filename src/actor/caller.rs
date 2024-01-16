@@ -5,7 +5,7 @@ use std::thread::JoinHandle;
 use crossbeam::channel::{Receiver, Select};
 use crate::{
 	config::Callback,
-	valid_data::ValidData,
+	valid_data::ExtraData,
 	state::{AudioState,AudioStateReader},
 	macros::{debug2,trace2,select_recv},
 };

@@ -7,7 +7,7 @@ use crate::{
 	signal::{self,SeekError,SeekedTime},
 	source::{Source, source_decode::SourceDecode},
 	state::AudioState,
-	valid_data::ValidData,
+	valid_data::ExtraData,
 	actor::{audio::TookAudioBuffer,kernel::KernelToDecode},
 	macros::{recv,send,try_send,try_recv,debug2,trace2,select_recv, error2},
 	error::{SourceError,DecodeError, SansanError},
@@ -48,7 +48,7 @@ type ToAudio = (AudioBuffer<f32>, Time);
 //---------------------------------------------------------------------------------------------------- Decode
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
-pub(crate) struct Decode<Data: ValidData> {
+pub(crate) struct Decode<Data: ExtraData> {
 	audio_ready_to_recv: Arc<AtomicBool>,             // [Audio]'s way of telling [Decode] it is ready for samples
 	buffer:              VecDeque<ToAudio>,           // Local decoded packets, ready to send to [Audio]
 	source:              SourceDecode,                 // Our current [Source] that we are decoding
@@ -59,7 +59,7 @@ pub(crate) struct Decode<Data: ValidData> {
 
 /// See [src/actor/kernel.rs]'s [Channels]
 #[allow(clippy::missing_docs_in_private_items)]
-struct Channels<Data: ValidData> {
+struct Channels<Data: ExtraData> {
 	shutdown:         Receiver<()>,
 	to_gc:            Sender<DecodeToGc>,
 	to_audio:         Sender<ToAudio>,
@@ -90,7 +90,7 @@ pub(crate) enum DecodeToGc {
 //---------------------------------------------------------------------------------------------------- Decode Impl
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
-pub(crate) struct InitArgs<Data: ValidData> {
+pub(crate) struct InitArgs<Data: ExtraData> {
 	pub(crate) init_barrier:        Option<Arc<Barrier>>,
 	pub(crate) audio_ready_to_recv: Arc<AtomicBool>,
 	pub(crate) shutdown_wait:       Arc<Barrier>,
@@ -108,7 +108,7 @@ pub(crate) struct InitArgs<Data: ValidData> {
 }
 
 //---------------------------------------------------------------------------------------------------- Decode Impl
-impl<Data: ValidData> Decode<Data> {
+impl<Data: ExtraData> Decode<Data> {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]

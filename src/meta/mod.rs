@@ -1,4 +1,4 @@
-//! Audio file metadata
+//! Audio metadata.
 
 mod metadata;
 pub use metadata::Metadata;

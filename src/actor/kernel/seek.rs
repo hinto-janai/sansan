@@ -4,7 +4,7 @@
 use crate::{
 	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode},
 	state::{AudioStateSnapshot,Current},
-	valid_data::ValidData,
+	valid_data::ExtraData,
 	signal::seek::{Seek,SeekedTime,SeekError},
 	macros::{try_send,recv},
 };
@@ -16,7 +16,7 @@ use std::{
 use symphonia::core::units::Time;
 
 //----------------------------------------------------------------------------------------------------
-impl<Data: ValidData> Kernel<Data> {
+impl<Data: ExtraData> Kernel<Data> {
 	/// The inner logic of seeking behavior.
 	///
 	/// This is used by `Decode` and in the below `seek()` in tests.

@@ -8,7 +8,7 @@ use strum::{
 use crate::{
 	source::{Source,Sources},
 	state::{AudioState,Current},
-	valid_data::ValidData,
+	valid_data::ExtraData,
 };
 
 //---------------------------------------------------------------------------------------------------- Add
@@ -18,7 +18,7 @@ use crate::{
 #[derive(Clone,Debug,PartialEq,PartialOrd)]
 pub struct Add<Data>
 where
-	Data: ValidData
+	Data: ExtraData
 {
 	/// The [`Source`] to add to the queue
 	pub source: Source<Data>,
@@ -30,7 +30,7 @@ where
 	pub play: bool,
 }
 
-impl<Data: ValidData> From<Source<Data>> for Add<Data> {
+impl<Data: ExtraData> From<Source<Data>> for Add<Data> {
 	/// Create an [`Add`] with default values from a [`Source`].
 	///
 	/// ```rust
@@ -79,7 +79,7 @@ impl<Data: ValidData> From<Source<Data>> for Add<Data> {
 #[derive(Clone,Debug,PartialEq,PartialOrd)]
 pub struct AddMany<Data>
 where
-	Data: ValidData
+	Data: ExtraData
 {
 	/// The [`Sources`] to add to the queue
 	pub sources: Sources<Data>,
@@ -91,7 +91,7 @@ where
 	pub play: bool,
 }
 
-impl<Data: ValidData> From<Add<Data>> for AddMany<Data> {
+impl<Data: ExtraData> From<Add<Data>> for AddMany<Data> {
 	fn from(add: Add<Data>) -> Self {
 		Self {
 			sources: Sources::from_1(add.source),
@@ -102,7 +102,7 @@ impl<Data: ValidData> From<Add<Data>> for AddMany<Data> {
 	}
 }
 
-impl<Data: ValidData> From<Sources<Data>> for AddMany<Data> {
+impl<Data: ExtraData> From<Sources<Data>> for AddMany<Data> {
 	/// Create an [`AddMany`] with default values from a [`Source`].
 	///
 	/// ```rust

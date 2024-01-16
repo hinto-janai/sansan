@@ -4,12 +4,12 @@
 use crate::{
 	actor::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::AudioStateSnapshot,
-	valid_data::ValidData,
+	valid_data::ExtraData,
 };
 use crossbeam::channel::Sender;
 
 //----------------------------------------------------------------------------------------------------
-impl<Data: ValidData> Kernel<Data> {
+impl<Data: ExtraData> Kernel<Data> {
 	/// TODO
 	pub(super) fn toggle(
 		&mut self,

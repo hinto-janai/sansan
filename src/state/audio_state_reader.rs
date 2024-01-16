@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	valid_data::ValidData,
+	valid_data::ExtraData,
 	state::{AudioState,AudioStateSnapshot},
 };
 use someday::Reader;
@@ -14,12 +14,12 @@ use crate::Engine;
 //---------------------------------------------------------------------------------------------------- AudioStateReader
 /// TODO
 #[derive(Clone,Debug)]
-pub struct AudioStateReader<Data: ValidData>(pub(crate) Reader<AudioState<Data>>);
+pub struct AudioStateReader<Data: ExtraData>(pub(crate) Reader<AudioState<Data>>);
 
 //---------------------------------------------------------------------------------------------------- AudioStateReader Impl
 impl<Data> AudioStateReader<Data>
 where
-	Data: ValidData,
+	Data: ExtraData,
 {
 	#[inline]
 	#[must_use]

@@ -9,7 +9,7 @@ use crate::{
 	actor::kernel::KernelToGc,
 	actor::decode::DecodeToGc,
 	state::{AudioState,Current},
-	valid_data::ValidData,
+	valid_data::ExtraData,
 	macros::{debug2,warn2,try_recv,select_recv},
 	source::source_decode::SourceDecode,
 };
@@ -19,7 +19,7 @@ use symphonia::core::audio::AudioBuffer;
 //---------------------------------------------------------------------------------------------------- Gc
 /// The [G]arbage [c]ollector.
 #[allow(clippy::missing_docs_in_private_items)]
-pub(crate) struct Gc<Data: ValidData> {
+pub(crate) struct Gc<Data: ExtraData> {
 	pub(crate) shutdown_wait: Arc<Barrier>,
 	pub(crate) shutdown:      Receiver<()>,
 	pub(crate) from_audio:    Receiver<AudioBuffer<f32>>,
@@ -29,13 +29,13 @@ pub(crate) struct Gc<Data: ValidData> {
 
 //---------------------------------------------------------------------------------------------------- InitArgs
 #[allow(clippy::missing_docs_in_private_items)]
-pub(crate) struct InitArgs<Data: ValidData> {
+pub(crate) struct InitArgs<Data: ExtraData> {
 	pub(crate) init_barrier: Option<Arc<Barrier>>,
 	pub(crate) gc: Gc<Data>,
 }
 
 //---------------------------------------------------------------------------------------------------- Gc Impl
-impl<Data: ValidData> Gc<Data> {
+impl<Data: ExtraData> Gc<Data> {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]

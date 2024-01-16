@@ -3,7 +3,7 @@
 //---------------------------------------------------------------------------------------------------- use
 use crate::{
 	state::AudioState,
-	valid_data::ValidData,
+	valid_data::ExtraData,
 	error::{OutputError,DecodeError,SourceError,SansanError},
 	signal::SeekError,
 	config::error_callback::ErrorCallback,

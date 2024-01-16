@@ -5,7 +5,7 @@ use crate::{
 	state::{AudioState,Current},
 	signal::SeekError,
 	source::Source,
-	valid_data::ValidData,
+	valid_data::ExtraData,
 };
 use strum::{
 	AsRefStr,Display,EnumCount,EnumIter,

@@ -4,7 +4,7 @@
 use crate::{
 	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::{AudioStateSnapshot,Current},
-	valid_data::ValidData,
+	valid_data::ExtraData,
 	signal::add::{AddMany,AddMethod},
 	macros::try_send,
 };
@@ -12,7 +12,7 @@ use crossbeam::channel::{Sender,Receiver};
 use std::sync::atomic::Ordering;
 
 //----------------------------------------------------------------------------------------------------
-impl<Data: ValidData> Kernel<Data> {
+impl<Data: ExtraData> Kernel<Data> {
 	/// TODO
 	///
 	/// # Invariants

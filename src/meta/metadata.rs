@@ -3,7 +3,7 @@
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
 	error::SourceError,
-	valid_data::ValidData,
+	valid_data::ExtraData,
 };
 use std::{
 	time::Duration,

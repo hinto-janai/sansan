@@ -11,13 +11,13 @@ use crate::{
 	engine::Engine,
 	config::LiveConfig,
 	state::AtomicState,
-	valid_data::ValidData,
+	valid_data::ExtraData,
 };
 
 //---------------------------------------------------------------------------------------------------- Engine Impl (test-only)
 
 #[cfg(test)]
-impl<Data: ValidData> Engine<Data> {
+impl<Data: ExtraData> Engine<Data> {
 	pub(crate) fn atomic_state(&self) -> &AtomicState {
 		&self.atomic_state
 	}

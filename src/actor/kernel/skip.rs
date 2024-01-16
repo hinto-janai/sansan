@@ -4,7 +4,7 @@
 use crate::{
 	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::{AudioStateSnapshot,Current},
-	valid_data::ValidData,
+	valid_data::ExtraData,
 	signal::skip::{Skip,SkipError},
 	signal::repeat::Repeat,
 	macros::{try_send,recv},
@@ -13,7 +13,7 @@ use crossbeam::channel::{Sender,Receiver};
 use std::sync::atomic::Ordering;
 
 //----------------------------------------------------------------------------------------------------
-impl<Data: ValidData> Kernel<Data> {
+impl<Data: ExtraData> Kernel<Data> {
 	/// The inner part of `skip()`, used by `next()`.
 	pub(super) fn skip_inner(
 		&mut self,

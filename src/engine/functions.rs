@@ -3,7 +3,7 @@
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
 	engine::{Engine},
-	valid_data::ValidData,
+	valid_data::ExtraData,
 	macros::{recv,try_send,debug2,info2},
 	state::{
 		AudioStateSnapshot,
@@ -22,7 +22,7 @@ use crate::{
 //---------------------------------------------------------------------------------------------------- Engine Impl
 impl<Data> Engine<Data>
 where
-	Data: ValidData,
+	Data: ExtraData,
 {
 	//---------------------------------------------------------------------------------------------------- Reader
 	#[inline]
@@ -254,7 +254,7 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- Drop
-impl<Data: ValidData> Drop for Engine<Data> {
+impl<Data: ExtraData> Drop for Engine<Data> {
 	#[cold]
 	#[inline(never)]
 	#[allow(clippy::branches_sharing_code)]

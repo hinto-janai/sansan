@@ -5,7 +5,7 @@ use crate::{
 	signal::{Volume,Repeat,AtomicVolume,AtomicRepeat},
 	source::Source,
 	meta::Metadata,
-	valid_data::ValidData,
+	valid_data::ExtraData,
 	state::current::Current,
 };
 use someday::{Reader, Commit, CommitRef};
@@ -23,7 +23,7 @@ use std::{
 #[derive(Clone,Debug,PartialEq)]
 pub struct AudioState<Data>
 where
-	Data: ValidData,
+	Data: ExtraData,
 {
 	/// Are we playing audio right now?
 	pub playing: bool,
@@ -48,7 +48,7 @@ where
 //---------------------------------------------------------------------------------------------------- AudioState Impl
 impl<Data> AudioState<Data>
 where
-	Data: ValidData,
+	Data: ExtraData,
 {
 	/// TODO
 	pub const DEFAULT: Self = Self {
@@ -60,7 +60,7 @@ where
 	};
 }
 
-impl<Data: ValidData> Default for AudioState<Data> {
+impl<Data: ExtraData> Default for AudioState<Data> {
 	fn default() -> Self {
 		Self::DEFAULT
 	}

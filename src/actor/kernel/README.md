@@ -13,7 +13,7 @@ This doesn't change functionality, although, maintaining `10 * 300 line` files i
 These are all defined as a `kernel.rs/Kernel` method, and in the same shape, i.e:
 ```rust
 //---------------------------------------------- Signal Implementation
-impl<Data: ValidData> Kernel<Data> {
+impl<Data: ExtraData> Kernel<Data> {
 	fn signal(&mut self) {
 		/* ... */
 	}

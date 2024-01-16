@@ -22,7 +22,7 @@ pub enum Shuffle {
 // // to the returned [Source].
 // //
 // // [Kernel] should forward this [Source] to [Decode].
-// impl<Data: ValidData> someday::ApplyReturn<Signal<Data>, Shuffle, Option<Source<Data>>> for AudioState<Data> {
+// impl<Data: ExtraData> someday::ApplyReturn<Signal<Data>, Shuffle, Option<Source<Data>>> for AudioState<Data> {
 // 	fn apply_return(s: &mut Shuffle, w: &mut Self, r: &Self) -> Option<Source<Data>> {
 // 		use rand::prelude::{Rng,SliceRandom};
 // 		let mut rng = rand::thread_rng();
