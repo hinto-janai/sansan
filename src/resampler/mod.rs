@@ -9,6 +9,6 @@ cfg_if::cfg_if! {
 		pub(crate) use dummy::DummyResampler as ResamplerStruct;
 	} else {
 		mod rubato;
-		pub(crate) use rubato::Rubato as ResamplerStruct;
+		pub(crate) use self::rubato::Rubato as ResamplerStruct;
 	}
 }
