@@ -9,7 +9,7 @@ use crate::{
 	actor::kernel::KernelToGc,
 	actor::decode::DecodeToGc,
 	state::{AudioState,Current},
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 	macros::{debug2,warn2,try_recv,select_recv},
 	source::source_decode::SourceDecode,
 };
@@ -19,28 +19,28 @@ use symphonia::core::audio::AudioBuffer;
 //---------------------------------------------------------------------------------------------------- Gc
 /// The [G]arbage [c]ollector.
 #[allow(clippy::missing_docs_in_private_items)]
-pub(crate) struct Gc<Data: ExtraData> {
+pub(crate) struct Gc<Extra: ExtraData> {
 	pub(crate) shutdown_wait: Arc<Barrier>,
 	pub(crate) shutdown:      Receiver<()>,
 	pub(crate) from_audio:    Receiver<AudioBuffer<f32>>,
 	pub(crate) from_decode:   Receiver<DecodeToGc>,
-	pub(crate) from_kernel:   Receiver<KernelToGc<Data>>,
+	pub(crate) from_kernel:   Receiver<KernelToGc<Extra>>,
 }
 
 //---------------------------------------------------------------------------------------------------- InitArgs
 #[allow(clippy::missing_docs_in_private_items)]
-pub(crate) struct InitArgs<Data: ExtraData> {
+pub(crate) struct InitArgs<Extra: ExtraData> {
 	pub(crate) init_barrier: Option<Arc<Barrier>>,
-	pub(crate) gc: Gc<Data>,
+	pub(crate) gc: Gc<Extra>,
 }
 
 //---------------------------------------------------------------------------------------------------- Gc Impl
-impl<Data: ExtraData> Gc<Data> {
+impl<Extra: ExtraData> Gc<Extra> {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]
 	/// Initialize [`Gc`].
-	pub(crate) fn init(init_args: InitArgs<Data>) -> Result<JoinHandle<()>, std::io::Error> {
+	pub(crate) fn init(init_args: InitArgs<Extra>) -> Result<JoinHandle<()>, std::io::Error> {
 		std::thread::Builder::new()
 			.name("Gc".into())
 			.spawn(move || {

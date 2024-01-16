@@ -4,7 +4,7 @@
 use crate::{
 	source::{Source,SourceInner},
 	error::SourceError,
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 };
 use std::{
 	time::Duration,
@@ -223,9 +223,9 @@ impl TryFrom<MediaSourceStream> for SourceDecode {
 }
 
 //---------------------------------------------------------------------------------------------------- Source -> SourceDecode
-impl<Data> TryInto<SourceDecode> for Source<Data>
+impl<Extra> TryInto<SourceDecode> for Source<Extra>
 where
-	Data: ExtraData
+	Extra: ExtraData
 {
 	type Error = SourceError;
 

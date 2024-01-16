@@ -4,22 +4,22 @@
 use crate::{
 	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::{AudioStateSnapshot,Current},
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 	signal::back::{Back,BackError},
 	macros::try_send,
 };
 use crossbeam::channel::{Sender,Receiver};
 
 //----------------------------------------------------------------------------------------------------
-impl<Data: ExtraData> Kernel<Data> {
+impl<Extra: ExtraData> Kernel<Extra> {
 	/// TODO
 	pub(super) fn back(
 		&mut self,
 		back: Back,
-		to_gc: &Sender<KernelToGc<Data>>,
+		to_gc: &Sender<KernelToGc<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
-		to_decode: &Sender<KernelToDecode<Data>>,
-		to_engine: &Sender<Result<AudioStateSnapshot<Data>, BackError>>,
+		to_decode: &Sender<KernelToDecode<Extra>>,
+		to_engine: &Sender<Result<AudioStateSnapshot<Extra>, BackError>>,
 	) {
 		if self.queue_empty() {
 			try_send!(to_engine, Err(BackError::QueueEmpty));
@@ -35,9 +35,9 @@ impl<Data: ExtraData> Kernel<Data> {
 	pub(super) fn back_inner(
 		&mut self,
 		back: Back,
-		to_gc: &Sender<KernelToGc<Data>>,
+		to_gc: &Sender<KernelToGc<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
-		to_decode: &Sender<KernelToDecode<Data>>,
+		to_decode: &Sender<KernelToDecode<Extra>>,
 	) {
 		// INVARIANT: `self.queue_empty()` must be handled by the caller.
 

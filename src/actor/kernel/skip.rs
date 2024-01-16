@@ -4,7 +4,7 @@
 use crate::{
 	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::{AudioStateSnapshot,Current},
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 	signal::skip::{Skip,SkipError},
 	signal::repeat::Repeat,
 	macros::{try_send,recv},
@@ -13,14 +13,14 @@ use crossbeam::channel::{Sender,Receiver};
 use std::sync::atomic::Ordering;
 
 //----------------------------------------------------------------------------------------------------
-impl<Data: ExtraData> Kernel<Data> {
+impl<Extra: ExtraData> Kernel<Extra> {
 	/// The inner part of `skip()`, used by `next()`.
 	pub(super) fn skip_inner(
 		&mut self,
 		skip: Skip,
-		to_gc: &Sender<KernelToGc<Data>>,
+		to_gc: &Sender<KernelToGc<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
-		to_decode: &Sender<KernelToDecode<Data>>,
+		to_decode: &Sender<KernelToDecode<Extra>>,
 	) {
 		// INVARIANT: `self.queue_empty()` must be handled by the caller.
 
@@ -106,10 +106,10 @@ impl<Data: ExtraData> Kernel<Data> {
 	pub(super) fn skip(
 		&mut self,
 		skip: Skip,
-		to_gc: &Sender<KernelToGc<Data>>,
+		to_gc: &Sender<KernelToGc<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
-		to_decode: &Sender<KernelToDecode<Data>>,
-		to_engine: &Sender<Result<AudioStateSnapshot<Data>, SkipError>>
+		to_decode: &Sender<KernelToDecode<Extra>>,
+		to_engine: &Sender<Result<AudioStateSnapshot<Extra>, SkipError>>
 	) {
 		if self.queue_empty() {
 			try_send!(to_engine, Err(SkipError::QueueEmpty));
@@ -178,21 +178,21 @@ mod tests {
 		let resp = engine.skip(skip).unwrap();
 		let current = resp.current.as_ref().unwrap();
 		assert_eq!(current.index, 5);
-		assert_eq!(*current.source.data(), 5);
+		assert_eq!(*current.source.extra(), 5);
 
 		//---------------------------------- 0 does nothing
 		let skip = Skip { skip: 0 };
 		let resp = engine.skip(skip).unwrap();
 		let current = resp.current.as_ref().unwrap();
 		assert_eq!(current.index, 5);
-		assert_eq!(*current.source.data(), 5);
+		assert_eq!(*current.source.extra(), 5);
 
 		//---------------------------------- 4 forwards (to last index)
 		let skip = Skip { skip: 4 };
 		let resp = engine.skip(skip).unwrap();
 		let current = resp.current.as_ref().unwrap();
 		assert_eq!(current.index, 9);
-		assert_eq!(*current.source.data(), 9);
+		assert_eq!(*current.source.extra(), 9);
 
 		//---------------------------------- Repeat queue
 		let resp = engine.repeat(Repeat::Queue);
@@ -203,7 +203,7 @@ mod tests {
 		let resp = engine.skip(skip).unwrap();
 		let current = resp.current.as_ref().unwrap();
 		assert_eq!(current.index, 0);
-		assert_eq!(*current.source.data(), 0);
+		assert_eq!(*current.source.extra(), 0);
 
 		//---------------------------------- Repeat `Current`
 		let resp = engine.repeat(Repeat::Current);
@@ -212,7 +212,7 @@ mod tests {
 		let resp = engine.skip(skip).unwrap();
 		let current = resp.current.as_ref().unwrap();
 		assert_eq!(current.index, 0);
-		assert_eq!(*current.source.data(), 0);
+		assert_eq!(*current.source.extra(), 0);
 
 		//---------------------------------- Skip to last index
 		let resp = engine.repeat(Repeat::Off);
@@ -221,7 +221,7 @@ mod tests {
 		let resp = engine.skip(skip).unwrap();
 		let current = resp.current.as_ref().unwrap();
 		assert_eq!(current.index, 9);
-		assert_eq!(*current.source.data(), 9);
+		assert_eq!(*current.source.extra(), 9);
 
 		//---------------------------------- No repeat mode, end the queue.
 		let skip = Skip { skip: usize::MAX };

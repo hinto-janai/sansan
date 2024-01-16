@@ -3,7 +3,7 @@
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
 	engine::{Engine},
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 	macros::{recv,try_send,debug2,info2},
 	state::{
 		AudioStateSnapshot,
@@ -20,28 +20,28 @@ use crate::{
 };
 
 //---------------------------------------------------------------------------------------------------- Engine Impl
-impl<Data> Engine<Data>
+impl<Extra> Engine<Extra>
 where
-	Data: ExtraData,
+	Extra: ExtraData,
 {
 	//---------------------------------------------------------------------------------------------------- Reader
 	#[inline]
 	#[must_use]
 	/// TODO
-	pub fn audio_state_snapshot(&self) -> AudioStateSnapshot<Data> {
+	pub fn audio_state_snapshot(&self) -> AudioStateSnapshot<Extra> {
 		self.reader.get()
 	}
 
 	//---------------------------------------------------------------------------------------------------- Reader
 	#[must_use]
 	/// TODO
-	pub fn reader(&self) -> AudioStateReader<Data> {
+	pub fn reader(&self) -> AudioStateReader<Extra> {
 		AudioStateReader::clone(&self.reader)
 	}
 
 	#[must_use]
 	/// TODO
-	pub const fn reader_ref(&self) -> &AudioStateReader<Data> {
+	pub const fn reader_ref(&self) -> &AudioStateReader<Extra> {
 		&self.reader
 	}
 
@@ -112,70 +112,70 @@ where
 	// INVARIANT: `Kernel` must not assume all Requests are actionable.
 
 	/// TODO
-	pub fn toggle(&mut self) -> AudioStateSnapshot<Data> {
+	pub fn toggle(&mut self) -> AudioStateSnapshot<Extra> {
 		try_send!(self.send_toggle, ());
 		recv!(self.recv_audio_state)
 	}
 
 	/// TODO
-	pub fn play(&mut self) -> AudioStateSnapshot<Data> {
+	pub fn play(&mut self) -> AudioStateSnapshot<Extra> {
 		try_send!(self.send_play, ());
 		recv!(self.recv_audio_state)
 	}
 
 	/// TODO
-	pub fn pause(&mut self) -> AudioStateSnapshot<Data> {
+	pub fn pause(&mut self) -> AudioStateSnapshot<Extra> {
 		try_send!(self.send_pause, ());
 		recv!(self.recv_audio_state)
 	}
 
 	#[allow(clippy::should_implement_trait)]
 	/// TODO
-	pub fn next(&mut self) -> AudioStateSnapshot<Data> {
+	pub fn next(&mut self) -> AudioStateSnapshot<Extra> {
 		try_send!(self.send_next, ());
 		recv!(self.recv_audio_state)
 	}
 
 	/// TODO
-	pub fn previous(&mut self) -> AudioStateSnapshot<Data> {
+	pub fn previous(&mut self) -> AudioStateSnapshot<Extra> {
 		try_send!(self.send_previous, ());
 		recv!(self.recv_audio_state)
 	}
 
 	/// TODO
-	pub fn stop(&mut self) -> AudioStateSnapshot<Data> {
+	pub fn stop(&mut self) -> AudioStateSnapshot<Extra> {
 		try_send!(self.send_stop, ());
 		recv!(self.recv_audio_state)
 	}
 
 	/// TODO
-	pub fn clear(&mut self, clear: Clear) -> AudioStateSnapshot<Data> {
+	pub fn clear(&mut self, clear: Clear) -> AudioStateSnapshot<Extra> {
 		try_send!(self.send_clear, clear);
 		recv!(self.recv_audio_state)
 	}
 
 	/// TODO
-	pub fn restore(&mut self, audio_state: AudioState<Data>) -> AudioStateSnapshot<Data> {
+	pub fn restore(&mut self, audio_state: AudioState<Extra>) -> AudioStateSnapshot<Extra> {
 		try_send!(self.send_restore, audio_state);
 		recv!(self.recv_audio_state)
 	}
 
 	/// TODO
-	pub fn repeat(&mut self, repeat: Repeat) -> AudioStateSnapshot<Data> {
+	pub fn repeat(&mut self, repeat: Repeat) -> AudioStateSnapshot<Extra> {
 		self.repeat = repeat;
 		try_send!(self.send_repeat, repeat);
 		recv!(self.recv_audio_state)
 	}
 
 	/// TODO
-	pub fn volume(&mut self, volume: Volume) -> AudioStateSnapshot<Data> {
+	pub fn volume(&mut self, volume: Volume) -> AudioStateSnapshot<Extra> {
 		self.volume = volume;
 		try_send!(self.send_volume, volume);
 		recv!(self.recv_audio_state)
 	}
 
 	/// TODO
-	pub fn shuffle(&mut self, shuffle: Shuffle) -> AudioStateSnapshot<Data> {
+	pub fn shuffle(&mut self, shuffle: Shuffle) -> AudioStateSnapshot<Extra> {
 		try_send!(self.send_shuffle, shuffle);
 		recv!(self.recv_audio_state)
 	}
@@ -184,7 +184,7 @@ where
 	///
 	/// # Errors
 	/// TODO
-	pub fn add(&mut self, add: Add<Data>) -> AudioStateSnapshot<Data> {
+	pub fn add(&mut self, add: Add<Extra>) -> AudioStateSnapshot<Extra> {
 		try_send!(self.send_add, add);
 		recv!(self.recv_audio_state)
 	}
@@ -193,7 +193,7 @@ where
 	///
 	/// # Errors
 	/// TODO
-	pub fn add_many(&mut self, add_many: AddMany<Data>) -> AudioStateSnapshot<Data> {
+	pub fn add_many(&mut self, add_many: AddMany<Extra>) -> AudioStateSnapshot<Extra> {
 		try_send!(self.send_add_many, add_many);
 		recv!(self.recv_audio_state)
 	}
@@ -202,7 +202,7 @@ where
 	///
 	/// # Errors
 	/// TODO
-	pub fn seek(&mut self, seek: Seek) -> Result<AudioStateSnapshot<Data>, SeekError> {
+	pub fn seek(&mut self, seek: Seek) -> Result<AudioStateSnapshot<Extra>, SeekError> {
 		try_send!(self.send_seek, seek);
 		recv!(self.recv_seek)
 	}
@@ -211,7 +211,7 @@ where
 	///
 	/// # Errors
 	/// TODO
-	pub fn skip(&mut self, skip: Skip) -> Result<AudioStateSnapshot<Data>, SkipError> {
+	pub fn skip(&mut self, skip: Skip) -> Result<AudioStateSnapshot<Extra>, SkipError> {
 		try_send!(self.send_skip, skip);
 		recv!(self.recv_skip)
 	}
@@ -220,7 +220,7 @@ where
 	///
 	/// # Errors
 	/// TODO
-	pub fn back(&mut self, back: Back) -> Result<AudioStateSnapshot<Data>, BackError> {
+	pub fn back(&mut self, back: Back) -> Result<AudioStateSnapshot<Extra>, BackError> {
 		try_send!(self.send_back, back);
 		recv!(self.recv_back)
 	}
@@ -229,7 +229,7 @@ where
 	///
 	/// # Errors
 	/// TODO
-	pub fn set_index(&mut self, set_index: SetIndex) -> Result<AudioStateSnapshot<Data>, SetIndexError> {
+	pub fn set_index(&mut self, set_index: SetIndex) -> Result<AudioStateSnapshot<Extra>, SetIndexError> {
 		try_send!(self.send_set_index, set_index);
 		recv!(self.recv_set_index)
 	}
@@ -238,7 +238,7 @@ where
 	///
 	/// # Errors
 	/// TODO
-	pub fn remove(&mut self, remove: Remove) -> Result<AudioStateSnapshot<Data>, RemoveError> {
+	pub fn remove(&mut self, remove: Remove) -> Result<AudioStateSnapshot<Extra>, RemoveError> {
 		try_send!(self.send_remove, remove);
 		recv!(self.recv_remove)
 	}
@@ -247,14 +247,14 @@ where
 	///
 	/// # Errors
 	/// TODO
-	pub fn remove_range(&mut self, remove_range: impl std::ops::RangeBounds<usize>) -> Result<AudioStateSnapshot<Data>, RemoveError> {
+	pub fn remove_range(&mut self, remove_range: impl std::ops::RangeBounds<usize>) -> Result<AudioStateSnapshot<Extra>, RemoveError> {
 		try_send!(self.send_remove_range, remove_range.into());
 		recv!(self.recv_remove_range)
 	}
 }
 
 //---------------------------------------------------------------------------------------------------- Drop
-impl<Data: ExtraData> Drop for Engine<Data> {
+impl<Extra: ExtraData> Drop for Engine<Extra> {
 	#[cold]
 	#[inline(never)]
 	#[allow(clippy::branches_sharing_code)]

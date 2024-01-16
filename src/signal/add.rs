@@ -8,7 +8,7 @@ use strum::{
 use crate::{
 	source::{Source,Sources},
 	state::{AudioState,Current},
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 };
 
 //---------------------------------------------------------------------------------------------------- Add
@@ -16,12 +16,12 @@ use crate::{
 // #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq,PartialOrd)]
-pub struct Add<Data>
+pub struct Add<Extra>
 where
-	Data: ExtraData
+	Extra: ExtraData
 {
 	/// The [`Source`] to add to the queue
-	pub source: Source<Data>,
+	pub source: Source<Extra>,
 	/// How should we add this [`Source`] to the queue?
 	pub method: AddMethod,
 	/// Should we clear the queue before adding?
@@ -30,7 +30,7 @@ where
 	pub play: bool,
 }
 
-impl<Data: ExtraData> From<Source<Data>> for Add<Data> {
+impl<Extra: ExtraData> From<Source<Extra>> for Add<Extra> {
 	/// Create an [`Add`] with default values from a [`Source`].
 	///
 	/// ```rust
@@ -48,7 +48,7 @@ impl<Data: ExtraData> From<Source<Data>> for Add<Data> {
 	///         play: false,
 	///     }
 	/// );
-	fn from(source: Source<Data>) -> Self {
+	fn from(source: Source<Extra>) -> Self {
 		Self {
 			source,
 			method: AddMethod::Back,
@@ -77,12 +77,12 @@ impl<Data: ExtraData> From<Source<Data>> for Add<Data> {
 // #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq,PartialOrd)]
-pub struct AddMany<Data>
+pub struct AddMany<Extra>
 where
-	Data: ExtraData
+	Extra: ExtraData
 {
 	/// The [`Sources`] to add to the queue
-	pub sources: Sources<Data>,
+	pub sources: Sources<Extra>,
 	/// How should we add these [`Source`]'s to the queue?
 	pub method: AddMethod,
 	/// Should we clear the queue before adding?
@@ -91,8 +91,8 @@ where
 	pub play: bool,
 }
 
-impl<Data: ExtraData> From<Add<Data>> for AddMany<Data> {
-	fn from(add: Add<Data>) -> Self {
+impl<Extra: ExtraData> From<Add<Extra>> for AddMany<Extra> {
+	fn from(add: Add<Extra>) -> Self {
 		Self {
 			sources: Sources::from_1(add.source),
 			method: add.method,
@@ -102,7 +102,7 @@ impl<Data: ExtraData> From<Add<Data>> for AddMany<Data> {
 	}
 }
 
-impl<Data: ExtraData> From<Sources<Data>> for AddMany<Data> {
+impl<Extra: ExtraData> From<Sources<Extra>> for AddMany<Extra> {
 	/// Create an [`AddMany`] with default values from a [`Source`].
 	///
 	/// ```rust
@@ -120,7 +120,7 @@ impl<Data: ExtraData> From<Sources<Data>> for AddMany<Data> {
 	///         play: false,
 	///     }
 	/// );
-	fn from(sources: Sources<Data>) -> Self {
+	fn from(sources: Sources<Extra>) -> Self {
 		Self {
 			sources,
 			method: AddMethod::Back,

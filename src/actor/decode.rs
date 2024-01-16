@@ -7,7 +7,7 @@ use crate::{
 	signal::{self,SeekError,SeekedTime},
 	source::{Source, source_decode::SourceDecode},
 	state::AudioState,
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 	actor::{audio::TookAudioBuffer,kernel::KernelToDecode},
 	macros::{recv,send,try_send,try_recv,debug2,trace2,select_recv, error2},
 	error::{SourceError,DecodeError, SansanError},
@@ -48,25 +48,25 @@ type ToAudio = (AudioBuffer<f32>, Time);
 //---------------------------------------------------------------------------------------------------- Decode
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
-pub(crate) struct Decode<Data: ExtraData> {
+pub(crate) struct Decode<Extra: ExtraData> {
 	audio_ready_to_recv: Arc<AtomicBool>,             // [Audio]'s way of telling [Decode] it is ready for samples
 	buffer:              VecDeque<ToAudio>,           // Local decoded packets, ready to send to [Audio]
 	source:              SourceDecode,                 // Our current [Source] that we are decoding
 	done_decoding:       bool,                        // Whether we have finished decoding our current [Source]
 	shutdown_wait:       Arc<Barrier>,                // Shutdown barrier between all actors
-	_p:                  PhantomData<Data>,
+	_p:                  PhantomData<Extra>,
 }
 
 /// See [src/actor/kernel.rs]'s [Channels]
 #[allow(clippy::missing_docs_in_private_items)]
-struct Channels<Data: ExtraData> {
+struct Channels<Extra: ExtraData> {
 	shutdown:         Receiver<()>,
 	to_gc:            Sender<DecodeToGc>,
 	to_audio:         Sender<ToAudio>,
 	from_audio:       Receiver<TookAudioBuffer>,
 	to_kernel_seek:   Sender<Result<SeekedTime, SeekError>>,
 	to_kernel_source: Sender<Result<(), SourceError>>,
-	from_kernel:      Receiver<KernelToDecode<Data>>,
+	from_kernel:      Receiver<KernelToDecode<Extra>>,
 
 	// If the `from` channesl are `Some`, we must hang on the channel until
 	// `Kernel` responds, else, we can continue, as in [`ErrorCallback::Continue`].
@@ -90,7 +90,7 @@ pub(crate) enum DecodeToGc {
 //---------------------------------------------------------------------------------------------------- Decode Impl
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
-pub(crate) struct InitArgs<Data: ExtraData> {
+pub(crate) struct InitArgs<Extra: ExtraData> {
 	pub(crate) init_barrier:        Option<Arc<Barrier>>,
 	pub(crate) audio_ready_to_recv: Arc<AtomicBool>,
 	pub(crate) shutdown_wait:       Arc<Barrier>,
@@ -100,7 +100,7 @@ pub(crate) struct InitArgs<Data: ExtraData> {
 	pub(crate) from_audio:          Receiver<TookAudioBuffer>,
 	pub(crate) to_kernel_seek:      Sender<Result<SeekedTime, SeekError>>,
 	pub(crate) to_kernel_source:    Sender<Result<(), SourceError>>,
-	pub(crate) from_kernel:         Receiver<KernelToDecode<Data>>,
+	pub(crate) from_kernel:         Receiver<KernelToDecode<Extra>>,
 	pub(crate) to_kernel_error_d:   Sender<DecodeError>,
 	pub(crate) from_kernel_error_d: Option<Receiver<()>>,
 	pub(crate) to_kernel_error_s:   Sender<SourceError>,
@@ -108,12 +108,12 @@ pub(crate) struct InitArgs<Data: ExtraData> {
 }
 
 //---------------------------------------------------------------------------------------------------- Decode Impl
-impl<Data: ExtraData> Decode<Data> {
+impl<Extra: ExtraData> Decode<Extra> {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]
 	/// Initialize `Decode`.
-	pub(crate) fn init(args: InitArgs<Data>) -> Result<JoinHandle<()>, std::io::Error> {
+	pub(crate) fn init(args: InitArgs<Extra>) -> Result<JoinHandle<()>, std::io::Error> {
 		std::thread::Builder::new()
 			.name("Decode".into())
 			.spawn(move || {
@@ -170,7 +170,7 @@ impl<Data: ExtraData> Decode<Data> {
 	#[cold]
 	#[inline(never)]
 	/// `Decode`'s main function.
-	fn main(mut self, channels: Channels<Data>) {
+	fn main(mut self, channels: Channels<Extra>) {
 		debug2!("Decode - main()");
 
 		// Create channels that we will
@@ -312,7 +312,7 @@ impl<Data: ExtraData> Decode<Data> {
 
 	#[inline]
 	/// TODO
-	fn new_source(&mut self, source: Source<Data>, channels: &Channels<Data>) {
+	fn new_source(&mut self, source: Source<Extra>, channels: &Channels<Extra>) {
 		debug2!("Decode - new_source(), source: {source:?}");
 
 		match source.try_into() {
@@ -335,7 +335,7 @@ impl<Data: ExtraData> Decode<Data> {
 		// Re-use seek logic.
 		// This is in a separate inner function
 		// because it needs to be tested "functionally".
-		let time = crate::actor::kernel::Kernel::<Data>::seek_inner(
+		let time = crate::actor::kernel::Kernel::<Extra>::seek_inner(
 			seek,
 			self.source.secs_total,
 			self.source.time_now.seconds,
@@ -355,7 +355,7 @@ impl<Data: ExtraData> Decode<Data> {
 	#[cold]
 	#[inline(never)]
 	/// TODO
-	fn handle_decode_error(channels: &Channels<Data>, error: DecodeError) {
+	fn handle_decode_error(channels: &Channels<Extra>, error: DecodeError) {
 		error2!("Decode - decode error: {error:?}");
 
 		try_send!(channels.to_kernel_error_d, error);
@@ -367,7 +367,7 @@ impl<Data: ExtraData> Decode<Data> {
 	#[cold]
 	#[inline(never)]
 	/// TODO
-	fn handle_source_error(channels: &Channels<Data>, error: SourceError) {
+	fn handle_source_error(channels: &Channels<Extra>, error: SourceError) {
 		error2!("Decode - source error: {error:?}");
 
 		try_send!(channels.to_kernel_error_s, error);

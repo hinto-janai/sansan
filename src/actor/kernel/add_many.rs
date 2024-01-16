@@ -4,7 +4,7 @@
 use crate::{
 	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::{AudioStateSnapshot,Current},
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 	signal::add::{AddMany,AddMethod},
 	macros::try_send,
 };
@@ -12,7 +12,7 @@ use crossbeam::channel::{Sender,Receiver};
 use std::sync::atomic::Ordering;
 
 //----------------------------------------------------------------------------------------------------
-impl<Data: ExtraData> Kernel<Data> {
+impl<Extra: ExtraData> Kernel<Extra> {
 	/// TODO
 	///
 	/// # Invariants
@@ -21,11 +21,11 @@ impl<Data: ExtraData> Kernel<Data> {
 	/// 3. Add operations saturate at out-of-bounds insertions (<0, >=queue.len())
 	pub(super) fn add_many(
 		&mut self,
-		add_many: AddMany<Data>,
-		to_gc: &Sender<KernelToGc<Data>>,
+		add_many: AddMany<Extra>,
+		to_gc: &Sender<KernelToGc<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
-		to_decode: &Sender<KernelToDecode<Data>>,
-		to_engine: &Sender<AudioStateSnapshot<Data>>
+		to_decode: &Sender<KernelToDecode<Extra>>,
+		to_engine: &Sender<AudioStateSnapshot<Extra>>
 	) {
 		let add_many_sources = add_many.sources.as_slice();
 		assert!(!add_many_sources.is_empty());
@@ -215,7 +215,7 @@ mod tests {
 			engine: &mut Engine<usize>,
 			add_many: AddMany<usize>,
 			index: usize,
-			data: &[usize],
+			extra: &[usize],
 		) {
 			// Send `AddMany` signal to the `Engine`
 			// and get back the `AudioStateSnapshot`.
@@ -223,17 +223,17 @@ mod tests {
 
 			// Debug print.
 			println!("a: {a:#?}");
-			println!("data: {data:?}\n");
+			println!("extra: {extra:?}\n");
 
 			// Assert the `Source`'s in our state match the list of `Data` given, e.g:
 			//
-			// data:    [0, 1, 2]
+			// extra:    [0, 1, 2]
 			// sources: [(source_1, 0), (source_2, 1), (source_3), 2]
 			//
 			// This would be OK.
 			let mut i = 0;
-			for data in data {
-				assert_eq!(a.queue[i].data(), data);
+			for extra in extra {
+				assert_eq!(a.queue[i].extra(), extra);
 				i += 1;
 			}
 

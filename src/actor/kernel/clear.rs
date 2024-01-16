@@ -3,7 +3,7 @@
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
 	actor::kernel::{Kernel,KernelToGc},
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 	signal::Clear,
 	state::AudioStateSnapshot,
 	macros::try_send,
@@ -12,13 +12,13 @@ use crossbeam::channel::Sender;
 use std::sync::atomic::Ordering;
 
 //----------------------------------------------------------------------------------------------------
-impl<Data: ExtraData> Kernel<Data> {
+impl<Extra: ExtraData> Kernel<Extra> {
 	/// TODO
 	pub(super) fn clear(
 		&mut self,
 		clear: Clear,
-		to_gc: &Sender<KernelToGc<Data>>,
-		to_engine: &Sender<AudioStateSnapshot<Data>>,
+		to_gc: &Sender<KernelToGc<Extra>>,
+		to_engine: &Sender<AudioStateSnapshot<Extra>>,
 	) {
 		match clear {
 			Clear::Queue => if self.queue_empty() {

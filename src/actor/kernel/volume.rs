@@ -4,19 +4,19 @@
 use crate::{
 	actor::kernel::kernel::{Kernel,KernelToDecode},
 	state::{AudioStateSnapshot,Current},
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 	signal::volume::Volume,
 	macros::{try_send,recv},
 };
 use crossbeam::channel::Sender;
 
 //----------------------------------------------------------------------------------------------------
-impl<Data: ExtraData> Kernel<Data> {
+impl<Extra: ExtraData> Kernel<Extra> {
 	/// TODO
 	pub(super) fn volume(
 		&mut self,
 		volume: Volume,
-		to_engine: &Sender<AudioStateSnapshot<Data>>,
+		to_engine: &Sender<AudioStateSnapshot<Extra>>,
 	) {
 		if self.w.volume == volume {
 			try_send!(to_engine, self.audio_state_snapshot());

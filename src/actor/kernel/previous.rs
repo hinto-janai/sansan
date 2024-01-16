@@ -4,21 +4,21 @@
 use crate::{
 	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::{AudioStateSnapshot,Current},
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 	signal::back::Back,
 	macros::try_send,
 };
 use crossbeam::channel::{Sender,Receiver};
 
 //----------------------------------------------------------------------------------------------------
-impl<Data: ExtraData> Kernel<Data> {
+impl<Extra: ExtraData> Kernel<Extra> {
 	/// TODO
 	pub(super) fn previous(
 		&mut self,
-		to_gc: &Sender<KernelToGc<Data>>,
+		to_gc: &Sender<KernelToGc<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
-		to_decode: &Sender<KernelToDecode<Data>>,
-		to_engine: &Sender<AudioStateSnapshot<Data>>,
+		to_decode: &Sender<KernelToDecode<Extra>>,
+		to_engine: &Sender<AudioStateSnapshot<Extra>>,
 	) {
 		if self.queue_empty() {
 			try_send!(to_engine, self.audio_state_snapshot());

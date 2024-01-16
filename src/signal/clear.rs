@@ -15,7 +15,7 @@ pub enum Clear {
 }
 
 //---------------------------------------------------------------------------------------------------- someday::ApplyReturn
-// impl<Data: ExtraData> someday::ApplyReturn<Signal<Data>, Clear, ()> for AudioState<Data> {
+// impl<Extra: ExtraData> someday::ApplyReturn<Signal<Extra>, Clear, ()> for AudioState<Extra> {
 // 	fn apply_return(s: &mut Clear, w: &mut Self, _: &Self) {
 // 		// INVARIANT: [Kernel] checks debug invariants.
 

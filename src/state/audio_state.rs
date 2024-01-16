@@ -5,7 +5,7 @@ use crate::{
 	signal::{Volume,Repeat,AtomicVolume,AtomicRepeat},
 	source::Source,
 	meta::Metadata,
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 	state::current::Current,
 };
 use someday::{Reader, Commit, CommitRef};
@@ -21,9 +21,9 @@ use std::{
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq)]
-pub struct AudioState<Data>
+pub struct AudioState<Extra>
 where
-	Data: ExtraData,
+	Extra: ExtraData,
 {
 	/// Are we playing audio right now?
 	pub playing: bool,
@@ -39,16 +39,16 @@ where
 	/// INVARIANT TODO:
 	/// If this is `Some`, the queue _MUST_ be non-empty
 	/// and must contain the Source.
-	pub current: Option<Current<Data>>,
+	pub current: Option<Current<Extra>>,
 
 	/// The current song queue.
-	pub queue: VecDeque<Source<Data>>,
+	pub queue: VecDeque<Source<Extra>>,
 }
 
 //---------------------------------------------------------------------------------------------------- AudioState Impl
-impl<Data> AudioState<Data>
+impl<Extra> AudioState<Extra>
 where
-	Data: ExtraData,
+	Extra: ExtraData,
 {
 	/// TODO
 	pub const DEFAULT: Self = Self {
@@ -60,7 +60,7 @@ where
 	};
 }
 
-impl<Data: ExtraData> Default for AudioState<Data> {
+impl<Extra: ExtraData> Default for AudioState<Extra> {
 	fn default() -> Self {
 		Self::DEFAULT
 	}

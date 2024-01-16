@@ -240,7 +240,7 @@ impl From<f32> for Volume {
 }
 
 //---------------------------------------------------------------------------------------------------- someday::ApplyReturn
-// impl<Data: ExtraData> someday::ApplyReturn<Signal<Data>, Volume, ()> for AudioState<Data> {
+// impl<Extra: ExtraData> someday::ApplyReturn<Signal<Extra>, Volume, ()> for AudioState<Extra> {
 // 	fn apply_return(s: &mut Volume, w: &mut Self, _: &Self) {
 // 		w.volume = *s;
 // 	}

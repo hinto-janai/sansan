@@ -4,22 +4,22 @@
 use crate::{
 	actor::kernel::{Kernel,KernelToDecode,KernelToAudio,KernelToGc},
 	state::{AudioState,AudioStateSnapshot},
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 	macros::try_send,
 };
 use crossbeam::channel::Sender;
 use std::sync::atomic::Ordering;
 
 //----------------------------------------------------------------------------------------------------
-impl<Data: ExtraData> Kernel<Data> {
+impl<Extra: ExtraData> Kernel<Extra> {
 	/// TODO
 	pub(super) fn restore(
 		&mut self,
-		audio_state: AudioState<Data>,
-		to_gc: &Sender<KernelToGc<Data>>,
+		audio_state: AudioState<Extra>,
+		to_gc: &Sender<KernelToGc<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
-		to_decode: &Sender<KernelToDecode<Data>>,
-		to_engine: &Sender<AudioStateSnapshot<Data>>,
+		to_decode: &Sender<KernelToDecode<Extra>>,
+		to_engine: &Sender<AudioStateSnapshot<Extra>>,
 	) {
 		// Save atomic state before losing ownership.
 		let atomic_state_repeat  = audio_state.repeat;

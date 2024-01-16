@@ -4,18 +4,18 @@
 use crate::{
 	actor::kernel::Kernel,
 	state::AudioStateSnapshot,
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 	macros::try_send,
 };
 use crossbeam::channel::Sender;
 use std::sync::atomic::Ordering;
 
 //----------------------------------------------------------------------------------------------------
-impl<Data: ExtraData> Kernel<Data> {
+impl<Extra: ExtraData> Kernel<Extra> {
 	/// TODO
 	pub(super) fn pause(
 		&mut self,
-		to_engine: &Sender<AudioStateSnapshot<Data>>,
+		to_engine: &Sender<AudioStateSnapshot<Extra>>,
 	) {
 		if !self.current_is_some() || !self.playing() {
 			try_send!(to_engine, self.audio_state_snapshot());

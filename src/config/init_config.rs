@@ -7,7 +7,7 @@ use crate::{
 	config::{Callbacks,LiveConfig},
 	engine::Engine,
 	state::AudioState,
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 };
 use strum::{
 	AsRefStr,
@@ -24,9 +24,9 @@ use strum::{
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug)]
 /// TODO
-pub struct InitConfig<Data>
+pub struct InitConfig<Extra>
 where
-	Data: ExtraData,
+	Extra: ExtraData,
 {
 	//------------------------------------------ Engine
 	/// TODO
@@ -42,15 +42,15 @@ where
 
 	//------------------------------------------ Restore state/settings
 	/// TODO
-	pub audio_state: Option<AudioState<Data>>,
+	pub audio_state: Option<AudioState<Extra>>,
 	/// TODO
 	pub live_config: Option<LiveConfig>,
 }
 
 //---------------------------------------------------------------------------------------------------- InitConfig Impl
-impl<Data> InitConfig<Data>
+impl<Extra> InitConfig<Extra>
 where
-	Data: ExtraData,
+	Extra: ExtraData,
 {
 	/// Return a reasonable default [`InitConfig`].
 	///
@@ -65,7 +65,7 @@ where
 	/// is also `()`.
 	///
 	/// Of course, you can (and probably should) override these generics,
-	/// and provide any custom combination of `Data, Call, Error`.
+	/// and provide any custom combination of `Extra, Call, Error`.
 	///
 	/// ```rust
 	/// # use sansan::config::*;
@@ -88,7 +88,7 @@ where
 	};
 }
 
-impl<Data: ExtraData> Default for InitConfig<Data> {
+impl<Extra: ExtraData> Default for InitConfig<Extra> {
 	fn default() -> Self {
 		Self::DEFAULT
 	}

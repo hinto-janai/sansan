@@ -4,22 +4,22 @@
 use crate::{
 	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::AudioStateSnapshot,
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 	signal::{add::{Add,AddMethod}, AddMany},
 	macros::try_send, source::Sources,
 };
 use crossbeam::channel::{Sender,Receiver};
 
 //----------------------------------------------------------------------------------------------------
-impl<Data: ExtraData> Kernel<Data> {
+impl<Extra: ExtraData> Kernel<Extra> {
 	/// TODO
 	pub(super) fn add(
 		&mut self,
-		add: Add<Data>,
-		to_gc: &Sender<KernelToGc<Data>>,
+		add: Add<Extra>,
+		to_gc: &Sender<KernelToGc<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
-		to_decode: &Sender<KernelToDecode<Data>>,
-		to_engine: &Sender<AudioStateSnapshot<Data>>
+		to_decode: &Sender<KernelToDecode<Extra>>,
+		to_engine: &Sender<AudioStateSnapshot<Extra>>
 	) {
 		// Re-use `add_many()`.
 		self.add_many(add.into(), to_gc, to_audio, to_decode, to_engine);
@@ -53,7 +53,7 @@ mod tests {
 			engine: &mut Engine<usize>,
 			add: Add<usize>,
 			index: usize,
-			data: &[usize],
+			extra: &[usize],
 		) {
 			// Send `Add` signal to the `Engine`
 			// and get back the `AudioStateSnapshot`.
@@ -61,17 +61,17 @@ mod tests {
 
 			// Debug print.
 			println!("a: {a:#?}");
-			println!("data: {data:?}\n");
+			println!("extra: {extra:?}\n");
 
 			// Assert the `Source`'s in our state match the list of `Data` given, e.g:
 			//
-			// data:    [0, 1, 2]
+			// extra:    [0, 1, 2]
 			// sources: [(source_1, 0), (source_2, 1), (source_3), 2]
 			//
 			// This would be OK.
 			let mut i = 0;
-			for data in data {
-				assert_eq!(a.queue[i].data(), data);
+			for extra in extra {
+				assert_eq!(a.queue[i].extra(), extra);
 				i += 1;
 			}
 

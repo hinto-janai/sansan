@@ -5,7 +5,7 @@ use crate::{
 	signal::{Volume,Repeat,AtomicVolume,AtomicRepeat},
 	source::Source,
 	meta::Metadata,
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 };
 use someday::{Reader, Commit, CommitRef};
 use std::{
@@ -20,27 +20,27 @@ use std::{
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq)]
-pub struct Current<Data>
+pub struct Current<Extra>
 where
-	Data: ExtraData
+	Extra: ExtraData
 {
 	/// TODO
-	pub source: Source<Data>,
+	pub source: Source<Extra>,
 	/// TODO
 	pub index: usize,
 	/// TODO
 	pub elapsed: f64,
 }
 
-impl<Data> Current<Data>
+impl<Extra> Current<Extra>
 where
-	Data: ExtraData
+	Extra: ExtraData
 {
 	/// Returns an `Option<Current>` with:
 	/// - a new `Source`
 	/// - 0th index
 	/// - 0.0 elapsed time
-	pub(crate) const fn new(source: Source<Data>) -> Self {
+	pub(crate) const fn new(source: Source<Extra>) -> Self {
 		Self {
 			source,
 			index: 0,

@@ -4,7 +4,7 @@
 use crate::{
 	source::Source,
 	error::SourceError,
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 };
 use std::{
 	time::Duration,
@@ -32,16 +32,16 @@ use crate::state::AudioState;
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug,Clone,PartialEq,PartialOrd)]
 /// TODO
-pub struct Sources<Data>(SourcesInner<Data>)
+pub struct Sources<Extra>(SourcesInner<Extra>)
 where
-	Data: ExtraData;
+	Extra: ExtraData;
 
-impl<Data> Sources<Data>
+impl<Extra> Sources<Extra>
 where
-	Data: ExtraData,
+	Extra: ExtraData,
 {
 	/// TODO
-	pub fn as_slice(&self) -> &[Source<Data>] {
+	pub fn as_slice(&self) -> &[Source<Extra>] {
 		use SourcesInner as S;
 		match &self.0 {
 			S::One(s) => std::slice::from_ref(s),
@@ -82,15 +82,15 @@ where
 	}
 
 	/// TODO
-	pub fn iter(&self) -> impl Iterator<Item = &Source<Data>> {
+	pub fn iter(&self) -> impl Iterator<Item = &Source<Extra>> {
 		self.as_slice().iter()
 	}
 
 	#[must_use]
 	#[allow(clippy::should_implement_trait)]
 	/// TODO
-	pub fn from_iter(sources: impl Iterator<Item = Source<Data>>) -> Option<Self> {
-		let boxed: Box<[Source<Data>]> = sources.collect();
+	pub fn from_iter(sources: impl Iterator<Item = Source<Extra>>) -> Option<Self> {
+		let boxed: Box<[Source<Extra>]> = sources.collect();
 		if boxed.is_empty() {
 			None
 		} else {
@@ -100,7 +100,7 @@ where
 
 	#[must_use]
 	/// TODO
-	pub const fn from_static(sources: &'static [Source<Data>]) -> Option<Self> {
+	pub const fn from_static(sources: &'static [Source<Extra>]) -> Option<Self> {
 		if sources.is_empty() {
 			None
 		} else {
@@ -112,89 +112,89 @@ where
 	/// TODO
 	pub fn dummy() -> Self
 	where
-		Data: Default,
+		Extra: Default,
 	{
 		let source = Source::dummy();
 		Self::from_1(source)
 	}
 
 	#[must_use] /// TODO
-	pub const fn from_1(source: Source<Data>) -> Self { Self(SourcesInner::One(source)) }
+	pub const fn from_1(source: Source<Extra>) -> Self { Self(SourcesInner::One(source)) }
 	#[must_use] /// TODO
-	pub const fn from_2(source: [Source<Data>; 2]) -> Self { Self(SourcesInner::Array2(source)) }
+	pub const fn from_2(source: [Source<Extra>; 2]) -> Self { Self(SourcesInner::Array2(source)) }
 	#[must_use] /// TODO
-	pub const fn from_3(source: [Source<Data>; 3]) -> Self { Self(SourcesInner::Array3(source)) }
+	pub const fn from_3(source: [Source<Extra>; 3]) -> Self { Self(SourcesInner::Array3(source)) }
 	#[must_use] /// TODO
-	pub const fn from_4(source: [Source<Data>; 4]) -> Self { Self(SourcesInner::Array4(source)) }
+	pub const fn from_4(source: [Source<Extra>; 4]) -> Self { Self(SourcesInner::Array4(source)) }
 	#[must_use] /// TODO
-	pub const fn from_5(source: [Source<Data>; 5]) -> Self { Self(SourcesInner::Array5(source)) }
+	pub const fn from_5(source: [Source<Extra>; 5]) -> Self { Self(SourcesInner::Array5(source)) }
 	#[must_use] /// TODO
-	pub const fn from_6(source: [Source<Data>; 6]) -> Self { Self(SourcesInner::Array6(source)) }
+	pub const fn from_6(source: [Source<Extra>; 6]) -> Self { Self(SourcesInner::Array6(source)) }
 	#[must_use] /// TODO
-	pub const fn from_7(source: [Source<Data>; 7]) -> Self { Self(SourcesInner::Array7(source)) }
+	pub const fn from_7(source: [Source<Extra>; 7]) -> Self { Self(SourcesInner::Array7(source)) }
 	#[must_use] /// TODO
-	pub const fn from_8(source: [Source<Data>; 8]) -> Self { Self(SourcesInner::Array8(source)) }
+	pub const fn from_8(source: [Source<Extra>; 8]) -> Self { Self(SourcesInner::Array8(source)) }
 	#[must_use] /// TODO
-	pub const fn from_9(source: [Source<Data>; 9]) -> Self { Self(SourcesInner::Array9(source)) }
+	pub const fn from_9(source: [Source<Extra>; 9]) -> Self { Self(SourcesInner::Array9(source)) }
 	#[must_use] /// TODO
-	pub const fn from_10(source: [Source<Data>; 10]) -> Self { Self(SourcesInner::Array10(source)) }
+	pub const fn from_10(source: [Source<Extra>; 10]) -> Self { Self(SourcesInner::Array10(source)) }
 	#[must_use] /// TODO
-	pub const fn from_11(source: [Source<Data>; 11]) -> Self { Self(SourcesInner::Array11(source)) }
+	pub const fn from_11(source: [Source<Extra>; 11]) -> Self { Self(SourcesInner::Array11(source)) }
 	#[must_use] /// TODO
-	pub const fn from_12(source: [Source<Data>; 12]) -> Self { Self(SourcesInner::Array12(source)) }
+	pub const fn from_12(source: [Source<Extra>; 12]) -> Self { Self(SourcesInner::Array12(source)) }
 	#[must_use] /// TODO
-	pub const fn from_13(source: [Source<Data>; 13]) -> Self { Self(SourcesInner::Array13(source)) }
+	pub const fn from_13(source: [Source<Extra>; 13]) -> Self { Self(SourcesInner::Array13(source)) }
 	#[must_use] /// TODO
-	pub const fn from_14(source: [Source<Data>; 14]) -> Self { Self(SourcesInner::Array14(source)) }
+	pub const fn from_14(source: [Source<Extra>; 14]) -> Self { Self(SourcesInner::Array14(source)) }
 	#[must_use] /// TODO
-	pub const fn from_15(source: [Source<Data>; 15]) -> Self { Self(SourcesInner::Array15(source)) }
+	pub const fn from_15(source: [Source<Extra>; 15]) -> Self { Self(SourcesInner::Array15(source)) }
 	#[must_use] /// TODO
-	pub const fn from_16(source: [Source<Data>; 16]) -> Self { Self(SourcesInner::Array16(source)) }
+	pub const fn from_16(source: [Source<Extra>; 16]) -> Self { Self(SourcesInner::Array16(source)) }
 	#[must_use] /// TODO
-	pub const fn from_17(source: [Source<Data>; 17]) -> Self { Self(SourcesInner::Array17(source)) }
+	pub const fn from_17(source: [Source<Extra>; 17]) -> Self { Self(SourcesInner::Array17(source)) }
 	#[must_use] /// TODO
-	pub const fn from_18(source: [Source<Data>; 18]) -> Self { Self(SourcesInner::Array18(source)) }
+	pub const fn from_18(source: [Source<Extra>; 18]) -> Self { Self(SourcesInner::Array18(source)) }
 	#[must_use] /// TODO
-	pub const fn from_19(source: [Source<Data>; 19]) -> Self { Self(SourcesInner::Array19(source)) }
+	pub const fn from_19(source: [Source<Extra>; 19]) -> Self { Self(SourcesInner::Array19(source)) }
 	#[must_use] /// TODO
-	pub const fn from_20(source: [Source<Data>; 20]) -> Self { Self(SourcesInner::Array20(source)) }
+	pub const fn from_20(source: [Source<Extra>; 20]) -> Self { Self(SourcesInner::Array20(source)) }
 	#[must_use] /// TODO
-	pub const fn from_21(source: [Source<Data>; 21]) -> Self { Self(SourcesInner::Array21(source)) }
+	pub const fn from_21(source: [Source<Extra>; 21]) -> Self { Self(SourcesInner::Array21(source)) }
 	#[must_use] /// TODO
-	pub const fn from_22(source: [Source<Data>; 22]) -> Self { Self(SourcesInner::Array22(source)) }
+	pub const fn from_22(source: [Source<Extra>; 22]) -> Self { Self(SourcesInner::Array22(source)) }
 	#[must_use] /// TODO
-	pub const fn from_23(source: [Source<Data>; 23]) -> Self { Self(SourcesInner::Array23(source)) }
+	pub const fn from_23(source: [Source<Extra>; 23]) -> Self { Self(SourcesInner::Array23(source)) }
 	#[must_use] /// TODO
-	pub const fn from_24(source: [Source<Data>; 24]) -> Self { Self(SourcesInner::Array24(source)) }
+	pub const fn from_24(source: [Source<Extra>; 24]) -> Self { Self(SourcesInner::Array24(source)) }
 	#[must_use] /// TODO
-	pub const fn from_25(source: [Source<Data>; 25]) -> Self { Self(SourcesInner::Array25(source)) }
+	pub const fn from_25(source: [Source<Extra>; 25]) -> Self { Self(SourcesInner::Array25(source)) }
 	#[must_use] /// TODO
-	pub const fn from_26(source: [Source<Data>; 26]) -> Self { Self(SourcesInner::Array26(source)) }
+	pub const fn from_26(source: [Source<Extra>; 26]) -> Self { Self(SourcesInner::Array26(source)) }
 	#[must_use] /// TODO
-	pub const fn from_27(source: [Source<Data>; 27]) -> Self { Self(SourcesInner::Array27(source)) }
+	pub const fn from_27(source: [Source<Extra>; 27]) -> Self { Self(SourcesInner::Array27(source)) }
 	#[must_use] /// TODO
-	pub const fn from_28(source: [Source<Data>; 28]) -> Self { Self(SourcesInner::Array28(source)) }
+	pub const fn from_28(source: [Source<Extra>; 28]) -> Self { Self(SourcesInner::Array28(source)) }
 	#[must_use] /// TODO
-	pub const fn from_29(source: [Source<Data>; 29]) -> Self { Self(SourcesInner::Array29(source)) }
+	pub const fn from_29(source: [Source<Extra>; 29]) -> Self { Self(SourcesInner::Array29(source)) }
 	#[must_use] /// TODO
-	pub const fn from_30(source: [Source<Data>; 30]) -> Self { Self(SourcesInner::Array30(source)) }
+	pub const fn from_30(source: [Source<Extra>; 30]) -> Self { Self(SourcesInner::Array30(source)) }
 	#[must_use] /// TODO
-	pub const fn from_31(source: [Source<Data>; 31]) -> Self { Self(SourcesInner::Array31(source)) }
+	pub const fn from_31(source: [Source<Extra>; 31]) -> Self { Self(SourcesInner::Array31(source)) }
 	#[must_use] /// TODO
-	pub const fn from_32(source: [Source<Data>; 32]) -> Self { Self(SourcesInner::Array32(source)) }
+	pub const fn from_32(source: [Source<Extra>; 32]) -> Self { Self(SourcesInner::Array32(source)) }
 }
 
-impl<'a, Data: ExtraData> IntoIterator for &'a Sources<Data> {
-	type Item = &'a Source<Data>;
-	type IntoIter = std::slice::Iter<'a, Source<Data>>;
+impl<'a, Extra: ExtraData> IntoIterator for &'a Sources<Extra> {
+	type Item = &'a Source<Extra>;
+	type IntoIter = std::slice::Iter<'a, Source<Extra>>;
 	fn into_iter(self) -> Self::IntoIter {
 		self.as_slice().iter()
 	}
 }
 
 /// From 1 Source.
-impl<Data: ExtraData> From<Source<Data>> for Sources<Data> {
-	fn from(value: Source<Data>) -> Self {
+impl<Extra: ExtraData> From<Source<Extra>> for Sources<Extra> {
+	fn from(value: Source<Extra>) -> Self {
 		Self::from_1(value)
 	}
 }
@@ -207,8 +207,8 @@ macro_rules! impl_from_array {
 		$(,)?
 	)*) => {
 		$(
-			impl<Data: ExtraData> From<[Source<Data>; $array_len]> for Sources<Data> {
-				fn from(value: [Source<Data>; $array_len]) -> Self {
+			impl<Extra: ExtraData> From<[Source<Extra>; $array_len]> for Sources<Extra> {
+				fn from(value: [Source<Extra>; $array_len]) -> Self {
 					Self::$constructor(value)
 				}
 			}
@@ -252,73 +252,73 @@ impl_from_array! {
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug,Clone,PartialEq,PartialOrd)]
 /// TODO
-pub(crate) enum SourcesInner<Data: ExtraData> {
+pub(crate) enum SourcesInner<Extra: ExtraData> {
 	/// TODO
-	One(Source<Data>),
+	One(Source<Extra>),
 	/// TODO
-	Box(Box<[Source<Data>]>),
+	Box(Box<[Source<Extra>]>),
 	/// TODO
-	Static(Cow<'static, [Source<Data>]>),
+	Static(Cow<'static, [Source<Extra>]>),
 	/// TODO
-	Array2([Source<Data>; 2]),
+	Array2([Source<Extra>; 2]),
 	/// TODO
-	Array3([Source<Data>; 3]),
+	Array3([Source<Extra>; 3]),
 	/// TODO
-	Array4([Source<Data>; 4]),
+	Array4([Source<Extra>; 4]),
 	/// TODO
-	Array5([Source<Data>; 5]),
+	Array5([Source<Extra>; 5]),
 	/// TODO
-	Array6([Source<Data>; 6]),
+	Array6([Source<Extra>; 6]),
 	/// TODO
-	Array7([Source<Data>; 7]),
+	Array7([Source<Extra>; 7]),
 	/// TODO
-	Array8([Source<Data>; 8]),
+	Array8([Source<Extra>; 8]),
 	/// TODO
-	Array9([Source<Data>; 9]),
+	Array9([Source<Extra>; 9]),
 	/// TODO
-	Array10([Source<Data>; 10]),
+	Array10([Source<Extra>; 10]),
 	/// TODO
-	Array11([Source<Data>; 11]),
+	Array11([Source<Extra>; 11]),
 	/// TODO
-	Array12([Source<Data>; 12]),
+	Array12([Source<Extra>; 12]),
 	/// TODO
-	Array13([Source<Data>; 13]),
+	Array13([Source<Extra>; 13]),
 	/// TODO
-	Array14([Source<Data>; 14]),
+	Array14([Source<Extra>; 14]),
 	/// TODO
-	Array15([Source<Data>; 15]),
+	Array15([Source<Extra>; 15]),
 	/// TODO
-	Array16([Source<Data>; 16]),
+	Array16([Source<Extra>; 16]),
 	/// TODO
-	Array17([Source<Data>; 17]),
+	Array17([Source<Extra>; 17]),
 	/// TODO
-	Array18([Source<Data>; 18]),
+	Array18([Source<Extra>; 18]),
 	/// TODO
-	Array19([Source<Data>; 19]),
+	Array19([Source<Extra>; 19]),
 	/// TODO
-	Array20([Source<Data>; 20]),
+	Array20([Source<Extra>; 20]),
 	/// TODO
-	Array21([Source<Data>; 21]),
+	Array21([Source<Extra>; 21]),
 	/// TODO
-	Array22([Source<Data>; 22]),
+	Array22([Source<Extra>; 22]),
 	/// TODO
-	Array23([Source<Data>; 23]),
+	Array23([Source<Extra>; 23]),
 	/// TODO
-	Array24([Source<Data>; 24]),
+	Array24([Source<Extra>; 24]),
 	/// TODO
-	Array25([Source<Data>; 25]),
+	Array25([Source<Extra>; 25]),
 	/// TODO
-	Array26([Source<Data>; 26]),
+	Array26([Source<Extra>; 26]),
 	/// TODO
-	Array27([Source<Data>; 27]),
+	Array27([Source<Extra>; 27]),
 	/// TODO
-	Array28([Source<Data>; 28]),
+	Array28([Source<Extra>; 28]),
 	/// TODO
-	Array29([Source<Data>; 29]),
+	Array29([Source<Extra>; 29]),
 	/// TODO
-	Array30([Source<Data>; 30]),
+	Array30([Source<Extra>; 30]),
 	/// TODO
-	Array31([Source<Data>; 31]),
+	Array31([Source<Extra>; 31]),
 	/// TODO
-	Array32([Source<Data>; 32]),
+	Array32([Source<Extra>; 32]),
 }

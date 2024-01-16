@@ -10,7 +10,7 @@
 pub(crate) struct Toggle;
 
 //---------------------------------------------------------------------------------------------------- someday::Apply
-// impl<Data: ExtraData> someday::ApplyReturn<Signal<Data>, Toggle, ()> for AudioState<Data> {
+// impl<Extra: ExtraData> someday::ApplyReturn<Signal<Extra>, Toggle, ()> for AudioState<Extra> {
 // 	fn apply_return(s: &mut Toggle, w: &mut Self, r: &Self) {
 // 		// INVARIANT: [Kernel] must check these.
 // 		debug_assert!(w.current.is_some());

@@ -4,7 +4,7 @@
 use crate::{
 	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::{AudioStateSnapshot,Current},
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 	signal::remove::{Remove,RemoveError},
 	signal::remove_range::RemoveRange,
 	macros::try_send,
@@ -16,15 +16,15 @@ use std::{
 };
 
 //----------------------------------------------------------------------------------------------------
-impl<Data: ExtraData> Kernel<Data> {
+impl<Extra: ExtraData> Kernel<Extra> {
 	/// TODO
 	pub(super) fn remove(
 		&mut self,
 		remove: Remove,
-		to_gc: &Sender<KernelToGc<Data>>,
+		to_gc: &Sender<KernelToGc<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
-		to_decode: &Sender<KernelToDecode<Data>>,
-		to_engine: &Sender<Result<AudioStateSnapshot<Data>, RemoveError>>,
+		to_decode: &Sender<KernelToDecode<Extra>>,
+		to_engine: &Sender<Result<AudioStateSnapshot<Extra>, RemoveError>>,
 	) {
 		// Re-use the range function.
 		//
@@ -90,9 +90,9 @@ mod tests {
 		restore_audio_state(&mut engine);
 		let audio_state = engine.reader().get();
 
-		// Get an array of the queue's <Data>, from 0th element to the last.
+		// Get an array of the queue's <Extra>, from 0th element to the last.
 		fn queue_data(queue: &VecDeque<Source<usize>>) -> Vec<usize> {
-			queue.iter().map(|s| *s.data()).collect()
+			queue.iter().map(|s| *s.extra()).collect()
 		}
 
 		//---------------------------------- Remove bad index
@@ -104,21 +104,21 @@ mod tests {
 		let resp = engine.remove(Remove { index: 5 }).unwrap();
 		assert_eq!(queue_data(&resp.queue), [0, 1, 2, 3, 4, /* 5, */ 6, 7, 8, 9]);
 		assert_eq!(resp.current.as_ref().unwrap().index, 4);
-		assert_eq!(*resp.current.as_ref().unwrap().source.data(), 4);
+		assert_eq!(*resp.current.as_ref().unwrap().source.extra(), 4);
 		restore_audio_state(&mut engine);
 
 		//---------------------------------- Remove the current index
 		let resp = engine.remove(Remove { index: 4 }).unwrap();
 		assert_eq!(queue_data(&resp.queue), [0, 1, 2, 3, /* 4, */ 5, 6, 7, 8, 9]);
 		assert_eq!(resp.current.as_ref().unwrap().index, 4);
-		assert_eq!(*resp.current.as_ref().unwrap().source.data(), 5); // 4 -> 5 (data)
+		assert_eq!(*resp.current.as_ref().unwrap().source.extra(), 5); // 4 -> 5 (data)
 		restore_audio_state(&mut engine);
 
 		//---------------------------------- Remove the 3rd index (behind current)
 		let resp = engine.remove(Remove { index: 3 }).unwrap();
 		assert_eq!(queue_data(&resp.queue), [0, 1, 2, /* 3, */ 4, 5, 6, 7, 8, 9]);
 		assert_eq!(resp.current.as_ref().unwrap().index, 3);
-		assert_eq!(*resp.current.as_ref().unwrap().source.data(), 4);
+		assert_eq!(*resp.current.as_ref().unwrap().source.extra(), 4);
 		restore_audio_state(&mut engine);
 
 		//---------------------------------- Remove entire queue
@@ -129,7 +129,7 @@ mod tests {
 		let state = engine.reader().get();
 		assert_eq!(queue_data(&state.queue), [/* 0, 1, 2, 3, 4, 5, 6, 7, 8, */ 9]);
 		assert_eq!(state.current.as_ref().unwrap().index, 0);
-		assert_eq!(*state.current.as_ref().unwrap().source.data(), 9);
+		assert_eq!(*state.current.as_ref().unwrap().source.extra(), 9);
 
 		let resp = engine.remove(Remove { index: 0 }).unwrap();
 		assert_eq!(queue_data(&resp.queue), []);

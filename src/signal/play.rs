@@ -10,7 +10,7 @@
 pub(crate) struct Play;
 
 //---------------------------------------------------------------------------------------------------- someday::Apply
-// impl<Data: ExtraData> someday::ApplyReturn<Signal<Data>, Play, ()> for AudioState<Data> {
+// impl<Extra: ExtraData> someday::ApplyReturn<Signal<Extra>, Play, ()> for AudioState<Extra> {
 // 	fn apply_return(s: &mut Play, w: &mut Self, r: &Self) {
 // 		// INVARIANT: [Kernel] must check these.
 // 		debug_assert!(w.current.is_some());

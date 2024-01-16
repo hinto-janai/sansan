@@ -137,8 +137,8 @@ compile_error!("sansan is only compatible with 64/32-bit CPUs");
 mod engine;
 pub use engine::Engine;
 
-mod valid_data;
-pub use valid_data::ExtraData;
+mod extra_data;
+pub use extra_data::ExtraData;
 
 pub mod state;
 pub mod source;

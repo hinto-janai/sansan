@@ -3,7 +3,7 @@
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
 	engine::{Engine, error::EngineInitError},
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 	macros::{try_send,debug2,info2},
 	state::{
 		AudioStateReader,
@@ -51,9 +51,9 @@ use crate::resampler::ResamplerStruct;
 const ACTOR_COUNT: usize = 6;
 
 //---------------------------------------------------------------------------------------------------- Engine Impl
-impl<Data> Engine<Data>
+impl<Extra> Engine<Extra>
 where
-	Data: ExtraData,
+	Extra: ExtraData,
 {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
@@ -68,7 +68,7 @@ where
 	///
 	/// # Panics
 	/// TODO
-	pub fn init(mut config: InitConfig<Data>) -> Result<Self, EngineInitError> {
+	pub fn init(mut config: InitConfig<Extra>) -> Result<Self, EngineInitError> {
 		info2!("Engine - initializing...");
 		debug2!("Engine - init config:\n{config:#?}");
 
@@ -325,7 +325,7 @@ where
 					from_kernel: gc_from_k,
 				},
 			},
-			Gc::<Data>::init
+			Gc::<Extra>::init
 		);
 
 		//-------------------------------------------------------------- Initialize [Kernel] <-> [Engine] channels
@@ -446,7 +446,7 @@ where
 			w: audio_state_writer,
 			channels,
 		};
-		if let Err(error) = Kernel::<Data>::init(init_args) {
+		if let Err(error) = Kernel::<Extra>::init(init_args) {
 			return Err(EngineInitError::ThreadSpawn {
 				name: "Kernel",
 				error,

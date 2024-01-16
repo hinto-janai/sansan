@@ -4,7 +4,7 @@
 use crate::{
 	actor::kernel::kernel::Kernel,
 	state::{AudioStateSnapshot,Current},
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 	signal::repeat::Repeat,
 	macros::try_send,
 };
@@ -15,12 +15,12 @@ use std::{
 };
 
 //----------------------------------------------------------------------------------------------------
-impl<Data: ExtraData> Kernel<Data> {
+impl<Extra: ExtraData> Kernel<Extra> {
 	/// TODO
 	pub(super) fn repeat(
 		&mut self,
 		repeat: Repeat,
-		to_engine: &Sender<AudioStateSnapshot<Data>>,
+		to_engine: &Sender<AudioStateSnapshot<Extra>>,
 	) {
 		if self.w.repeat == repeat {
 			try_send!(to_engine, self.audio_state_snapshot());

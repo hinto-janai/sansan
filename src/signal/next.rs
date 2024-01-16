@@ -19,8 +19,8 @@ pub(crate) struct Next {
 // // must clean the audio state up, and tell everyone else.
 // //
 // // `Some(Source)` means there is a new source to play.
-// impl<Data: ExtraData> ApplyReturn<Signal<Data>, Next, Option<Source<Data>>> for AudioState<Data> {
-// 	fn apply_return(s: &mut Next, w: &mut Self, _: &Self) -> Option<Source<Data>> {
+// impl<Extra: ExtraData> ApplyReturn<Signal<Extra>, Next, Option<Source<Extra>>> for AudioState<Extra> {
+// 	fn apply_return(s: &mut Next, w: &mut Self, _: &Self) -> Option<Source<Extra>> {
 // 		// INVARIANT:
 // 		// [Kernel] only checks that
 // 		// the queue isn't empty.

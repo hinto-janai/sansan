@@ -4,7 +4,7 @@
 use crate::{
 	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::{AudioStateSnapshot,Current},
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 	signal::set_index::{SetIndex,SetIndexError},
 	macros::{try_send,recv},
 };
@@ -12,15 +12,15 @@ use crossbeam::channel::Sender;
 use std::sync::atomic::Ordering;
 
 //----------------------------------------------------------------------------------------------------
-impl<Data: ExtraData> Kernel<Data> {
+impl<Extra: ExtraData> Kernel<Extra> {
 	/// TODO
 	pub(super) fn set_index(
 		&mut self,
 		set_index: SetIndex,
-		to_gc: &Sender<KernelToGc<Data>>,
+		to_gc: &Sender<KernelToGc<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
-		to_decode: &Sender<KernelToDecode<Data>>,
-		to_engine: &Sender<Result<AudioStateSnapshot<Data>, SetIndexError>>,
+		to_decode: &Sender<KernelToDecode<Extra>>,
+		to_engine: &Sender<Result<AudioStateSnapshot<Extra>, SetIndexError>>,
 	) {
 		if self.queue_empty() {
 			try_send!(to_engine, Err(SetIndexError::QueueEmpty));
@@ -106,7 +106,7 @@ mod tests {
 		let resp = engine.set_index(SetIndex { index: 9, play: None }).unwrap();
 		let current = resp.current.as_ref().unwrap();
 		assert_eq!(current.index, 9);
-		assert_eq!(*current.source.data(), 9);
+		assert_eq!(*current.source.extra(), 9);
 		assert_eq!(current.elapsed, 0.0);
 		assert_eq!(resp.playing, false);
 
@@ -114,7 +114,7 @@ mod tests {
 		let resp = engine.set_index(SetIndex { index: 0, play: None }).unwrap();
 		let current = resp.current.as_ref().unwrap();
 		assert_eq!(current.index, 0);
-		assert_eq!(*current.source.data(), 0);
+		assert_eq!(*current.source.extra(), 0);
 		assert_eq!(current.elapsed, 0.0);
 		assert_eq!(resp.playing, false);
 
@@ -122,7 +122,7 @@ mod tests {
 		let resp = engine.set_index(SetIndex { index: 0, play: Some(true) }).unwrap();
 		let current = resp.current.as_ref().unwrap();
 		assert_eq!(current.index, 0);
-		assert_eq!(*current.source.data(), 0);
+		assert_eq!(*current.source.extra(), 0);
 		assert_eq!(current.elapsed, 0.0);
 		assert_eq!(resp.playing, true);
 
@@ -130,7 +130,7 @@ mod tests {
 		let resp = engine.set_index(SetIndex { index: 0, play: Some(false) }).unwrap();
 		let current = resp.current.as_ref().unwrap();
 		assert_eq!(current.index, 0);
-		assert_eq!(*current.source.data(), 0);
+		assert_eq!(*current.source.extra(), 0);
 		assert_eq!(current.elapsed, 0.0);
 		assert_eq!(resp.playing, false);
 
@@ -141,7 +141,7 @@ mod tests {
 		let audio_state = engine.reader().get();
 		let current = audio_state.current.as_ref().unwrap();
 		assert_eq!(current.index, 0);
-		assert_eq!(*current.source.data(), 0);
+		assert_eq!(*current.source.extra(), 0);
 		assert_eq!(current.elapsed, 0.0);
 		assert_eq!(audio_state.playing, false);
 	}

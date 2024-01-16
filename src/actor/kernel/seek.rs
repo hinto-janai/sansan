@@ -4,7 +4,7 @@
 use crate::{
 	actor::kernel::kernel::{Kernel,KernelToAudio,KernelToDecode},
 	state::{AudioStateSnapshot,Current},
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 	signal::seek::{Seek,SeekedTime,SeekError},
 	macros::{try_send,recv},
 };
@@ -16,7 +16,7 @@ use std::{
 use symphonia::core::units::Time;
 
 //----------------------------------------------------------------------------------------------------
-impl<Data: ExtraData> Kernel<Data> {
+impl<Extra: ExtraData> Kernel<Extra> {
 	/// The inner logic of seeking behavior.
 	///
 	/// This is used by `Decode` and in the below `seek()` in tests.
@@ -87,9 +87,9 @@ impl<Data: ExtraData> Kernel<Data> {
 	pub(super) fn seek(
 		&mut self,
 		seek: Seek,
-		to_decode: &Sender<KernelToDecode<Data>>,
+		to_decode: &Sender<KernelToDecode<Extra>>,
 		from_decode_seek: &Receiver<Result<SeekedTime, SeekError>>,
-		to_engine: &Sender<Result<AudioStateSnapshot<Data>, SeekError>>,
+		to_engine: &Sender<Result<AudioStateSnapshot<Extra>, SeekError>>,
 	) {
 		// Return error to [Engine] if we don't have a `Current` loaded.
 		if !self.current_is_some() {

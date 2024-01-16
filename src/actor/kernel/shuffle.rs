@@ -4,7 +4,7 @@
 use crate::{
 	actor::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::{AudioStateSnapshot,Current},
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 	signal::shuffle::Shuffle,
 	signal::seek::{Seek,SeekError,SeekedTime},
 	macros::try_send,
@@ -12,15 +12,15 @@ use crate::{
 use crossbeam::channel::{Sender,Receiver};
 
 //----------------------------------------------------------------------------------------------------
-impl<Data: ExtraData> Kernel<Data> {
+impl<Extra: ExtraData> Kernel<Extra> {
 	/// TODO
 	pub(super) fn shuffle(
 		&mut self,
 		shuffle: Shuffle,
-		to_gc: &Sender<KernelToGc<Data>>,
+		to_gc: &Sender<KernelToGc<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
-		to_decode: &Sender<KernelToDecode<Data>>,
-		to_engine: &Sender<AudioStateSnapshot<Data>>,
+		to_decode: &Sender<KernelToDecode<Extra>>,
+		to_engine: &Sender<AudioStateSnapshot<Extra>>,
 	) {
 		let queue_len = self.w.queue.len();
 
@@ -220,7 +220,7 @@ mod tests {
 		let resp = engine.restore(audio_state);
 		assert_eq!(resp.queue.len(), 10);
 		assert_eq!(resp.current.as_ref().unwrap().index, 4);
-		let queue_data: Vec<usize> = resp.queue.iter().map(|s| *s.data()).collect();
+		let queue_data: Vec<usize> = resp.queue.iter().map(|s| *s.extra()).collect();
 		assert_eq!(queue_data, &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
 		//---------------------------------- Testing function used after each operation.
@@ -242,7 +242,7 @@ mod tests {
 			// sources: [(source_1, 0), (source_2, 1), (source_3), 2]
 			//
 			// This would be OK.
-			let queue_data: Vec<usize> = resp.queue.iter().map(|s| *s.data()).collect();
+			let queue_data: Vec<usize> = resp.queue.iter().map(|s| *s.extra()).collect();
 			println!("queue_data: {queue_data:?}");
 			assert_eq!(queue_data, data);
 

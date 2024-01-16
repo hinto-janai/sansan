@@ -6,7 +6,7 @@ use crossbeam::channel::{Sender, Receiver, Select};
 use rand::SeedableRng;
 use crate::{
 	macros::{send,recv,try_recv,try_send,debug2,select_recv, trace2},
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 	state::{
 		AudioState,
 		AtomicState,
@@ -60,13 +60,13 @@ use strum::EnumCount;
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
 #[derive(Debug)]
-pub(crate) struct Kernel<Data: ExtraData> {
+pub(crate) struct Kernel<Extra: ExtraData> {
 	pub(super) atomic_state: Arc<AtomicState>,
 	/// The [W]riter half of the [Engine]'s [`AudioState`].
 	///
 	/// This originally was [audio_state] but this field is
 	/// accessed a lot, so it is just [w], for [w]riter.
-	pub(super) w:               someday::Writer<AudioState<Data>>,
+	pub(super) w:               someday::Writer<AudioState<Extra>>,
 	pub(super) shutdown_wait:   Arc<Barrier>,
 }
 
@@ -75,10 +75,10 @@ pub(crate) struct Kernel<Data: ExtraData> {
 // send to the other actors.
 
 /// TODO
-pub(crate) enum KernelToDecode<Data: ExtraData> {
+pub(crate) enum KernelToDecode<Extra: ExtraData> {
 	/// Convert this [Source] into a real
 	/// [SourceDecode] and start decoding it.
-	NewSource(Source<Data>),
+	NewSource(Source<Extra>),
 	/// Seek to this timestamp in the currently
 	/// playing track and start decoding from there
 	Seek(crate::signal::Seek),
@@ -96,11 +96,11 @@ pub(crate) enum KernelToAudio {
 }
 
 /// TODO
-pub(crate) enum KernelToGc<Data: ExtraData> {
+pub(crate) enum KernelToGc<Extra: ExtraData> {
 	/// TODO
-	Source(Source<Data>),
+	Source(Source<Extra>),
 	/// TODO
-	AudioState(AudioState<Data>),
+	AudioState(AudioState<Extra>),
 }
 
 //---------------------------------------------------------------------------------------------------- Recv
@@ -116,7 +116,7 @@ pub(crate) enum KernelToGc<Data: ExtraData> {
 /// receive channels are in this one-off [Recv] instead of within
 /// [Kernel] as fields.
 #[allow(clippy::missing_docs_in_private_items)]
-pub(crate) struct Channels<Data: ExtraData> {
+pub(crate) struct Channels<Extra: ExtraData> {
 	// Shutdown signal.
 	pub(crate) shutdown: Receiver<()>,
 	pub(crate) shutdown_hang: Receiver<()>,
@@ -132,7 +132,7 @@ pub(crate) struct Channels<Data: ExtraData> {
 	pub(crate) from_audio_error: Receiver<OutputError>,
 
 	// [Decode]
-	pub(crate) to_decode:           Sender<KernelToDecode<Data>>,
+	pub(crate) to_decode:           Sender<KernelToDecode<Extra>>,
 	pub(crate) from_decode_seek:    Receiver<Result<SeekedTime, SeekError>>,
 	pub(crate) from_decode_source:  Receiver<Result<(), SourceError>>,
 	pub(crate) to_decode_error_d:   Option<(Sender<()>, ErrorCallback)>,
@@ -141,10 +141,10 @@ pub(crate) struct Channels<Data: ExtraData> {
 	pub(crate) from_decode_error_s: Receiver<SourceError>,
 
 	// [Gc]
-	pub(crate) to_gc: Sender<KernelToGc<Data>>,
+	pub(crate) to_gc: Sender<KernelToGc<Extra>>,
 
 	// Shared common return channel for signals that don't have special output.
-	pub(crate) send_audio_state: Sender<AudioStateSnapshot<Data>>,
+	pub(crate) send_audio_state: Sender<AudioStateSnapshot<Extra>>,
 
 	// Signals that have no input and output `AudioStateSnapshot`
 	pub(crate) recv_toggle:   Receiver<()>,
@@ -155,49 +155,49 @@ pub(crate) struct Channels<Data: ExtraData> {
 	pub(crate) recv_stop:     Receiver<()>,
 
 	// Signals that have input and output `AudioStateSnapshot`
-	pub(crate) recv_add:            Receiver<Add<Data>>,
-	pub(crate) recv_add_many:       Receiver<AddMany<Data>>,
+	pub(crate) recv_add:            Receiver<Add<Extra>>,
+	pub(crate) recv_add_many:       Receiver<AddMany<Extra>>,
 	pub(crate) recv_clear:          Receiver<Clear>,
 	pub(crate) recv_repeat:         Receiver<Repeat>,
 	pub(crate) recv_volume:         Receiver<Volume>,
 	pub(crate) recv_shuffle:        Receiver<Shuffle>,
-	pub(crate) recv_restore:        Receiver<AudioState<Data>>,
+	pub(crate) recv_restore:        Receiver<AudioState<Extra>>,
 
 	// Signals that return `Result<T, E>`
-	pub(crate) send_seek:         Sender<Result<AudioStateSnapshot<Data>, SeekError>>,
+	pub(crate) send_seek:         Sender<Result<AudioStateSnapshot<Extra>, SeekError>>,
 	pub(crate) recv_seek:         Receiver<Seek>,
-	pub(crate) send_skip:         Sender<Result<AudioStateSnapshot<Data>, SkipError>>,
+	pub(crate) send_skip:         Sender<Result<AudioStateSnapshot<Extra>, SkipError>>,
 	pub(crate) recv_skip:         Receiver<Skip>,
-	pub(crate) send_back:         Sender<Result<AudioStateSnapshot<Data>, BackError>>,
+	pub(crate) send_back:         Sender<Result<AudioStateSnapshot<Extra>, BackError>>,
 	pub(crate) recv_back:         Receiver<Back>,
-	pub(crate) send_set_index:    Sender<Result<AudioStateSnapshot<Data>, SetIndexError>>,
+	pub(crate) send_set_index:    Sender<Result<AudioStateSnapshot<Extra>, SetIndexError>>,
 	pub(crate) recv_set_index:    Receiver<SetIndex>,
-	pub(crate) send_remove:       Sender<Result<AudioStateSnapshot<Data>, RemoveError>>,
+	pub(crate) send_remove:       Sender<Result<AudioStateSnapshot<Extra>, RemoveError>>,
 	pub(crate) recv_remove:       Receiver<Remove>,
-	pub(crate) send_remove_range: Sender<Result<AudioStateSnapshot<Data>, RemoveError>>,
+	pub(crate) send_remove_range: Sender<Result<AudioStateSnapshot<Extra>, RemoveError>>,
 	pub(crate) recv_remove_range: Receiver<RemoveRange>,
 }
 
 //---------------------------------------------------------------------------------------------------- Kernel Impl
 #[allow(clippy::missing_docs_in_private_items)]
-pub(crate) struct InitArgs<Data: ExtraData> {
+pub(crate) struct InitArgs<Extra: ExtraData> {
 	pub(crate) init_barrier:  Option<Arc<Barrier>>,
 	pub(crate) atomic_state:  Arc<AtomicState>,
 	pub(crate) shutdown_wait: Arc<Barrier>,
-	pub(crate) w:             someday::Writer<AudioState<Data>>,
-	pub(crate) channels:      Channels<Data>,
+	pub(crate) w:             someday::Writer<AudioState<Extra>>,
+	pub(crate) channels:      Channels<Extra>,
 }
 
 //---------------------------------------------------------------------------------------------------- Kernel Impl
-impl<Data> Kernel<Data>
+impl<Extra> Kernel<Extra>
 where
-	Data: ExtraData
+	Extra: ExtraData
 {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]
 	/// Initialize `Kernel`.
-	pub(crate) fn init(args: InitArgs<Data>) -> Result<JoinHandle<()>, std::io::Error> {
+	pub(crate) fn init(args: InitArgs<Extra>) -> Result<JoinHandle<()>, std::io::Error> {
 		std::thread::Builder::new()
 			.name("Kernel".into())
 			.spawn(move || {
@@ -228,7 +228,7 @@ where
 	#[inline(never)]
 	#[allow(clippy::cognitive_complexity)]
 	/// `Kernel`'s main function.
-	fn main(mut self, mut c: Channels<Data>) {
+	fn main(mut self, mut c: Channels<Extra>) {
 		// Create channels that we will
 		// be selecting/listening to for all time.
 		let mut select = Select::new();
@@ -399,8 +399,8 @@ where
 	pub(super) fn reset_source(
 		&self,
 		to_audio: &Sender<KernelToAudio>,
-		to_decode: &Sender<KernelToDecode<Data>>,
-		source: Source<Data>,
+		to_decode: &Sender<KernelToDecode<Extra>>,
+		source: Source<Extra>,
 	) {
 		// Tell `Audio` to discard its current audio data.
 		//
@@ -429,8 +429,8 @@ where
 	/// - `Decode` should not wipe any current data
 	/// - `Decode` should get started decoding this new `Source` ASAP
 	pub(super) fn new_source(
-		to_decode: &Sender<KernelToDecode<Data>>,
-		source: Source<Data>,
+		to_decode: &Sender<KernelToDecode<Extra>>,
+		source: Source<Extra>,
 	) {
 		try_send!(to_decode, KernelToDecode::NewSource(source));
 	}
@@ -455,7 +455,7 @@ where
 
 	#[inline]
 	/// TODO
-	pub(super) fn audio_state_snapshot(&self) -> AudioStateSnapshot<Data> {
+	pub(super) fn audio_state_snapshot(&self) -> AudioStateSnapshot<Extra> {
 		AudioStateSnapshot(self.w.head_remote_ref())
 	}
 
@@ -463,9 +463,9 @@ where
 	/// Replace the `AudioState`'s `Current` without dropping
 	/// the `Source` in-scope, but instead sending it to `Gc`.
 	pub(super) fn replace_current(
-		current: &mut Option<Current<Data>>,
-		new_current: Option<Current<Data>>,
-		to_gc: &Sender<KernelToGc<Data>>
+		current: &mut Option<Current<Extra>>,
+		new_current: Option<Current<Extra>>,
+		to_gc: &Sender<KernelToGc<Extra>>
 	) {
 		let old_current = std::mem::replace(current, new_current);
 		if let Some(current) = old_current {

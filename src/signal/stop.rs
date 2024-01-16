@@ -10,7 +10,7 @@
 pub(crate) struct Stop;
 
 //---------------------------------------------------------------------------------------------------- someday::ApplyReturn
-// impl<Data: ExtraData> someday::ApplyReturn<Signal<Data>, Stop, ()> for AudioState<Data> {
+// impl<Extra: ExtraData> someday::ApplyReturn<Signal<Extra>, Stop, ()> for AudioState<Extra> {
 // 	fn apply_return(_: &mut Stop, w: &mut Self, _: &Self) {
 // 		// INVARIANT: [Kernel] checks these.
 // 		debug_assert!(w.current.is_some() || !w.queue.is_empty());

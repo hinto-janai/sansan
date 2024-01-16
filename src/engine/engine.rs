@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	valid_data::ExtraData,
+	extra_data::ExtraData,
 	macros::{recv,try_send,debug2,info2},
 	state::{
 		AudioStateSnapshot,
@@ -52,12 +52,12 @@ use crate::resampler::ResamplerStruct;
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
 #[derive(Debug)]
-pub struct Engine<Data>
+pub struct Engine<Extra>
 where
-	Data: ExtraData,
+	Extra: ExtraData,
 {
 	/// Data and objects.
-	pub(super) reader: AudioStateReader<Data>,
+	pub(super) reader: AudioStateReader<Extra>,
 	pub(super) config: LiveConfig,
 	pub(super) atomic_state: Arc<AtomicState>,
 
@@ -76,7 +76,7 @@ where
 
 	/// This channel is shared between all signals that don't
 	/// have special output, i.e, they return `AudioStateSnapshot`.
-	pub(super) recv_audio_state: R<AudioStateSnapshot<Data>>,
+	pub(super) recv_audio_state: R<AudioStateSnapshot<Extra>>,
 
 	/// Signals that have no input and output `AudioStateSnapshot`
 	pub(super) send_toggle:   S<()>,
@@ -87,10 +87,10 @@ where
 	pub(super) send_stop:     S<()>,
 
 	/// Signals that have input and output `AudioStateSnapshot`.
-	pub(super) send_add:       S<Add<Data>>,
-	pub(super) send_add_many:  S<AddMany<Data>>,
+	pub(super) send_add:       S<Add<Extra>>,
+	pub(super) send_add_many:  S<AddMany<Extra>>,
 	pub(super) send_clear:     S<Clear>,
-	pub(super) send_restore:   S<AudioState<Data>>,
+	pub(super) send_restore:   S<AudioState<Extra>>,
 	pub(super) send_repeat:    S<Repeat>,
 	pub(super) send_volume:    S<Volume>,
 	pub(super) send_shuffle:   S<Shuffle>,
@@ -99,17 +99,17 @@ where
 	/// These don't use the common `recv_audio_state_snapshot`,
 	/// as they return unique values.
 	pub(super) send_seek:         S<Seek>,
-	pub(super) recv_seek:         R<Result<AudioStateSnapshot<Data>, SeekError>>,
+	pub(super) recv_seek:         R<Result<AudioStateSnapshot<Extra>, SeekError>>,
 	pub(super) send_skip:         S<Skip>,
-	pub(super) recv_skip:         R<Result<AudioStateSnapshot<Data>, SkipError>>,
+	pub(super) recv_skip:         R<Result<AudioStateSnapshot<Extra>, SkipError>>,
 	pub(super) send_back:         S<Back>,
-	pub(super) recv_back:         R<Result<AudioStateSnapshot<Data>, BackError>>,
+	pub(super) recv_back:         R<Result<AudioStateSnapshot<Extra>, BackError>>,
 	pub(super) send_set_index:    S<SetIndex>,
-	pub(super) recv_set_index:    R<Result<AudioStateSnapshot<Data>, SetIndexError>>,
+	pub(super) recv_set_index:    R<Result<AudioStateSnapshot<Extra>, SetIndexError>>,
 	pub(super) send_remove:       S<Remove>,
-	pub(super) recv_remove:       R<Result<AudioStateSnapshot<Data>, RemoveError>>,
+	pub(super) recv_remove:       R<Result<AudioStateSnapshot<Extra>, RemoveError>>,
 	pub(super) send_remove_range: S<RemoveRange>,
-	pub(super) recv_remove_range: R<Result<AudioStateSnapshot<Data>, RemoveError>>,
+	pub(super) recv_remove_range: R<Result<AudioStateSnapshot<Extra>, RemoveError>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Tests
