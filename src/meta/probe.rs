@@ -110,16 +110,20 @@ impl Metadata {
 		// This returns `None` if there was no metadata.
 		//
 		// This is more likely to contain metadata.
-		let md = if let Some(md) = probe_result.format.metadata().pop() {
-			Some(md)
-		// But, sometimes it is found here.
-		} else if let Some(mut ml) = probe_result.metadata.into_inner() {
-			ml.metadata().pop()
-		} else {
-			return;
-		};
-
-		let Some(md) = md else {
+		//
+		// Weird in-scope bindings are due to
+		// return-from-function lifetime shenanigans.
+		let binding_1 = probe_result.format.metadata();
+		let binding_2 = probe_result.metadata.get();
+		let Some(md) = (
+			if let Some(m) = binding_1.current() {
+				Some(m)
+			} else if let Some(m) = binding_2.as_ref() {
+				m.current()
+			} else {
+				None
+			}
+		) else {
 			return;
 		};
 
@@ -257,28 +261,19 @@ fn album_title(tags: &[Tag]) -> Option<Cow<'_, str>> {
 #[inline]
 /// Attempt to get song title.
 fn track_title(tags: &[Tag]) -> Option<Cow<'_, str>> {
-	if let Some(t) = tags.iter().find(|i| i.std_key == Some(StandardTagKey::TrackTitle)) {
-		let o = value(t);
-		if o.is_some() { return o; }
-	}
-
-	None
-	// Fallback to file name.
-	// if let Some(os_str) = path.file_stem() {
-	// 	Some(os_str.to_string_lossy().into_owned())
-	// } else {
-	// 	None
-	// }
+	tags
+		.iter()
+		.find(|i| i.std_key == Some(StandardTagKey::TrackTitle))
+		.and_then(value)
 }
 
 #[inline]
 /// Attempt to get track number.
 fn track_number(tags: &[Tag]) -> Option<u32> {
-	if let Some(t) = tags.iter().find(|i| i.std_key == Some(StandardTagKey::TrackNumber)) {
-		value_unsigned(t)
-	} else {
-		None
-	}
+	tags
+		.iter()
+		.find(|i| i.std_key == Some(StandardTagKey::TrackNumber))
+		.and_then(value_unsigned)
 }
 
 #[inline]
@@ -307,62 +302,52 @@ fn total_runtime(track: &Track) -> Option<Duration> {
 #[inline]
 /// Attempt to get track disc number.
 fn disc_number(tags: &[Tag]) -> Option<u32> {
-	if let Some(t) = tags.iter().find(|i| i.std_key == Some(StandardTagKey::DiscNumber)) {
-		value_unsigned(t)
-	} else {
-		None
-	}
+	tags
+		.iter()
+		.find(|i| i.std_key == Some(StandardTagKey::DiscNumber))
+		.and_then(value_unsigned)
 }
 
 #[inline]
 /// Attempt to get the release date.
 fn release_date(tags: &[Tag]) -> Option<Cow<'_, str>> {
-	if let Some(t) = tags.iter().find(|i| {
-		i.std_key == Some(StandardTagKey::Date) ||
-		i.std_key == Some(StandardTagKey::ReleaseDate) ||
-		i.std_key == Some(StandardTagKey::OriginalDate)
-	}) {
-		value(t)
-	} else {
-		None
-	}
+	tags
+		.iter()
+		.find(|i| {
+			i.std_key == Some(StandardTagKey::Date) ||
+			i.std_key == Some(StandardTagKey::ReleaseDate) ||
+			i.std_key == Some(StandardTagKey::OriginalDate)
+		})
+		.and_then(value)
 }
 
 #[inline]
 /// Attempt to get the genre.
 fn genre(tags: &[Tag]) -> Option<Cow<'_, str>> {
-	if let Some(t) = tags.iter().find(|i| i.std_key == Some(StandardTagKey::Genre)) {
-		value(t)
-	} else {
-		None
-	}
+	tags
+		.iter()
+		.find(|i| i.std_key == Some(StandardTagKey::Genre))
+		.and_then(value)
 }
 
 #[inline]
 /// Attempt to get the art bytes.
 fn cover_art(visuals: &[Visual]) -> Option<&[u8]> {
-	if visuals.is_empty() {
-		return None;
-	}
-
 	// Find the biggest visual and return it.
-	let mut biggest_index: usize = 0;
-	let mut biggest_bytes: usize = 0;
-	for (i, visual) in visuals.iter().enumerate() {
-		let len = visual.data.len();
-		if len > biggest_bytes {
-			biggest_bytes = len;
-			biggest_index = i;
-		}
-	}
-	Some(&*visuals[biggest_index].data)
+	visuals
+		.iter()
+		.max_by(|a, b| a.data.len().cmp(&b.data.len()))
+		.map(|biggest| &*biggest.data)
 }
 
 #[inline]
 /// Get the compilation bool.
 /// Assume `false` if it doesn't exist.
 fn compilation(tags: &[Tag]) -> Option<bool> {
-	tags.iter().find(|i| i.std_key == Some(StandardTagKey::Compilation)).map(value_bool)
+	tags
+		.iter()
+		.find(|i| i.std_key == Some(StandardTagKey::Compilation))
+		.map(value_bool)
 }
 
 #[inline]
