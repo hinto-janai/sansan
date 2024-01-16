@@ -39,10 +39,10 @@ pub struct Metadata {
 	pub cover_path:    Option<Arc<Path>>,
 	pub total_runtime: Option<Duration>,
 	pub sample_rate:   Option<u32>,
-	pub track:         Option<u32>,
-	pub disc:          Option<u32>,
-	pub art:           Option<Arc<[u8]>>,
-	pub release:       Option<Arc<str>>,
+	pub track_number:  Option<u32>,
+	pub disc_number:   Option<u32>,
+	pub cover_art:     Option<Arc<[u8]>>,
+	pub release_date:  Option<Arc<str>>,
 	pub genre:         Option<Arc<str>>,
 	pub compilation:   Option<bool>,
 }
@@ -64,10 +64,10 @@ impl Metadata {
 		cover_path:    None,
 		total_runtime: None,
 		sample_rate:   None,
-		track:         None,
-		disc:          None,
-		art:           None,
-		release:       None,
+		track_number:  None,
+		disc_number:   None,
+		cover_art:     None,
+		release_date:  None,
 		genre:         None,
 		compilation:   None,
 	};
@@ -101,10 +101,10 @@ impl Metadata {
 		self.cover_path.is_none()    &&
 		self.total_runtime.is_none() &&
 		self.sample_rate.is_none()   &&
-		self.track.is_none()         &&
-		self.disc.is_none()          &&
-		self.art.is_none()           &&
-		self.release.is_none()       &&
+		self.track_number.is_none()  &&
+		self.disc_number.is_none()   &&
+		self.cover_art.is_none()     &&
+		self.release_date.is_none()  &&
 		self.genre.is_none()         &&
 		self.compilation.is_some()
 	}
@@ -138,10 +138,10 @@ impl Metadata {
 		self.cover_path.is_some()    &&
 		self.total_runtime.is_some() &&
 		self.sample_rate.is_some()   &&
-		self.track.is_some()         &&
-		self.disc.is_some()          &&
-		self.art.is_some()           &&
-		self.release.is_some()       &&
+		self.track_number.is_some()  &&
+		self.disc_number.is_some()   &&
+		self.cover_art.is_some()     &&
+		self.release_date.is_some()  &&
 		self.genre.is_some()         &&
 		self.compilation.is_some()
 	}

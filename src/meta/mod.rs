@@ -4,4 +4,4 @@ mod metadata;
 pub use metadata::Metadata;
 
 mod probe;
-pub use probe::probe_path;
+pub use probe::ProbeError;
