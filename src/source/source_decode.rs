@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	source::{Source,SourceInner},
+	source::Source,
 	error::SourceError,
 	extra_data::ExtraData,
 };
@@ -223,40 +223,24 @@ impl TryFrom<MediaSourceStream> for SourceDecode {
 }
 
 //---------------------------------------------------------------------------------------------------- Source -> SourceDecode
-impl<Extra> TryInto<SourceDecode> for Source<Extra>
+impl<Extra> TryFrom<Source<Extra>> for SourceDecode
 where
 	Extra: ExtraData
 {
 	type Error = SourceError;
 
-	fn try_into(self) -> Result<SourceDecode, Self::Error> {
-		match self.0 {
-			SourceInner::ArcPath(path) => {
-				let file = File::open(path.0)?;
+	fn try_from(source: Source<Extra>) -> Result<Self, Self::Error> {
+		match source {
+			Source::Path { source, .. } => {
+				let file = File::open(source)?;
 				let mss = MediaSourceStream::new(
 					Box::new(file),
 					MEDIA_SOURCE_STREAM_OPTIONS,
 				);
 				mss.try_into()
 			},
-			SourceInner::CowPath(path) => {
-				let file = File::open(path.0)?;
-				let mss = MediaSourceStream::new(
-					Box::new(file),
-					MEDIA_SOURCE_STREAM_OPTIONS,
-				);
-				mss.try_into()
-			},
-			SourceInner::ArcByte(bytes) => {
-				let cursor = Cursor::new(bytes.0);
-				let mss = MediaSourceStream::new(
-					Box::new(cursor),
-					MEDIA_SOURCE_STREAM_OPTIONS,
-				);
-				mss.try_into()
-			},
-			SourceInner::CowByte(bytes) => {
-				let cursor = Cursor::new(bytes.0);
+			Source::Byte { source, .. } => {
+				let cursor = Cursor::new(source);
 				let mss = MediaSourceStream::new(
 					Box::new(cursor),
 					MEDIA_SOURCE_STREAM_OPTIONS,

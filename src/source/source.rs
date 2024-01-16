@@ -12,6 +12,7 @@ use std::{
 	fs::File,
 	path::{Path,PathBuf},
 	sync::Arc,
+	ffi::{OsStr,OsString},
 	borrow::Cow, fmt::Debug,
 };
 use symphonia::core::{
@@ -32,7 +33,7 @@ use crate::state::AudioState;
 use crate::state::AudioStateReader;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
-#[derive(Debug,Clone,PartialEq,PartialOrd)]
+#[derive(Clone,PartialEq,PartialOrd,Eq,Ord,Hash)]
 /// Audio source
 ///
 /// This is the main type that encapsulates data that can
@@ -40,8 +41,22 @@ use crate::state::AudioStateReader;
 /// the [`AudioState`] queue.
 ///
 /// TODO
-pub struct Source<Extra: ExtraData>(pub(super) SourceInner<Extra>);
+pub enum Source<Extra: ExtraData> {
+	#[allow(missing_docs)] // TODO
+	Path {
+		source:   Arc<Path>,
+		metadata: Metadata,
+		extra:    Extra,
+	},
+	#[allow(missing_docs)] // TODO
+	Byte {
+		source:   Arc<[u8]>,
+		metadata: Metadata,
+		extra:    Extra,
+	},
+}
 
+//---------------------------------------------------------------------------------------------------- Source Impl
 impl<Extra> Source<Extra>
 where
 	Extra: ExtraData
@@ -49,43 +64,35 @@ where
 	#[inline]
 	/// TODO
 	pub const fn extra(&self) -> &Extra {
-		match &self.0 {
-			SourceInner::ArcPath((_, extra, _)) |
-			SourceInner::ArcByte((_, extra, _)) |
-			SourceInner::CowPath((_, extra, _)) |
-			SourceInner::CowByte((_, extra, _)) => extra,
+		match self {
+			Self::Path { extra, .. } |
+			Self::Byte { extra, .. } => extra,
 		}
 	}
 
 	/// TODO
 	pub fn extra_mut(&mut self) -> &mut Extra {
-		match &mut self.0 {
-			SourceInner::ArcPath((_, extra, _)) |
-			SourceInner::ArcByte((_, extra, _)) |
-			SourceInner::CowPath((_, extra, _)) |
-			SourceInner::CowByte((_, extra, _)) => extra,
+		match self {
+			Self::Path { extra, .. } |
+			Self::Byte { extra, .. } => extra,
 		}
 	}
 
 	#[inline]
 	/// TODO
 	pub const fn metadata(&self) -> &Metadata {
-		match &self.0 {
-			SourceInner::ArcPath((_, _, meta)) |
-			SourceInner::ArcByte((_, _, meta)) |
-			SourceInner::CowPath((_, _, meta)) |
-			SourceInner::CowByte((_, _, meta)) => meta,
+		match self {
+			Self::Path { metadata, .. } |
+			Self::Byte { metadata, .. } => metadata,
 		}
 	}
 
 	#[inline]
 	/// TODO
 	pub fn metadata_mut(&mut self) -> &mut Metadata {
-		match &mut self.0 {
-			SourceInner::ArcPath((_, _, meta)) |
-			SourceInner::ArcByte((_, _, meta)) |
-			SourceInner::CowPath((_, _, meta)) |
-			SourceInner::CowByte((_, _, meta)) => meta,
+		match self {
+			Self::Path { metadata, .. } |
+			Self::Byte { metadata, .. } => metadata,
 		}
 	}
 
@@ -95,14 +102,29 @@ where
 	where
 		Extra: Default,
 	{
-		///
-		const ARRAY: &[u8] = &[];
-		let cow   = Cow::Borrowed(ARRAY);
-		let inner = SourceInner::CowByte((cow, Extra::default(), Metadata::DEFAULT));
-		Self(inner)
+		Self::Byte {
+			source:   Arc::new([]),
+			metadata: Default::default(),
+			extra:    Default::default(),
+		}
+	}
+
+	#[must_use]
+	#[inline]
+	/// If `self` is a [`Self::Path`] variant.
+	pub const fn is_path(&self) -> bool {
+		matches!(self, Self::Path { .. })
+	}
+
+	#[must_use]
+	#[inline]
+	/// If `self` is a [`Self::Byte`] variant.
+	pub const fn is_byte(&self) -> bool {
+		matches!(self, Self::Byte { .. })
 	}
 }
 
+//---------------------------------------------------------------------------------------------------- Source::from
 /// TODO
 macro_rules! impl_from {
 	(
@@ -112,93 +134,66 @@ macro_rules! impl_from {
 			|$source:ident|
 		$(
 			$($input:ty)+ => // What type are we converting From?
-			$enum:ident   => // What [SourceInner] enum will be used?
+			$enum:ident   => // What `Source` enum will be used?
 			$map:expr,       // What function to apply to the input to get it "correct"
 		)*
 	) => {
 		$(
-			impl<Extra: ExtraData> From<($($input)+, Extra, Metadata)> for Source<Extra> {
-				fn from(from: ($($input)+, Extra, Metadata)) -> Self {
-					let ($source, source1, source2) = from;
-					Self(SourceInner::$enum(($map, source1, source2)))
+			impl<Extra: ExtraData> From<($($input)+, Metadata, Extra)> for Source<Extra> {
+				fn from(from: ($($input)+, Metadata, Extra)) -> Self {
+					let ($source, metadata, extra) = from;
+					Self::$enum { source: $map, metadata, extra }
 				}
 			}
 			impl<Extra: ExtraData> From<($($input)+, Extra)> for Source<Extra> {
 				fn from(from: ($($input)+, Extra)) -> Self {
-					let ($source, source1) = from;
-					Self(SourceInner::$enum(($map, source1, Metadata::DEFAULT)))
+					let ($source, extra) = from;
+					Self::$enum { source: $map, metadata: Default::default(), extra }
 				}
 			}
 			impl<Extra: ExtraData + Default> From<$($input)+> for Source<Extra> {
 				fn from($source: $($input)+) -> Self {
-					Self(SourceInner::$enum(($map, Extra::default(), Metadata::DEFAULT)))
+					Self::$enum { source: $map, metadata: Default::default(), extra: Default::default(), }
 				}
 			}
 		)*
 	};
 }
+
 // These mappings exist instead of a generic
 // <T: AsRef<Path>> since that covers too much,
 // and we cannot specify the way we construct.
 impl_from! { |source|
-	// Input         Enum       Source
-	Arc<Path>     => ArcPath => source,
-	&Arc<Path>    => ArcPath => Arc::clone(source),
-	&'static Path => CowPath => Cow::Borrowed(source),
-	PathBuf       => CowPath => Cow::Owned(source),
-	Arc<str>      => ArcPath => Arc::from(Path::new(&*source)),
-	&Arc<str>     => ArcPath => Arc::from(Path::new(&**source)),
-	&'static str  => CowPath => Cow::Borrowed(Path::new(source)),
-	String        => CowPath => Cow::Owned(PathBuf::from(source)),
-	Arc<[u8]>     => ArcByte => Arc::clone(&source),
-	&Arc<[u8]>    => ArcByte => Arc::clone(source),
-	&'static [u8] => CowByte => Cow::Borrowed(source),
-	Vec<u8>       => CowByte => Cow::Owned(source),
+	// Input         Enum    Map
+	Arc<Path>     => Path => source,
+	&Arc<Path>    => Path => Arc::clone(source),
+	&Path         => Path => Arc::from(source),
+	PathBuf       => Path => Arc::from(source),
+	&str          => Path => Arc::<Path>::from(Path::new(source)),
+	&OsStr        => Path => Arc::<Path>::from(Path::new(source)),
+	String        => Path => Arc::<Path>::from(PathBuf::from(source).as_path()),
+	OsString      => Path => Arc::<Path>::from(PathBuf::from(source).as_path()),
+	Arc<[u8]>     => Byte => source,
+	&Arc<[u8]>    => Byte => Arc::clone(source),
+	&[u8]         => Byte => Arc::from(source),
+	Vec<u8>       => Byte => Arc::<[u8]>::from(source),
+	Box<[u8]>     => Byte => Arc::<[u8]>::from(source),
 }
 
-//---------------------------------------------------------------------------------------------------- SourceInner
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
-#[derive(Clone,PartialEq,PartialOrd)]
-/// TODO
-pub(crate) enum SourceInner<Extra: ExtraData> {
-	/// TODO
-	ArcPath((Arc<Path>, Extra, Metadata)),
-	/// TODO
-	ArcByte((Arc<[u8]>, Extra, Metadata)),
-	/// TODO
-	CowPath((Cow<'static, Path>, Extra, Metadata)),
-	/// TODO
-	CowByte((Cow<'static, [u8]>, Extra, Metadata)),
-}
-
-impl<Extra: ExtraData + Debug> Debug for SourceInner<Extra> {
+//---------------------------------------------------------------------------------------------------- Debug
+impl<Extra: ExtraData + Debug> Debug for Source<Extra> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::ArcPath((path, extra, metadata)) => {
-				f.debug_struct("ArcPath")
-					.field("path", path)
+			Self::Path { source, extra, metadata } => {
+				f.debug_struct("Source::Path")
+					.field("source", source)
 					.field("extra", extra)
 					.field("metadata", metadata)
 					.finish()
 			},
-			Self::ArcByte((bytes, extra, metadata)) => {
-				f.debug_struct("ArcByte")
-					.field("bytes", &bytes.len())
-					.field("extra", extra)
-					.field("metadata", metadata)
-					.finish()
-			},
-			Self::CowPath((path, extra, metadata)) => {
-				f.debug_struct("CowPath")
-					.field("path", path)
-					.field("extra", extra)
-					.field("metadata", metadata)
-					.finish()
-			},
-			Self::CowByte((bytes, extra, metadata)) => {
-				f.debug_struct("CowByte")
-					.field("bytes", &bytes.len())
+			Self::Byte { source, extra, metadata } => {
+				f.debug_struct("Source::Byte")
+					.field("source", &source.len())
 					.field("extra", extra)
 					.field("metadata", metadata)
 					.finish()

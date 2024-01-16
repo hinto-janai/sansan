@@ -15,7 +15,7 @@ use crate::{
 /// TODO
 // #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
-#[derive(Clone,Debug,PartialEq,PartialOrd)]
+#[derive(Clone,Debug,PartialEq,PartialOrd,Eq,Ord,Hash)]
 pub struct Add<Extra>
 where
 	Extra: ExtraData
