@@ -62,7 +62,7 @@ mod tests {
 	#[test]
 	fn clear() {
 		let mut engine = crate::tests::init();
-		let reader = engine.reader();
+		let reader = engine.reader().clone();
 		assert!(reader.get().queue.is_empty());
 
 		// Add sources to the queue.

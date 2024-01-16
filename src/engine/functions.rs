@@ -28,31 +28,12 @@ where
 	#[inline]
 	#[must_use]
 	/// TODO
-	pub fn audio_state_snapshot(&self) -> AudioStateSnapshot<Extra> {
-		self.reader.get()
-	}
-
-	//---------------------------------------------------------------------------------------------------- Reader
-	#[must_use]
-	/// TODO
-	pub fn reader(&self) -> AudioStateReader<Extra> {
-		AudioStateReader::clone(&self.reader)
-	}
-
-	#[must_use]
-	/// TODO
-	pub const fn reader_ref(&self) -> &AudioStateReader<Extra> {
+	pub const fn reader(&self) -> &AudioStateReader<Extra> {
 		&self.reader
 	}
 
-	#[inline]
-	#[must_use]
-	/// How many [`AudioStateReader`]'s are there?
-	pub fn reader_count(&self) -> std::num::NonZeroUsize {
-		self.reader.reader_count()
-	}
-
 	//---------------------------------------------------------------------------------------------------- Config
+	#[inline]
 	#[must_use]
 	/// TODO
 	pub const fn config(&self) -> &LiveConfig {
@@ -72,12 +53,14 @@ where
 
 	//---------------------------------------------------------------------------------------------------- Get
 	#[must_use]
+	#[inline]
 	/// TODO
 	pub const fn get_volume(&self) -> Volume {
 		self.volume
 	}
 
 	#[must_use]
+	#[inline]
 	/// TODO
 	pub const fn get_repeat(&self) -> Repeat {
 		self.repeat

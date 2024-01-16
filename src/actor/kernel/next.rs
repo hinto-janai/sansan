@@ -47,7 +47,7 @@ mod tests {
 	#[test]
 	fn next() {
 		let mut engine = crate::tests::init();
-		let reader = engine.reader();
+		let reader = engine.reader().clone();
 		let audio_state = reader.get();
 		assert_eq!(audio_state.queue.len(), 0);
 		assert_eq!(audio_state.repeat, Repeat::Off);
