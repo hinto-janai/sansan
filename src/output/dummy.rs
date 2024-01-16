@@ -187,7 +187,7 @@ impl<R: Resampler> AudioOutput for DummyAudioOutput<R> {
 		//
 		// `cubeb` will tell us when it has drained,
 		// so hang until it has.
-		recv!(self.drained);
+		drop(self.drained.recv());
 	}
 
 	fn discard(&mut self) {
@@ -202,11 +202,11 @@ impl<R: Resampler> AudioOutput for DummyAudioOutput<R> {
 		// methods not applicable.
 
 		if self.discard.is_empty() {
-			send!(self.discard, ());
+			drop(self.discard.send(()));
 		}
 
 		// Wait until cubeb has drained.
-		recv!(self.drained);
+		drop(self.drained.recv());
 	}
 
 	#[cold]
