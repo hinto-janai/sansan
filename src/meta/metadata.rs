@@ -6,6 +6,7 @@ use crate::{
 	extra_data::ExtraData,
 };
 use std::{
+	fmt::{self,Debug},
 	time::Duration,
 	io::Cursor,
 	fs::File,
@@ -30,7 +31,7 @@ use crate::state::AudioState;
 /// TODO
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
-#[derive(Debug,Clone,PartialEq,PartialOrd,Eq,Ord,Hash)]
+#[derive(Clone,PartialEq,PartialOrd,Eq,Ord,Hash)]
 #[allow(missing_docs)]
 pub struct Metadata {
 	pub artist_name:   Option<Arc<str>>,
@@ -151,5 +152,24 @@ impl Metadata {
 impl Default for Metadata {
 	fn default() -> Self {
 		Self::DEFAULT
+	}
+}
+
+impl Debug for Metadata {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		f.debug_struct("Metadata")
+			.field("artist_name",   &self.artist_name)
+			.field("album_title",   &self.album_title)
+			.field("track_title",   &self.track_title)
+			.field("cover_path",    &self.cover_path)
+			.field("total_runtime", &self.total_runtime)
+			.field("sample_rate",   &self.sample_rate)
+			.field("track_number",  &self.track_number)
+			.field("disc_number",   &self.disc_number)
+			.field("cover_art",     &self.cover_art.as_ref().map(|b| b.len())) // All this just to not print out a bunch of bytes
+			.field("release_date",  &self.release_date)
+			.field("genre",         &self.genre)
+			.field("compilation",   &self.compilation)
+			.finish()
 	}
 }
