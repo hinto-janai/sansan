@@ -60,6 +60,7 @@ mod tests {
 	use super::*;
 	use crate::signal::SetIndex;
 	use crate::signal::add::{AddMany,AddMethod};
+	use crate::source::Source;
 	use crate::state::{AudioState,Current};
 	use pretty_assertions::assert_eq;
 	use std::thread::sleep;
@@ -84,9 +85,16 @@ mod tests {
 		assert_eq!(audio_state.current, None);
 		assert_eq!(audio_state.playing, false);
 
-		//---------------------------------- No `Current`, early return
+		//---------------------------------- No `Current`, set to 1st queue element.
 		let resp = engine.play();
-		assert_eq!(audio_state, resp);
+		assert_eq!(
+			resp.current.as_ref().unwrap(),
+			&Current {
+				source: crate::tests::source(0),
+				index: 0,
+				elapsed: 0.0,
+			}
+		);
 
 		//---------------------------------- `Current` exist, but already playing, early return
 		let audio_state = engine.set_index(SetIndex {

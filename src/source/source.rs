@@ -187,15 +187,15 @@ impl<Extra: ExtraData + Debug> Debug for Source<Extra> {
 			Self::Path { source, extra, metadata } => {
 				f.debug_struct("Source::Path")
 					.field("source", source)
-					.field("extra", extra)
 					.field("metadata", metadata)
+					.field("extra", extra)
 					.finish()
 			},
 			Self::Byte { source, extra, metadata } => {
 				f.debug_struct("Source::Byte")
 					.field("source", &source.len())
-					.field("extra", extra)
 					.field("metadata", metadata)
+					.field("extra", extra)
 					.finish()
 			},
 		}
