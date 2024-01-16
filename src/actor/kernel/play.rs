@@ -99,7 +99,7 @@ mod tests {
 		//---------------------------------- `Current` exist, but already playing, early return
 		let audio_state = engine.set_index(SetIndex {
 			index: 0,
-			play: Some(true),
+			start_playing: true,
 		}).unwrap();
 		assert_eq!(audio_state.current.as_ref().unwrap().index, 0);
 		assert_eq!(audio_state.playing, true);

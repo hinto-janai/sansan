@@ -35,14 +35,14 @@ impl<Extra: ExtraData> Kernel<Extra> {
 
 		self.reset_source(to_audio, to_decode, source.clone());
 
-		let play = set_index.play == Some(true);
-		if play {
-			self.atomic_state.playing.store(play, Ordering::Release);
+		let start_playing = set_index.start_playing;
+		if start_playing {
+			self.atomic_state.playing.store(true, Ordering::Release);
 		}
 
 		self.w.add_commit_push(|w, _| {
-			if play {
-				w.playing = play;
+			if start_playing {
+				w.playing = true;
 			}
 			Self::replace_current(
 				&mut w.current,
@@ -81,7 +81,7 @@ mod tests {
 		assert_eq!(audio_state.current, None);
 
 		//---------------------------------- No `Current`, early return
-		let resp = engine.set_index(SetIndex { index: 0, play: None });
+		let resp = engine.set_index(SetIndex { index: 0, start_playing: false });
 		assert_eq!(resp, Err(SetIndexError::QueueEmpty));
 
 		//---------------------------------- Set-up our baseline `AudioState`
@@ -103,7 +103,7 @@ mod tests {
 		assert_eq!(resp.current.as_ref().unwrap().index, 4);
 
 		//---------------------------------- Index to the last element
-		let resp = engine.set_index(SetIndex { index: 9, play: None }).unwrap();
+		let resp = engine.set_index(SetIndex { index: 9, start_playing: false }).unwrap();
 		let current = resp.current.as_ref().unwrap();
 		assert_eq!(current.index, 9);
 		assert_eq!(*current.source.extra(), 9);
@@ -111,7 +111,7 @@ mod tests {
 		assert_eq!(resp.playing, false);
 
 		//---------------------------------- Index to the first element
-		let resp = engine.set_index(SetIndex { index: 0, play: None }).unwrap();
+		let resp = engine.set_index(SetIndex { index: 0, start_playing: false }).unwrap();
 		let current = resp.current.as_ref().unwrap();
 		assert_eq!(current.index, 0);
 		assert_eq!(*current.source.extra(), 0);
@@ -119,23 +119,23 @@ mod tests {
 		assert_eq!(resp.playing, false);
 
 		//---------------------------------- Index to the first element, and play
-		let resp = engine.set_index(SetIndex { index: 0, play: Some(true) }).unwrap();
+		let resp = engine.set_index(SetIndex { index: 0, start_playing: true }).unwrap();
 		let current = resp.current.as_ref().unwrap();
 		assert_eq!(current.index, 0);
 		assert_eq!(*current.source.extra(), 0);
 		assert_eq!(current.elapsed, 0.0);
 		assert_eq!(resp.playing, true);
 
-		//---------------------------------- Index to the first element, and pause
-		let resp = engine.set_index(SetIndex { index: 0, play: Some(false) }).unwrap();
+		//---------------------------------- Index to the first element
+		let resp = engine.set_index(SetIndex { index: 0, start_playing: false }).unwrap();
 		let current = resp.current.as_ref().unwrap();
 		assert_eq!(current.index, 0);
 		assert_eq!(*current.source.extra(), 0);
 		assert_eq!(current.elapsed, 0.0);
-		assert_eq!(resp.playing, false);
+		assert_eq!(resp.playing, true);
 
 		//---------------------------------- Out-of-bounds index
-		let resp = engine.set_index(SetIndex { index: 10, play: None });
+		let resp = engine.set_index(SetIndex { index: 10, start_playing: false });
 		assert_eq!(resp, Err(SetIndexError::OutOfBounds));
 		// AudioState is unchanged.
 		let audio_state = engine.reader().get();
@@ -143,6 +143,6 @@ mod tests {
 		assert_eq!(current.index, 0);
 		assert_eq!(*current.source.extra(), 0);
 		assert_eq!(current.elapsed, 0.0);
-		assert_eq!(audio_state.playing, false);
+		assert_eq!(audio_state.playing, true);
 	}
 }

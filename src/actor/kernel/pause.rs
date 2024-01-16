@@ -77,7 +77,7 @@ mod tests {
 		//---------------------------------- `Current` exist, but not playing, early return
 		let audio_state = engine.set_index(SetIndex {
 			index: 0,
-			play: None,
+			start_playing: false,
 		}).unwrap();
 		assert_eq!(audio_state.current.as_ref().unwrap().index, 0);
 		let resp = engine.pause();

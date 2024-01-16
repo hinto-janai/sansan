@@ -200,7 +200,7 @@ mod tests {
 		assert_eq!(audio_state.current, None);
 
 		//---------------------------------- No `Current`, early return
-		let resp = engine.set_index(SetIndex { index: 0, play: None });
+		let resp = engine.set_index(SetIndex { index: 0, start_playing: false });
 		assert_eq!(resp, Err(SetIndexError::QueueEmpty));
 
 		//---------------------------------- Set-up our baseline `AudioState`

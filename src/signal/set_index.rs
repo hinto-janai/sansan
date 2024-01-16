@@ -21,7 +21,7 @@ pub struct SetIndex {
 	/// TODO
 	pub index: usize,
 	/// TODO
-	pub play: Option<bool>,
+	pub start_playing: bool,
 }
 
 //---------------------------------------------------------------------------------------------------- SetIndexError

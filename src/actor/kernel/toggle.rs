@@ -73,7 +73,7 @@ mod tests {
 		assert_eq!(resp.playing, true);
 
 		//---------------------------------- Set `Current`
-		let resp = engine.set_index(SetIndex { index: 5, play: None }).unwrap();
+		let resp = engine.set_index(SetIndex { index: 5, start_playing: false }).unwrap();
 		assert_eq!(resp.current.as_ref().unwrap().index, 5);
 
 		//---------------------------------- Toggle
