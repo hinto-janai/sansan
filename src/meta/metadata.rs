@@ -106,7 +106,7 @@ impl Metadata {
 		self.cover_art.is_none()     &&
 		self.release_date.is_none()  &&
 		self.genre.is_none()         &&
-		self.compilation.is_some()
+		self.compilation.is_none()
 	}
 
 	#[must_use]
@@ -114,16 +114,17 @@ impl Metadata {
 	///
 	/// ```
 	/// # use sansan::meta::*;
+	/// # use std::{time::*,sync::*,path::*};
 	/// let metadata = Metadata {
 	///     artist_name:   Some("".into()),
 	///     album_title:   Some("".into()),
 	///     track_title:   Some("".into()),
-	///     cover_path:    Some("".into()),
+	///     cover_path:    Some(Path::new("").into()),
 	///     total_runtime: Some(Duration::from_secs(1)),
 	///     sample_rate:   Some(96_000),
 	///     track_number:  Some(1),
 	///     disc_number:   Some(1),
-	///     cover_art:     Some(Arc::new([Arc::new([])])),
+	///     cover_art:     Some(Arc::new([])),
 	///     release_date:  Some("".into()),
 	///     genre:         Some("".into()),
 	///     compilation:   Some(false),
