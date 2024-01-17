@@ -32,6 +32,7 @@ jobs:
         path: |
           target
           ~/.cargo
+          ~/.rustup
         key: ${{ matrix.os }}
 
     - name: Install dependencies

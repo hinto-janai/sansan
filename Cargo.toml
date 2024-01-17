@@ -10,21 +10,14 @@ keywords       = ["music", "real-time", "audio", "engine", "lock-free"]
 categories     = ["multimedia::audio"]
 readme         = "README.md"
 license        = "MIT"
+license-file   = "LICENSE"
 description    = "Real-time music engine"
 
 # Arc::into_inner()
-rust-version   = "1.70.0"
+rust-version = "1.70.0"
 
-# Exclude files when uploading to crate.io
-exclude = [
-	".github",
-	"assets",
-	"book",
-	"examples",
-	"DESIGN.md",
-	"deny.toml",
-	"Cargo.lock",
-]
+# https://doc.rust-lang.org/cargo/reference/manifest.html#the-exclude-and-include-fields
+include = ["/src"]
 
 [package.metadata.docs.rs]
 all-features = true
