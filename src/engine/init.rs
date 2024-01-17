@@ -80,10 +80,6 @@ where
 		// These may or may not have been already checked
 		// by other constructors, but we will check again here.
 		{
-			// Previous threshold must be a normal float.
-			if !live_config.back_threshold.is_normal() {
-				return Err(EngineInitError::PreviousThreshold(live_config.back_threshold));
-			}
 		}
 
 		// If [config.init_blocking] is true, make a [Some(barrier)]

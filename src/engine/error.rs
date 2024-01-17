@@ -8,10 +8,6 @@ use std::time::Duration;
 #[derive(Debug)]
 ///
 pub enum EngineInitError {
-	#[error("previous threshold seconds - found: `{0}`, expected: an `is_normal()` float")]
-	/// Previous threshold seconds was not an [`f64::is_normal`] float.
-	PreviousThreshold(f64),
-
 	#[error("failed to spawn thread `{name}`: {error}")]
 	/// Failed to spawn an OS thread
 	ThreadSpawn {

@@ -45,12 +45,13 @@ pub(crate) struct Audio<Output>
 where
 	Output: AudioOutput,
 {
-	atomic_state:  Arc<AtomicState>, // Shared atomic audio state with the rest of the actors
-	playing:       bool,             // A local boolean so we don't have to atomic access each loop
-	elapsed:       f64,              // Elapsed time, used for the elapsed callback (f64 is reset each call)
-	ready_to_recv: Arc<AtomicBool>,  // [Audio]'s way of telling [Decode] it is ready for samples
-	shutdown_wait: Arc<Barrier>,     // Shutdown barrier between all actors
-	output:        Output,           // Audio hardware/server connection
+	atomic_state:        Arc<AtomicState>, // Shared atomic audio state with the rest of the actors
+	playing:             bool,             // A local boolean so we don't have to atomic access each loop
+	elapsed_callback:    f64,              // Elapsed time, used for the elapsed callback (f64 is reset each call)
+	elapsed_audio_state: f64,              // Elapsed time, used for the `atomic_state.elapsed_refresh_rate`
+	ready_to_recv:       Arc<AtomicBool>,  // [Audio]'s way of telling [Decode] it is ready for samples
+	shutdown_wait:       Arc<Barrier>,     // Shutdown barrier between all actors
+	output:              Output,           // Audio hardware/server connection
 }
 
 //---------------------------------------------------------------------------------------------------- Channels
@@ -157,7 +158,8 @@ where
 				let this = Audio {
 					atomic_state,
 					playing: false,
-					elapsed: 0.0,
+					elapsed_callback: 0.0,
+					elapsed_audio_state: 0.0,
 					ready_to_recv,
 					shutdown_wait,
 					output,
@@ -266,6 +268,35 @@ where
 		let spec     = *audio.spec();
 		let duration = audio.capacity() as u64;
 
+		#[allow(clippy::cast_lossless)]
+		// Calculate the amount of nominal time this `AudioBuffer` represents.
+		//
+		// The formula seems to be (duration * 1_000_000 / sample_rate), e.g:
+		//
+		// (1152 * 1_000_000) / 48_000 = 24_000 microseconds.
+		//
+		// To account for oversleeping and other stuff,
+		// set the multiplier slightly lower.
+		let nominal_seconds = duration as f64 / spec.rate as f64;
+
+		// If we're past the refresh rate for `AudioState`,
+		// tell [Kernel] to update with the new timestamp.
+		self.elapsed_audio_state += nominal_seconds;
+		if self.elapsed_audio_state >= self.atomic_state.elapsed_refresh_rate.get() {
+			try_send!(c.to_kernel, time);
+			self.elapsed_audio_state = 0.0;
+		}
+
+		// Notify [Caller] if enough time
+		// has elapsed in the current track.
+		if let Some((sender, elapsed_target)) = c.to_caller_elapsed.as_ref() {
+			self.elapsed_callback += nominal_seconds;
+			if self.elapsed_callback >= *elapsed_target {
+				try_send!(sender, ());
+				self.elapsed_callback = 0.0;
+			}
+		}
+
 		// If the spec/duration is different, we must re-open a
 		// matching audio output device or audio will get weird.
 		let output_spec     = self.output.spec();
@@ -295,23 +326,7 @@ where
 		// Write audio buffer (hangs).
 		if let Err(e) = self.output.write(audio, &c.to_gc, volume) {
 			try_send!(c.to_kernel_error, e);
-			return;
 		}
-
-		// Notify [Caller] if enough time
-		// has elapsed in the current track.
-		if let Some((sender, elapsed_target)) = c.to_caller_elapsed.as_ref() {
-			let total_seconds = time.seconds as f64 + time.frac;
-
-			if total_seconds >= *elapsed_target {
-				self.elapsed = 0.0;
-				try_send!(sender, ());
-			}
-		}
-
-		// TODO: tell [Kernel] we just wrote
-		// an audio buffer with [time] timestamp.
-		try_send!(c.to_kernel, time);
 	}
 
 	#[inline]
@@ -335,8 +350,9 @@ where
 		//
 		// self.ready_to_recv.store(false, Ordering::Release);
 
-		// Reset elapsed time for our callback.
-		self.elapsed = 0.0;
+		// Reset local elapsed time.
+		self.elapsed_callback = 0.0;
+		self.elapsed_audio_state = 0.0;
 
 		// `Time` is just `u64` + `f64`.
 		// Doesn't make sense sending stack variables to GC.

@@ -34,6 +34,8 @@ macro_rules! impl_atomic_f {
 		$unsigned:ident,           // The underlying unsigned type
 		$atomic_unsigned:ident,    // The underlying unsigned atomic type
 		$bits_0:literal,           // Bit pattern for 0.0
+		$bits_0033:literal,        // Bit pattern for 0.033
+		$bits_010:literal,         // Bit pattern for 0.1
 		$bits_025:literal,         // Bit pattern for 0.25
 		$bits_050:literal,         // Bit pattern for 0.50
 		$bits_075:literal,         // Bit pattern for 0.75
@@ -59,6 +61,10 @@ macro_rules! impl_atomic_f {
         impl $atomic_float {
             /// Representation of `0.0` as bits, can be inputted into [`Self::from_bits`].
             pub(crate) const BITS_0: $unsigned = $bits_0;
+            /// Representation of `0.033` as bits, can be inputted into [`Self::from_bits`].
+            pub(crate) const BITS_0_033: $unsigned = $bits_0033;
+            /// Representation of `0.10` as bits, can be inputted into [`Self::from_bits`].
+            pub(crate) const BITS_0_10: $unsigned = $bits_010;
             /// Representation of `0.25` as bits, can be inputted into [`Self::from_bits`].
             pub(crate) const BITS_0_25: $unsigned = $bits_025;
             /// Representation of `0.50` as bits, can be inputted into [`Self::from_bits`].
@@ -71,6 +77,10 @@ macro_rules! impl_atomic_f {
             pub(crate) const BITS_3: $unsigned = $bits_3;
             /// `Self` with `0.0` as the inner float.
             pub(crate) const SELF_0: Self = Self($atomic_unsigned::new($bits_0));
+            /// `Self` with `0.033` as the inner float.
+            pub(crate) const SELF_0_033: Self = Self($atomic_unsigned::new($bits_0033));
+            /// `Self` with `0.10` as the inner float.
+            pub(crate) const SELF_0_10: Self = Self($atomic_unsigned::new($bits_010));
             /// `Self` with `0.25` as the inner float.
             pub(crate) const SELF_0_25: Self = Self($atomic_unsigned::new($bits_025));
             /// `Self` with `0.50` as the inner float.
@@ -342,6 +352,8 @@ impl_atomic_f! {
     u64,
     AtomicU64,
     0,
+    4584916622242297676,
+    4591870180066957722,
     4598175219545276416,
     4602678819172646912,
     4604930618986332160,
@@ -356,6 +368,8 @@ impl_atomic_f! {
     u32,
     AtomicU32,
     0,
+    1023879938,
+    1036831949,
     1048576000,
     1056964608,
     1061158912,
@@ -448,6 +462,8 @@ mod tests {
     fn f32_bits() {
         assert_eq!(AtomicF32::default().get(), 0.00);
         assert_eq!(AtomicF32::from_bits(AtomicF32::BITS_0).get(), 0.00);
+        assert_eq!(AtomicF32::from_bits(AtomicF32::BITS_0_10).get(), 0.10);
+        assert_eq!(AtomicF32::from_bits(AtomicF32::BITS_0_33).get(), 0.33);
         assert_eq!(AtomicF32::from_bits(AtomicF32::BITS_0_25).get(), 0.25);
         assert_eq!(AtomicF32::from_bits(AtomicF32::BITS_0_50).get(), 0.50);
         assert_eq!(AtomicF32::from_bits(AtomicF32::BITS_0_75).get(), 0.75);
@@ -459,6 +475,8 @@ mod tests {
     fn f64_bits() {
         assert_eq!(AtomicF64::default().get(), 0.00);
         assert_eq!(AtomicF64::from_bits(AtomicF64::BITS_0).get(), 0.00);
+        assert_eq!(AtomicF64::from_bits(AtomicF64::BITS_0_10).get(), 0.10);
+        assert_eq!(AtomicF64::from_bits(AtomicF64::BITS_0_33).get(), 0.33);
         assert_eq!(AtomicF64::from_bits(AtomicF64::BITS_0_25).get(), 0.25);
         assert_eq!(AtomicF64::from_bits(AtomicF64::BITS_0_50).get(), 0.50);
         assert_eq!(AtomicF64::from_bits(AtomicF64::BITS_0_75).get(), 0.75);
