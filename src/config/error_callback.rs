@@ -12,18 +12,18 @@ use crate::{
 };
 
 //---------------------------------------------------------------------------------------------------- ErrorCallback
-/// The action `sansan` will take on various errors.
+/// The action the [`Engine`] will take on various errors.
 ///
-/// `sansan` can error in various situations:
+/// The `Engine` can error in various situations:
 /// - During decoding (e.g, corrupted data)
 /// - During playback (e.g, audio device was unplugged)
 /// - During [`Source`] loading (e.g, file doesn't exist)
 ///
-/// When these errors occur, what should `sansan` do?
+/// When these errors occur, what should the `Engine` do?
 ///
 /// These are solely used in [`Callbacks`] which solely exist in [`InitConfig`],
 /// where each particular type of error can be given a variant of [`ErrorCallback`]
-/// that determines what action `sansan` will take in the case.
+/// that determines what action the `Engine` will take in the case.
 ///
 /// The generic `<Error>` parameter is never meant to be set by you,
 /// the user, it is just so that this can be generic over:

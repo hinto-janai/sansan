@@ -1,4 +1,4 @@
-//! Runtime errors that can occur in `sansan`.
+//! Runtime errors that can occur in the [`Engine`].
 //!
 //! Unlike errors that are returned immediately (e.g [`SeekError`] with [`Engine::seek`]),
 //! these are errors that can occur at any given moment during playback.

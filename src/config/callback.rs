@@ -22,8 +22,8 @@ use crate::{
 //---------------------------------------------------------------------------------------------------- Callbacks
 /// Various callbacks to execute upon certain conditions being met.
 ///
-/// This struct is used solely in [`InitConfig`], where you
-/// get to define what `sansan` does upon certain states.
+/// This struct is used solely in [`InitConfig`], where you get to
+/// define what the [`Engine`] does upon reaching certain states.
 ///
 /// ## Callback
 /// Each time the condition is met, the provided callback will be executed.
@@ -40,7 +40,7 @@ use crate::{
 /// callbacks.current_new(move |current: Current<()>| {
 ///     // A new `Current` was set!
 ///     //
-///     // This closure decides what `sansan` does after this happens.
+///     // This closure decides what the `Engine` does after this happens.
 ///     // In this case, we just send a channel message re-sending
 ///     // the new `Current`.
 ///     tx.send(current);
@@ -48,7 +48,7 @@ use crate::{
 ///
 /// // Meanwhile in another thread...
 /// while let Ok(current) = rx.recv() {
-///     // We received a message from `sansan`
+///     // We received a message from the `Engine`
 ///     // that we set a new `Current`, print
 ///     // its metadata if available.
 ///     println!("{:#?}", current.source.metadata());
@@ -65,8 +65,8 @@ use crate::{
 /// See [`ErrorCallback`] for more info.
 ///
 /// ## `None` error behavior
-/// `sansan` will do nothing upon errors if `None`
-/// is passed in the `error_*` fields.
+/// The `Engine` will do nothing upon errors if
+/// `None` is passed in the `error_*` fields.
 ///
 /// The tracks in the queue will continue to be decoded and played,
 /// even if the audio output device is not connected.
@@ -74,7 +74,7 @@ use crate::{
 /// I.e, track progress will continue regardless of errors.
 ///
 /// ## Safety
-/// `sansan` assumes none of these callbacks will panic.
+/// The `Engine` assumes none of these callbacks will panic.
 ///
 /// Also note that there is only 1 thread executing these
 /// callbacks at any given time, so any callback that hangs
@@ -105,13 +105,13 @@ pub struct Callbacks<Extra: ExtraData> {
 	/// The [`f32`] passed in the function is the value of [`Current::elapsed`].
 	pub elapsed: Option<(Box<dyn FnMut(f32) + Send + 'static>, Duration)>,
 
-	/// The action `sansan` will take on various [`DecodeError`]'s.
+	/// The action the `Engine` will take on various [`DecodeError`]'s.
 	pub error_decode: Option<ErrorCallback<DecodeError>>,
 
-	/// The action `sansan` will take on various [`OutputError`]'s.
+	/// The action the `Engine` will take on various [`OutputError`]'s.
 	pub error_output: Option<ErrorCallback<OutputError>>,
 
-	/// The action `sansan` will take on various [`SourceError`]'s.
+	/// The action the `Engine` will take on various [`SourceError`]'s.
 	pub error_source: Option<ErrorCallback<SourceError>>,
 }
 
@@ -201,9 +201,9 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 	///
 	/// // A decode error occured!
 	/// //
-	/// // This input decides how `sansan` handles it.
-	/// // This one in particular just makes
-	/// // `sansan` pause the audio playback.
+	/// // This input decides how the `Engine` handles it.
+	/// // This one in particular just makes the
+	/// // `Engine` pause the audio playback.
 	/// callbacks.error_decode(ErrorCallback::Pause);
 	/// ```
 	pub fn error_decode(&mut self, error_callback: ErrorCallback<DecodeError>) -> &mut Self {
@@ -225,8 +225,8 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 	/// callbacks.error_output(ErrorCallback::new_pause_and_fn(move |output_error| {
 	///     // An output error occured!
 	///     //
-	///     // This closure decides how `sansan` handles it.
-	///     // This one in particular will make `sansan` pause
+	///     // This closure decides how the `Engine` handles it.
+	///     // This one in particular will make `Engine` pause
 	///     // the audio playback, print the error, then send a
 	///     // channel message.
 	///     tx.send(output_error);
@@ -234,7 +234,7 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 	///
 	/// // Meanwhile in another thread...
 	/// while let Ok(output_error) = rx.recv() {
-	///     // We received an error from `sansan`, print it.
+	///     // We received an error from the `Engine`, print it.
 	///     eprintln!("{output_error}");
 	///     # break;
 	/// }
@@ -255,8 +255,8 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 	/// callbacks.error_source(ErrorCallback::new_fn(|source_error| {
 	///     // A source error occured!
 	///     //
-	///     // This closure decides how `sansan` handles it.
-	///     // This one in particular will make `sansan`
+	///     // This closure decides how the `Engine` handles it.
+	///     // This one in particular will make the `Engine`
 	///     // print the error and continue as normal.
 	///     eprintln!("{source_error}");
 	/// }));
