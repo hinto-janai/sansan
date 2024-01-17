@@ -32,10 +32,10 @@ use std::sync::{
 };
 
 // Audio I/O backend.
-use crate::output::AudioOutputStruct;
+use crate::output::{AudioOutputStruct, AUDIO_OUTPUT_BACKEND};
 
 // Resampler backend.
-use crate::resampler::ResamplerStruct;
+use crate::resampler::{ResamplerStruct, RESAMPLER_BACKEND};
 
 //---------------------------------------------------------------------------------------------------- Constants
 /// Total count of all the "actors" in our system.
@@ -68,6 +68,7 @@ impl<Extra: ExtraData> Engine<Extra> {
 	/// TODO
 	pub fn init(mut config: InitConfig<Extra>) -> Result<Self, EngineInitError> {
 		info2!("Engine - initializing...");
+		info2!("Engine - audio output backend: [{AUDIO_OUTPUT_BACKEND}], resampler backend: [{RESAMPLER_BACKEND}]");
 		debug2!("Engine - init config:\n{config:#?}");
 
 		// Set a default `LiveConfig` if it doesn't exist.
@@ -94,7 +95,7 @@ impl<Extra: ExtraData> Engine<Extra> {
 				count -= 1;
 			}
 
-			debug2!("Engine - actor count: {count}");
+			debug2!("Engine - effective actor count: {count}");
 
 			count
 		};
@@ -105,7 +106,7 @@ impl<Extra: ExtraData> Engine<Extra> {
 			None
 		};
 
-		debug2!("Engine - init config audio state: {:#?}", config.audio_state);
+		debug2!("Engine - init config audio state:\n{:#?}", config.audio_state);
 
 		// Initialize the `AudioStateReader`.
 		// TODO: initialize with `InitConfig`'s AudioState.

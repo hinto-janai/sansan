@@ -41,7 +41,7 @@ pub struct LiveConfig {
 	/// If this `Current::elapsed` were to be visualized as a typical
 	/// audio elapsed timestamp, it would look something like this:
 	///
-	/// ```
+	/// ```ignore
 	/// 00:00:00.000
 	/// 00:00:00.033
 	/// 00:00:00.066
@@ -62,7 +62,7 @@ pub struct LiveConfig {
 	///
 	/// Note that it is not guaranteed that each second will be perfectly captured, e.g:
 	///
-	/// ```
+	/// ```ignore
 	/// // `Duration::from_secs(1)`
 	/// 00:00:00.000
 	/// 00:00:01.000

@@ -55,13 +55,14 @@ These types of things are loosely defined in the code instead (with comments and
 ## Audio Dependencies
 This table summarizes the **audio-specific** libraries used by `sansan` and their purpose.
 
-| Dependency              | Version  | Owner                                                       | Purpose |
-|-------------------------|----------|-------------------------------------------------------------|---------|
-| `audio_thread_priority` | `0.27.1` | [Mozilla](https://github.com/mozilla/audio_thread_priority) | Real-time audio thread promotion
-| `cubeb`                 | `0.10.3` | [Mozilla](https://github.com/mozilla/cubeb-rs)              | Audio device input/output
-| `souvlaki`              | `0.6.1`  | [Sinono3](https://github.com/Sinono3/souvlaki)              | OS media control interface
-| `symphonia`             | `0.5.3`  | [Pdeljanov](https://github.com/pdeljanov/Symphonia)         | Audio demuxing/decoding/metadata
-| `rubato`                | `0.14.1` | [HEnquist](https://github.com/HEnquist/rubato)              | Audio resampling
+| Dependency              | Owner                                                       | Purpose |
+|-------------------------|-------------------------------------------------------------|---------|
+| `audio_thread_priority` | [Mozilla](https://github.com/mozilla/audio_thread_priority) | Real-time audio thread promotion
+| `cubeb`                 | [Mozilla](https://github.com/mozilla/cubeb-rs)              | Audio device output
+| `cpal`                  | [RustAudio]https://github.com/rustaudio/cpal)               | Audio device output
+| `souvlaki`              | [Sinono3](https://github.com/Sinono3/souvlaki)              | OS media control interface
+| `symphonia`             | [Pdeljanov](https://github.com/pdeljanov/Symphonia)         | Audio demuxing/decoding/metadata
+| `rubato`                | [HEnquist](https://github.com/HEnquist/rubato)              | Audio resampling
 
 ## Supported Targets
 Only 64-bit targets (`x86_64`, `ARM64`, etc) are supported.

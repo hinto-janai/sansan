@@ -4,7 +4,20 @@
 //!
 //! See [`sansan.cat`](https://sansan.cat) for a user-guide and
 //! [`examples/`](https://github.com/hinto-janai/sansan/tree/main/examples)
-//! for small example programs.
+//! for example programs.
+//!
+//! ### Feature Flags
+//! | Feature Flag | Purpose |
+//! |--------------|---------|
+//! | `cubeb`      | Enable usage of [`cubeb`](https://github.com/mozilla/cubeb-rs) as the audio output backend
+//! | `cpal`       | Enable usage of [`cpal`](https://github.com/rustaudio/cpal) as the audio output backend
+//! | `dummy`      | Enable usage of a dummy device as the audio output backend
+//!
+//! The default audio backend is `cubeb`.
+//!
+//! Using the `dummy` backend will allow perfectly normal `sansan` usage, with the
+//! exception that no audio will ever actually be played back, however, tracks will continue
+//! to play as normal and audio state will be updated _as if_ audio were actually being played.
 
 #![doc(html_logo_url = "https://raw.githubusercontent.com/hinto-janai/sansan/main/assets/img/icon_640_640.png")]
 

@@ -462,8 +462,8 @@ mod tests {
     fn f32_bits() {
         assert_eq!(AtomicF32::default().get(), 0.00);
         assert_eq!(AtomicF32::from_bits(AtomicF32::BITS_0).get(), 0.00);
+        assert_eq!(AtomicF32::from_bits(AtomicF32::BITS_0_033).get(), 0.033);
         assert_eq!(AtomicF32::from_bits(AtomicF32::BITS_0_10).get(), 0.10);
-        assert_eq!(AtomicF32::from_bits(AtomicF32::BITS_0_033).get(), 0.33);
         assert_eq!(AtomicF32::from_bits(AtomicF32::BITS_0_25).get(), 0.25);
         assert_eq!(AtomicF32::from_bits(AtomicF32::BITS_0_50).get(), 0.50);
         assert_eq!(AtomicF32::from_bits(AtomicF32::BITS_0_75).get(), 0.75);
@@ -475,8 +475,8 @@ mod tests {
     fn f64_bits() {
         assert_eq!(AtomicF64::default().get(), 0.00);
         assert_eq!(AtomicF64::from_bits(AtomicF64::BITS_0).get(), 0.00);
+        assert_eq!(AtomicF64::from_bits(AtomicF64::BITS_0_033).get(), 0.033);
         assert_eq!(AtomicF64::from_bits(AtomicF64::BITS_0_10).get(), 0.10);
-        assert_eq!(AtomicF64::from_bits(AtomicF64::BITS_0_033).get(), 0.33);
         assert_eq!(AtomicF64::from_bits(AtomicF64::BITS_0_25).get(), 0.25);
         assert_eq!(AtomicF64::from_bits(AtomicF64::BITS_0_50).get(), 0.50);
         assert_eq!(AtomicF64::from_bits(AtomicF64::BITS_0_75).get(), 0.75);
