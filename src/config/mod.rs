@@ -3,8 +3,8 @@
 #[allow(unused_imports)] // docs
 use crate::Engine;
 
-mod callback;
-pub use callback::Callbacks;
+mod callbacks;
+pub use callbacks::Callbacks;
 
 mod error_callback;
 pub use error_callback::ErrorCallback;

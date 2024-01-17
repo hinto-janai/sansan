@@ -9,6 +9,7 @@ use crate::{
 	config::{InitConfig,Callbacks},
 	source::Source,
 	state::AudioState,
+	error::{DecodeError,OutputError,SourceError},
 };
 
 //---------------------------------------------------------------------------------------------------- ErrorCallback
@@ -34,22 +35,29 @@ use crate::{
 /// If a function is passed, you'll get the specific error as an argument.
 ///
 /// See:
-/// [`Callbacks::error_decode`]
-/// [`Callbacks::error_output`]
-/// [`Callbacks::error_source`]
+/// - [`Callbacks::error_decode`]
+/// - [`Callbacks::error_output`]
+/// - [`Callbacks::error_source`]
 ///
 /// for usage.
 pub enum ErrorCallback<Error> {
-	/// Pause the audio stream.
+	/// Pause audio playback.
 	///
-	/// This will set the [`AudioState`]'s `playing`
+	/// This will set [`AudioState::playing`]
 	/// to `false` and pause playback.
 	Pause,
 
-	/// TODO
+	/// Pause audio playback and execute a function.
+	///
+	/// This will set [`AudioState::playing`]
+	/// to `false`, pause playback, then run the
+	/// provided function.
 	PauseAndFn(Box<dyn FnMut(Error) + Send + Sync + 'static>),
 
-	/// TODO
+	/// Execute a function.
+	///
+	/// This will solely execute the provided
+	/// function and will not pause any playback.
 	Fn(Box<dyn FnMut(Error) + Send + Sync + 'static>),
 }
 
@@ -62,7 +70,7 @@ impl<Error> ErrorCallback<Error> {
 
 	#[cold]
 	#[must_use]
-	/// TODO
+	/// Create a [`Self::PauseAndFn`] with the function `F`.
 	pub fn new_pause_and_fn<F>(callback: F) -> Self
 	where
 		F: FnMut(Error) + Send + Sync + 'static
@@ -72,7 +80,7 @@ impl<Error> ErrorCallback<Error> {
 
 	#[cold]
 	#[must_use]
-	/// TODO
+	/// Create a [`Self::Fn`] with the function `F`.
 	pub fn new_fn<F>(callback: F) -> Self
 	where
 		F: FnMut(Error) + Send + Sync + 'static

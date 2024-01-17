@@ -14,8 +14,9 @@ use std::{
 #[allow(unused_imports)] // docs
 use crate::{
 	Engine,
+	source::Source,
 	state::{AudioState,Current},
-	config::LiveConfig,
+	config::{LiveConfig,InitConfig},
 	signal::Repeat,
 };
 
@@ -34,7 +35,6 @@ use crate::{
 /// # use sansan::{config::*,error::*,source::*,state::*};
 /// let mut callbacks = Callbacks::<()>::new();
 /// let (tx, rx) = std::sync::mpsc::channel();
-///
 /// # tx.send(Current { source: Source::dummy(), index: 0, elapsed: 0.0 });
 ///
 /// callbacks.current_new(move |current: Current<()>| {
@@ -49,9 +49,8 @@ use crate::{
 /// // Meanwhile in another thread...
 /// while let Ok(current) = rx.recv() {
 ///     // We received a message from the `Engine`
-///     // that we set a new `Current`, print
-///     // its metadata if available.
-///     println!("{:#?}", current.source.metadata());
+///     // that we set a new `Current`, print its metadata.
+///     println!("New track: {:#?}", current.source.metadata());
 ///     # break;
 /// }
 /// ```
@@ -66,7 +65,7 @@ use crate::{
 ///
 /// ## `None` error behavior
 /// The `Engine` will do nothing upon errors if
-/// `None` is passed in the `error_*` fields.
+/// [`None`] is passed in the `error_*` fields.
 ///
 /// The tracks in the queue will continue to be decoded and played,
 /// even if the audio output device is not connected.
@@ -142,8 +141,21 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 		Self::DEFAULT
 	}
 
-	/// TODO
 	#[must_use]
+	/// Returns `true` if all fields are [`None`].
+	///
+	/// ```
+	/// # use sansan::config::*;
+	/// let callbacks: Callbacks<()> = Callbacks {
+	///     current_new:  None,
+	///     queue_end:    None,
+	///     elapsed:      None,
+	///     error_decode: None,
+	///     error_output: None,
+	///     error_source: None,
+	/// };
+	/// assert!(callbacks.all_none());
+	/// ```
 	pub const fn all_none(&self) -> bool {
 		self.current_new.is_none()  &&
 		self.queue_end.is_none()    &&
@@ -153,8 +165,22 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 		self.error_source.is_none()
 	}
 
-	/// TODO
 	#[must_use]
+	/// Returns `true` if all fields are [`Some`].
+	///
+	/// ```
+	/// # use sansan::config::*;
+	/// # use std::time::*;
+	/// let callbacks: Callbacks<()> = Callbacks {
+	///     current_new:  Some(Box::new(|_| {})),
+	///     queue_end:    Some(Box::new(||  {})),
+	///     elapsed:      Some((Box::new(|_| {}), Duration::ZERO)),
+	///     error_decode: Some(ErrorCallback::Pause),
+	///     error_output: Some(ErrorCallback::Pause),
+	///     error_source: Some(ErrorCallback::Pause),
+	/// };
+	/// assert!(callbacks.all_some());
+	/// ```
 	pub const fn all_some(&self) -> bool {
 		self.current_new.is_some()  &&
 		self.queue_end.is_some()    &&
@@ -164,7 +190,20 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 		self.error_source.is_some()
 	}
 
-	/// TODO
+	/// Set the behavior for when the a new [`AudioState::current`] is set.
+	///
+	/// The function has access to the new [`Current`].
+	///
+	/// ```rust
+	/// # use sansan::{config::*,error::*};
+	/// # use std::time::*;
+	/// let mut callbacks = Callbacks::<()>::new();
+	///
+	/// // Called when the last track of the queue finishes.
+	/// //
+	/// // This input decides how the `Engine` handles it.
+	/// callbacks.current_new(|current| println!("new current: {current:#?}"));
+	/// ```
 	pub fn current_new<F>(&mut self, callback: F) -> &mut Self
 	where
 		F: FnMut(Current<Extra>) + Send + Sync + 'static
@@ -173,7 +212,18 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 		self
 	}
 
-	/// TODO
+	/// Set the behavior for when the [`AudioState::queue`] ends.
+	///
+	/// ```rust
+	/// # use sansan::{config::*,error::*};
+	/// # use std::time::*;
+	/// let mut callbacks = Callbacks::<()>::new();
+	///
+	/// // Called when the last track of the queue finishes.
+	/// //
+	/// // This input decides how the `Engine` handles it.
+	/// callbacks.queue_end(|| println!("queue finished!"));
+	/// ```
 	pub fn queue_end<F>(&mut self, callback: F) -> &mut Self
 	where
 		F: FnMut() + Send + Sync + 'static
@@ -182,7 +232,26 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 		self
 	}
 
-	/// TODO
+	/// Set the behavior for when `duration` amount
+	/// of time has elapsed in the [`Current`] track.
+	///
+	/// The function has access to the new [`Current::elapsed`] value.
+	///
+	/// ```rust
+	/// # use sansan::{config::*,error::*};
+	/// # use std::time::*;
+	/// let mut callbacks = Callbacks::<()>::new();
+	///
+	/// // Called each second.
+	/// //
+	/// // This input decides how the `Engine` handles it.
+	/// // This one in particular just makes the `Engine`
+	/// // print the total amount of time elapsed.
+	/// callbacks.elapsed(
+	///     |elapsed| println!("total time elapsed: {elapsed}"),
+	///     Duration::from_secs(1),
+	/// );
+	/// ```
 	pub fn elapsed<F>(&mut self, callback: F, duration: Duration) -> &mut Self
 	where
 		F: FnMut(f32) + Send + Sync + 'static
@@ -219,7 +288,6 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 	/// # use sansan::{config::*,error::*,source::*,state::*};
 	/// let mut callbacks = Callbacks::<()>::new();
 	/// let (tx, rx) = std::sync::mpsc::channel();
-	///
 	/// # tx.send(OutputError::StreamClosed);
 	///
 	/// callbacks.error_output(ErrorCallback::new_pause_and_fn(move |output_error| {

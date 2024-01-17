@@ -74,7 +74,7 @@ impl Metadata {
 	};
 
 	#[must_use]
-	/// If all fields are [`None`].
+	/// Returns `true` if all fields are [`None`].
 	///
 	/// ```
 	/// # use sansan::meta::*;
@@ -111,7 +111,7 @@ impl Metadata {
 	}
 
 	#[must_use]
-	/// If all fields are [`Some`].
+	/// Returns `true` if all fields are [`Some`].
 	///
 	/// ```
 	/// # use sansan::meta::*;
