@@ -2,20 +2,20 @@
 
 //---------------------------------------------------------------------------------------------------- use
 use crate::{
-	state::AudioState,
-	extra_data::ExtraData,
-	error::{OutputError,DecodeError,SourceError,SansanError},
-	signal::SeekError,
 	config::error_callback::ErrorCallback,
 };
 use std::{
 	fmt,
-	marker::PhantomData,
 	time::Duration,
 };
 
-#[allow(unused_imports)]
-use crate::Engine; // docs
+#[allow(unused_imports)] // docs
+use crate::{
+	Engine,
+	state::{AudioState,Current},
+	config::LiveConfig,
+	signal::Repeat,
+};
 
 //---------------------------------------------------------------------------------------------------- Callbacks
 /// Boxed, dynamically dispatched function with access to the current audio state.
@@ -23,18 +23,32 @@ pub(crate) type Callback = Box<dyn FnMut() + Send + 'static>;
 
 /// TODO
 pub struct Callbacks {
-	/// TODO
-	pub next: Option<Callback>,
-	/// TODO
+	/// Called when the [`Current`] in the [`AudioState`] was set to a new value.
+	///
+	/// Either to [`None`] or to some new [`Source`] (e.g, the next track in the queue).
+	///
+	/// This is called even if the [`LiveConfig`]'s repeat mode is set to [`Repeat::Current`],
+	/// i.e, if the current track repeats after finishing, this callback will still be called.
+	pub current_new: Option<Callback>,
+
+	/// Called when the last track in the queue in the [`AudioState`] ends.
+	///
+	/// This is called even if the [`LiveConfig`]'s repeat mode is set to [`Repeat::Queue`],
+	/// i.e, if the queue repeats after finishing, this callback will still be called.
 	pub queue_end: Option<Callback>,
-	/// TODO
-	pub repeat: Option<Callback>,
-	/// TODO
-	pub elapsed: Option<(Callback, f64)>,
+
+	/// Called each time playback has elapsed the given [`Duration`].
+	///
+	/// For example, if `Duration::from_secs(5)` were given,
+	/// this callback would be called each 5 seconds.
+	pub elapsed: Option<(Callback, Duration)>,
+
 	/// TODO
 	pub error_decode: Option<ErrorCallback>,
+
 	/// TODO
 	pub error_source: Option<ErrorCallback>,
+
 	/// TODO
 	pub error_output: Option<ErrorCallback>,
 }
@@ -50,21 +64,19 @@ impl Callbacks {
 	/// assert!(callbacks.all_none());
 	/// ```
 	pub const DEFAULT: Self = Self {
-		next:         None,
-		queue_end:    None,
-		repeat:       None,
-		elapsed:      None,
-		error_decode: None,
-		error_source: None,
-		error_output: None,
+		current_new:    None,
+		queue_end:      None,
+		elapsed:        None,
+		error_decode:   None,
+		error_source:   None,
+		error_output:   None,
 	};
 
 	/// TODO
 	#[must_use]
 	pub const fn all_none(&self) -> bool {
-		self.next.is_none()         &&
+		self.current_new.is_none()  &&
 		self.queue_end.is_none()    &&
-		self.repeat.is_none()       &&
 		self.elapsed.is_none()      &&
 		self.error_decode.is_none() &&
 		self.error_source.is_none() &&
@@ -74,9 +86,8 @@ impl Callbacks {
 	/// TODO
 	#[must_use]
 	pub const fn all_some(&self) -> bool {
-		self.next.is_some()         &&
+		self.current_new.is_some()  &&
 		self.queue_end.is_some()    &&
-		self.repeat.is_some()       &&
 		self.elapsed.is_some()      &&
 		self.error_decode.is_some() &&
 		self.error_source.is_some() &&
@@ -85,11 +96,11 @@ impl Callbacks {
 
 	#[cold]
 	/// TODO
-	pub fn next<F>(&mut self, callback: F) -> &mut Self
+	pub fn current_new<F>(&mut self, callback: F) -> &mut Self
 	where
 		F: FnMut() + Send + Sync + 'static
 	{
-		self.next = Some(Box::new(callback));
+		self.current_new = Some(Box::new(callback));
 		self
 	}
 
@@ -105,30 +116,20 @@ impl Callbacks {
 
 	#[cold]
 	/// TODO
-	pub fn repeat<F>(&mut self, callback: F) -> &mut Self
-	where
-		F: FnMut() + Send + Sync + 'static
-	{
-		self.repeat = Some(Box::new(callback));
-		self
-	}
-
-	#[cold]
-	/// TODO
 	///
 	/// ## Panics
-	/// `seconds` must be:
+	/// `duration` must be:
 	///
 	/// - Positive
 	/// - Non-zero
 	/// - Not an abnormal float ([`f64::NAN`], [`f64::INFINITY`], etc)
 	///
 	/// or [`Engine::init`] will panic.
-	pub fn elapsed<F>(&mut self, callback: F, seconds: f64) -> &mut Self
+	pub fn elapsed<F>(&mut self, callback: F, duration: Duration) -> &mut Self
 	where
 		F: FnMut() + Send + Sync + 'static
 	{
-		self.elapsed = Some((Box::new(callback), seconds));
+		self.elapsed = Some((Box::new(callback), duration));
 		self
 	}
 
@@ -174,10 +175,9 @@ impl fmt::Debug for Callbacks {
 	#[allow(clippy::missing_docs_in_private_items)]
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.debug_struct("Callbacks")
-			.field("next",         &self.next.as_ref().map(|_|      "Some(_)"))
+			.field("current_new",  &self.current_new.as_ref().map(|_|      "Some(_)"))
 			.field("queue_end",    &self.queue_end.as_ref().map(|_| "Some(_)"))
-			.field("repeat",       &self.repeat.as_ref().map(|_|    "Some(_)"))
-			.field("elapsed",      &self.elapsed.as_ref().map(|o|   format!("Some(_, {})", o.1)))
+			.field("elapsed",      &self.elapsed.as_ref().map(|o|   format!("Some(_, {:?})", o.1)))
 			.field("error_decode", &self.error_decode)
 			.field("error_source", &self.error_source)
 			.field("error_output", &self.error_output)

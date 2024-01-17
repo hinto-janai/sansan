@@ -100,6 +100,12 @@ impl ErrorCallback {
 	pub const fn is_fn(&self) -> bool {
 		matches!(self, Self::Fn(_))
 	}
+
+	#[must_use]
+	/// Returns `true` if this [`ErrorCallback`] will involve pausing.
+	pub const fn will_pause(&self) -> bool {
+		self.is_pause() || self.is_pause_and_fn()
+	}
 }
 
 impl Default for ErrorCallback {
@@ -114,8 +120,8 @@ impl fmt::Debug for ErrorCallback {
 		f.write_fmt(
 			match self {
 				Self::Pause => format_args!("ErrorCallback::Pause"),
-				Self::PauseAndFn(f) => format_args!("ErrorCallback::PauseAndFn(_)"),
-				Self::Fn(f) => format_args!("ErrorCallback::Fn(_)"),
+				Self::PauseAndFn(_) => format_args!("ErrorCallback::PauseAndFn(_)"),
+				Self::Fn(_) => format_args!("ErrorCallback::Fn(_)"),
 			}
 		)
 	}

@@ -1,17 +1,13 @@
 //! TODO
 
 //---------------------------------------------------------------------------------------------------- Use
-
+use std::time::Duration;
 
 //---------------------------------------------------------------------------------------------------- EngineInitError
 #[derive(thiserror::Error)]
 #[derive(Debug)]
 ///
 pub enum EngineInitError {
-	#[error("callback elapsed seconds - found: `{0}`, expected: an `is_normal()` float")]
-	/// Callback elapsed seconds was not an [`f64::is_normal`] float.
-	CallbackElapsed(f64),
-
 	#[error("previous threshold seconds - found: `{0}`, expected: an `is_normal()` float")]
 	/// Previous threshold seconds was not an [`f64::is_normal`] float.
 	PreviousThreshold(f64),

@@ -60,20 +60,15 @@ pub(crate) struct Decode<Extra: ExtraData> {
 /// See [src/actor/kernel.rs]'s [Channels]
 #[allow(clippy::missing_docs_in_private_items)]
 struct Channels<Extra: ExtraData> {
-	shutdown:         Receiver<()>,
-	to_gc:            Sender<DecodeToGc>,
-	to_audio:         Sender<ToAudio>,
-	from_audio:       Receiver<TookAudioBuffer>,
-	to_kernel_seek:   Sender<Result<SeekedTime, SeekError>>,
-	to_kernel_source: Sender<Result<(), SourceError>>,
-	from_kernel:      Receiver<KernelToDecode<Extra>>,
-
-	// If the `from` channesl are `Some`, we must hang on the channel until
-	// `Kernel` responds, else, we can continue, as in [`ErrorCallback::Continue`].
-	to_kernel_error_d:   Sender<DecodeError>,
-	from_kernel_error_d: Option<Receiver<()>>,
-	to_kernel_error_s:   Sender<SourceError>,
-	from_kernel_error_s: Option<Receiver<()>>,
+	shutdown:               Receiver<()>,
+	to_gc:                  Sender<DecodeToGc>,
+	to_audio:               Sender<ToAudio>,
+	from_audio:             Receiver<TookAudioBuffer>,
+	to_kernel_seek:         Sender<Result<SeekedTime, SeekError>>,
+	to_kernel_source:       Sender<Result<(), SourceError>>,
+	from_kernel:            Receiver<KernelToDecode<Extra>>,
+	to_kernel_error_decode: Sender<DecodeError>,
+	to_kernel_error_source: Sender<SourceError>,
 }
 
 //---------------------------------------------------------------------------------------------------- (Actual) Messages
@@ -91,20 +86,18 @@ pub(crate) enum DecodeToGc {
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct InitArgs<Extra: ExtraData> {
-	pub(crate) init_barrier:        Option<Arc<Barrier>>,
-	pub(crate) audio_ready_to_recv: Arc<AtomicBool>,
-	pub(crate) shutdown_wait:       Arc<Barrier>,
-	pub(crate) shutdown:            Receiver<()>,
-	pub(crate) to_gc:               Sender<DecodeToGc>,
-	pub(crate) to_audio:            Sender<ToAudio>,
-	pub(crate) from_audio:          Receiver<TookAudioBuffer>,
-	pub(crate) to_kernel_seek:      Sender<Result<SeekedTime, SeekError>>,
-	pub(crate) to_kernel_source:    Sender<Result<(), SourceError>>,
-	pub(crate) from_kernel:         Receiver<KernelToDecode<Extra>>,
-	pub(crate) to_kernel_error_d:   Sender<DecodeError>,
-	pub(crate) from_kernel_error_d: Option<Receiver<()>>,
-	pub(crate) to_kernel_error_s:   Sender<SourceError>,
-	pub(crate) from_kernel_error_s: Option<Receiver<()>>,
+	pub(crate) init_barrier:           Option<Arc<Barrier>>,
+	pub(crate) audio_ready_to_recv:    Arc<AtomicBool>,
+	pub(crate) shutdown_wait:          Arc<Barrier>,
+	pub(crate) shutdown:               Receiver<()>,
+	pub(crate) to_gc:                  Sender<DecodeToGc>,
+	pub(crate) to_audio:               Sender<ToAudio>,
+	pub(crate) from_audio:             Receiver<TookAudioBuffer>,
+	pub(crate) to_kernel_seek:         Sender<Result<SeekedTime, SeekError>>,
+	pub(crate) to_kernel_source:       Sender<Result<(), SourceError>>,
+	pub(crate) from_kernel:            Receiver<KernelToDecode<Extra>>,
+	pub(crate) to_kernel_error_decode: Sender<DecodeError>,
+	pub(crate) to_kernel_error_source: Sender<SourceError>,
 }
 
 //---------------------------------------------------------------------------------------------------- Decode Impl
@@ -128,10 +121,8 @@ impl<Extra: ExtraData> Decode<Extra> {
 					to_kernel_seek,
 					to_kernel_source,
 					from_kernel,
-					to_kernel_error_d,
-					from_kernel_error_d,
-					to_kernel_error_s,
-					from_kernel_error_s,
+					to_kernel_error_decode,
+					to_kernel_error_source,
 				} = args;
 
 				let channels = Channels {
@@ -142,10 +133,8 @@ impl<Extra: ExtraData> Decode<Extra> {
 					to_kernel_seek,
 					to_kernel_source,
 					from_kernel,
-					to_kernel_error_d,
-					from_kernel_error_d,
-					to_kernel_error_s,
-					from_kernel_error_s,
+					to_kernel_error_decode,
+					to_kernel_error_source,
 				};
 
 				let this = Self {
@@ -357,11 +346,7 @@ impl<Extra: ExtraData> Decode<Extra> {
 	/// TODO
 	fn handle_decode_error(channels: &Channels<Extra>, error: DecodeError) {
 		error2!("Decode - decode error: {error:?}");
-
-		try_send!(channels.to_kernel_error_d, error);
-		if let Some(channel) = channels.from_kernel_error_d.as_ref() {
-			recv!(channel);
-		}
+		try_send!(channels.to_kernel_error_decode, error);
 	}
 
 	#[cold]
@@ -369,11 +354,7 @@ impl<Extra: ExtraData> Decode<Extra> {
 	/// TODO
 	fn handle_source_error(channels: &Channels<Extra>, error: SourceError) {
 		error2!("Decode - source error: {error:?}");
-
-		try_send!(channels.to_kernel_error_s, error);
-		if let Some(channel) = channels.from_kernel_error_s.as_ref() {
-			recv!(channel);
-		}
+		try_send!(channels.to_kernel_error_source, error);
 	}
 
 	#[inline]

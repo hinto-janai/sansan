@@ -4,10 +4,10 @@
 use std::thread::JoinHandle;
 use crossbeam::channel::{Receiver, Select};
 use crate::{
-	config::Callback,
-	extra_data::ExtraData,
+	config::{Callback, Callbacks, ErrorCallback},
+	error::{DecodeError,SourceError,OutputError},
 	state::{AudioState,AudioStateReader},
-	macros::{debug2,trace2,select_recv},
+	macros::{debug2,trace2,select_recv}, error::SansanError,
 };
 use std::sync::{
 	Arc,
@@ -20,10 +20,7 @@ use std::sync::{
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct Caller {
-	cb_next:       Option<Callback>,
-	cb_queue_end:  Option<Callback>,
-	cb_repeat:     Option<Callback>,
-	cb_elapsed:    Option<Callback>,
+	callbacks:     Callbacks,
 	shutdown_wait: Arc<Barrier>,
 }
 
@@ -31,11 +28,13 @@ pub(crate) struct Caller {
 /// See [src/actor/kernel.rs]'s [Channels]
 #[allow(clippy::missing_docs_in_private_items)]
 struct Channels {
-	shutdown:  Receiver<()>,
-	next:      Receiver<()>,
-	queue_end: Receiver<()>,
-	repeat:    Receiver<()>,
-	elapsed:   Receiver<()>,
+	shutdown:     Receiver<()>,
+	current_new:  Receiver<()>,
+	queue_end:    Receiver<()>,
+	elapsed:      Receiver<()>,
+	error_decode: Receiver<DecodeError>,
+	error_source: Receiver<SourceError>,
+	error_output: Receiver<OutputError>,
 }
 
 //---------------------------------------------------------------------------------------------------- Caller Impl
@@ -43,17 +42,16 @@ struct Channels {
 #[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct InitArgs {
 	pub(crate) init_barrier:  Option<Arc<Barrier>>,
-	pub(crate) cb_next:       Option<Callback>,
-	pub(crate) cb_queue_end:  Option<Callback>,
-	pub(crate) cb_repeat:     Option<Callback>,
-	pub(crate) cb_elapsed:    Option<Callback>,
+	pub(crate) callbacks:     Callbacks,
 	pub(crate) low_priority:  bool,
 	pub(crate) shutdown_wait: Arc<Barrier>,
 	pub(crate) shutdown:      Receiver<()>,
-	pub(crate) next:          Receiver<()>,
+	pub(crate) current_new:   Receiver<()>,
 	pub(crate) queue_end:     Receiver<()>,
-	pub(crate) repeat:        Receiver<()>,
 	pub(crate) elapsed:       Receiver<()>,
+	pub(crate) error_decode:  Receiver<DecodeError>,
+	pub(crate) error_source:  Receiver<SourceError>,
+	pub(crate) error_output:  Receiver<OutputError>,
 }
 
 //---------------------------------------------------------------------------------------------------- Caller Impl
@@ -68,32 +66,30 @@ impl Caller {
 			.spawn(move || {
 				let InitArgs {
 					init_barrier,
-					cb_next,
-					cb_queue_end,
-					cb_repeat,
-					cb_elapsed,
+					callbacks,
 					low_priority,
 					shutdown_wait,
 					shutdown,
-					next,
+					current_new,
 					queue_end,
-					repeat,
 					elapsed,
+					error_decode,
+					error_source,
+					error_output,
 				} = args;
 
 				let channels = Channels {
 					shutdown,
-					next,
+					current_new,
 					queue_end,
-					repeat,
 					elapsed,
+					error_decode,
+					error_source,
+					error_output,
 				};
 
 				let this = Self {
-					cb_next,
-					cb_queue_end,
-					cb_repeat,
-					cb_elapsed,
+					callbacks,
 					shutdown_wait,
 				};
 
@@ -121,21 +117,25 @@ impl Caller {
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
 
-		assert_eq!(0, select.recv(&channels.next));
+		assert_eq!(0, select.recv(&channels.current_new));
 		assert_eq!(1, select.recv(&channels.queue_end));
-		assert_eq!(2, select.recv(&channels.repeat));
-		assert_eq!(3, select.recv(&channels.elapsed));
-		assert_eq!(4, select.recv(&channels.shutdown));
+		assert_eq!(2, select.recv(&channels.elapsed));
+		assert_eq!(3, select.recv(&channels.error_decode));
+		assert_eq!(4, select.recv(&channels.error_source));
+		assert_eq!(5, select.recv(&channels.error_output));
+		assert_eq!(6, select.recv(&channels.shutdown));
 
 		loop {
 			// Route signal to its appropriate handler function [fn_*()].
 			match select.ready() {
-				0 => { select_recv!(channels.next);      self.next(); },
-				1 => { select_recv!(channels.queue_end); self.queue_end(); },
-				2 => { select_recv!(channels.repeat);    self.repeat(); },
-				3 => { select_recv!(channels.elapsed);   self.elapsed(); },
+				0 => { select_recv!(channels.current_new);  self.current_new(); },
+				1 => { select_recv!(channels.queue_end);    self.queue_end(); },
+				2 => { select_recv!(channels.elapsed);      self.elapsed(); },
+				3 => { Self::call_error(&mut self.callbacks.error_decode, select_recv!(channels.error_decode)); },
+				4 => { Self::call_error(&mut self.callbacks.error_source, select_recv!(channels.error_source)); },
+				5 => { Self::call_error(&mut self.callbacks.error_output, select_recv!(channels.error_output)); },
 
-				4 => {
+				6 => {
 					select_recv!(channels.shutdown);
 					debug2!("Caller - shutting down");
 					// Wait until all threads are ready to shutdown.
@@ -157,33 +157,51 @@ impl Caller {
 	// to exact messages/signals from the other actors.
 
 	/// TODO
-	fn next(&mut self) {
-		trace2!("Caller - next()");
-		Self::call(&mut self.cb_next);
+	#[inline]
+	fn current_new(&mut self) {
+		trace2!("Caller - current_new()");
+		Self::call(&mut self.callbacks.current_new);
 	}
 
 	/// TODO
+	#[inline]
 	fn queue_end(&mut self) {
 		trace2!("Caller - queue_end()");
-		Self::call(&mut self.cb_queue_end);
+		Self::call(&mut self.callbacks.queue_end);
 	}
 
 	/// TODO
-	fn repeat(&mut self) {
-		trace2!("Caller - repeat()");
-		Self::call(&mut self.cb_repeat);
-	}
-
-	/// TODO
+	#[inline]
 	fn elapsed(&mut self) {
 		trace2!("Caller - elapsed()");
-		Self::call(&mut self.cb_elapsed);
+		// Must be special cased.
+		if let Some((callback, _)) = self.callbacks.elapsed.as_mut() {
+			callback();
+		}
 	}
 
-	/// TODO
+	/// Handle the regular callbacks.
+	#[inline]
 	fn call(callback: &mut Option<Callback>) {
-		if let Some(cb) = callback.as_mut() {
-			cb();
+		// INVARIANT:
+		// The other actors will always send message to `Caller`,
+		// since they don't know if they exist or not.
+		if let Some(callback) = callback.as_mut() {
+			callback();
 		}
+	}
+
+	#[inline]
+	/// Handle the error callbacks.
+	fn call_error(
+		error_callback: &mut Option<ErrorCallback>,
+		error: impl Into<SansanError>,
+	) {
+		if let Some(error_callback) = error_callback.as_mut() {
+			match error_callback {
+				ErrorCallback::Fn(f) | ErrorCallback::PauseAndFn(f) => f(error.into()),
+				ErrorCallback::Pause => (),
+			}
+		};
 	}
 }

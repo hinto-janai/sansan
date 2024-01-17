@@ -13,7 +13,8 @@ use crate::{
 	config::{
 		InitConfig,
 		Callbacks,
-		LiveConfig
+		LiveConfig,
+		ErrorCallback,
 	},
 	actor::{
 		audio::{Audio,AUDIO_BUFFER_LEN},
@@ -79,13 +80,6 @@ where
 		// These may or may not have been already checked
 		// by other constructors, but we will check again here.
 		{
-			// Callback elapsed seconds must be a normal float.
-			if let Some((_, seconds)) = config.callbacks.elapsed {
-				if !seconds.is_normal() {
-					return Err(EngineInitError::CallbackElapsed(seconds));
-				}
-			}
-
 			// Previous threshold must be a normal float.
 			if !live_config.back_threshold.is_normal() {
 				return Err(EngineInitError::PreviousThreshold(live_config.back_threshold));
@@ -168,10 +162,6 @@ where
 		}
 
 		//-------------------------------------------------------------- Spawn [Caller]
-		// FIXME:
-		// Only spawn [Caller] is callbacks exist,
-		// and only send messages from other actors
-		// if there are [Callback]'s in the vector.
 		let callbacks = {
 			// Prevent destructing `config`.
 			let mut cb = Callbacks::DEFAULT;
@@ -180,19 +170,23 @@ where
 		};
 
 		// Initialize [Caller]'s channels.
-		let (c_shutdown,          shutdown)  = bounded(1);
-		let (to_caller_next,      next)      = unbounded();
-		let (to_caller_queue_end, queue_end) = unbounded();
-		let (to_caller_repeat,    repeat)    = unbounded();
-		let (to_caller_elapsed,   elapsed)   = unbounded();
+		let (c_shutdown,               shutdown)     = bounded(1);
+		let (k_to_caller_current_new,  current_new)  = unbounded();
+		let (k_to_caller_queue_end,    queue_end)    = unbounded();
+		let (k_to_caller_elapsed,      elapsed)      = unbounded();
+		let (k_to_caller_error_decode, error_decode) = unbounded();
+		let (k_to_caller_error_source, error_source) = unbounded();
+		let (k_to_caller_error_output, error_output) = unbounded();
 
 		// The channels _other_ actors use to tell
 		// [Caller] that some event has gone off
 		// and that it should [call()] the callback.
-		let to_caller_next      = if callbacks.next.is_some()      { Some(to_caller_next)      } else { None };
-		let to_caller_queue_end = if callbacks.queue_end.is_some() { Some(to_caller_queue_end) } else { None };
-		let to_caller_repeat    = if callbacks.repeat.is_some()    { Some(to_caller_repeat)    } else { None };
-		let to_caller_elapsed   = callbacks.elapsed.as_ref().map(|(_, secs)| (to_caller_elapsed, *secs));
+		let to_caller_current_new = if callbacks.current_new.is_some() { Some(k_to_caller_current_new) } else { None };
+		let to_caller_queue_end   = if callbacks.queue_end.is_some()   { Some(k_to_caller_queue_end)   } else { None };
+		let to_caller_elapsed     = callbacks.elapsed.as_ref().map(|(_, dur)| (k_to_caller_elapsed, dur.as_secs_f64()));
+		let caller_error_decode_pause = callbacks.error_decode.as_ref().is_some_and(ErrorCallback::will_pause);
+		let caller_error_source_pause = callbacks.error_source.as_ref().is_some_and(ErrorCallback::will_pause);
+		let caller_error_output_pause = callbacks.error_output.as_ref().is_some_and(ErrorCallback::will_pause);
 
 		// INVARIANT:
 		//
@@ -202,23 +196,22 @@ where
 		// [Receiver] end of the channels.
 		if callbacks.all_none() {
 			debug2!("Engine - no callbacks, skipping `Caller`");
-			drop((shutdown, next, queue_end, repeat, elapsed));
+			drop((shutdown, current_new, queue_end, elapsed));
 		} else {
 			spawn_actor!(
 				"Caller",
 				crate::actor::caller::InitArgs {
 					init_barrier:  init_barrier.clone(), // Option<Arc<_>>,
-					cb_next:       callbacks.next,
-					cb_queue_end:  callbacks.queue_end,
-					cb_repeat:     callbacks.repeat,
-					cb_elapsed:    callbacks.elapsed.map(|(cb, _)| cb),
+					callbacks,
 					low_priority:  config.callback_low_priority,
 					shutdown_wait: Arc::clone(&shutdown_wait),
 					shutdown,
-					next,
+					current_new,
 					queue_end,
-					repeat,
 					elapsed,
+					error_decode,
+					error_source,
+					error_output,
 				},
 				Caller::init
 			);
@@ -235,12 +228,6 @@ where
 		let (a_to_k, k_from_a) = unbounded();
 		let (k_to_a, a_from_k) = unbounded();
 		let (err_a_to_k, err_k_from_a) = unbounded();
-		let (err_k_to_a, err_a_from_k) = if let Some(cb) = callbacks.error_output {
-			let (tx, rx) = unbounded();
-			((Some((tx, cb))), Some(rx))
-		} else {
-			(None, None)
-		};
 
 		// Shared values [Audio] <-> [Kernel].
 		let audio_ready_to_recv = Arc::new(AtomicBool::new(true));
@@ -262,7 +249,6 @@ where
 				to_kernel:         a_to_k,
 				from_kernel:       a_from_k,
 				to_kernel_error:   err_a_to_k,
-				from_kernel_error: err_a_from_k,
 			},
 			Audio::<AudioOutputStruct<ResamplerStruct>>::init
 		);
@@ -275,20 +261,8 @@ where
 		let (d_shutdown,    shutdown)        = bounded(1);
 
 		let (err_decode_d_to_k, err_decode_k_from_d) = unbounded();
-		let (err_decode_k_to_d, err_decode_d_from_k) = if let Some(cb) = callbacks.error_decode {
-			let (tx, rx) = unbounded();
-			((Some((tx, cb))), Some(rx))
-		} else {
-			(None, None)
-		};
-
 		let (err_source_d_to_k, err_source_k_from_d) = unbounded();
-		let (err_source_k_to_d, err_source_d_from_k) = if let Some(cb) = callbacks.error_source {
-			let (tx, rx) = unbounded();
-			((Some((tx, cb))), Some(rx))
-		} else {
-			(None, None)
-		};
+
 		spawn_actor!(
 			"Decode",
 			crate::actor::decode::InitArgs {
@@ -296,16 +270,14 @@ where
 				audio_ready_to_recv: Arc::clone(&audio_ready_to_recv),
 				shutdown_wait:       Arc::clone(&shutdown_wait),
 				shutdown,
-				to_gc:               d_to_gc,
-				to_audio:            d_to_a,
-				from_audio:          d_from_a,
-				to_kernel_seek:      d_to_k_seek,
-				to_kernel_source:    d_to_k_source,
-				from_kernel:         d_from_k,
-				to_kernel_error_d:   err_decode_d_to_k,
-				from_kernel_error_d: err_decode_d_from_k,
-				to_kernel_error_s:   err_source_d_to_k,
-				from_kernel_error_s: err_source_d_from_k,
+				to_gc:                  d_to_gc,
+				to_audio:               d_to_a,
+				from_audio:             d_from_a,
+				to_kernel_seek:         d_to_k_seek,
+				to_kernel_source:       d_to_k_source,
+				from_kernel:            d_from_k,
+				to_kernel_error_decode: err_decode_d_to_k,
+				to_kernel_error_source: err_source_d_to_k,
 			},
 			Decode::init
 		);
@@ -405,18 +377,18 @@ where
 			recv_next,
 			recv_previous,
 			recv_stop,
-			to_audio:            k_to_a,
-			from_audio:          k_from_a,
-			to_audio_error:      err_k_to_a,
-			from_audio_error:    err_k_from_a,
-			to_decode:           k_to_d,
-			from_decode_seek:    k_from_d_seek,
-			from_decode_source:  k_from_d_source,
-			to_decode_error_d:   err_decode_k_to_d,
-			to_decode_error_s:   err_source_k_to_d,
-			from_decode_error_d: err_decode_k_from_d,
-			from_decode_error_s: err_source_k_from_d,
-			to_gc:               k_to_gc,
+			to_audio:                 k_to_a,
+			from_audio:               k_from_a,
+			from_audio_error:         err_k_from_a,
+			to_decode:                k_to_d,
+			from_decode_seek:         k_from_d_seek,
+			from_decode_source:       k_from_d_source,
+			from_decode_error_decode: err_decode_k_from_d,
+			from_decode_error_source: err_source_k_from_d,
+			to_caller_error_decode:   (k_to_caller_error_decode, caller_error_decode_pause),
+			to_caller_error_source:   (k_to_caller_error_source, caller_error_source_pause),
+			to_caller_error_output:   (k_to_caller_error_output, caller_error_output_pause),
+			to_gc:                    k_to_gc,
 			send_audio_state,
 			recv_clear,
 			recv_repeat,

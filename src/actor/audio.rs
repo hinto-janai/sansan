@@ -60,7 +60,7 @@ struct Channels {
 	shutdown: Receiver<()>,
 
 	to_gc:             Sender<AudioBuffer<f32>>,
-	to_caller_elapsed: Option<(Sender<()>, f64)>,
+	to_caller_elapsed: Option<(Sender<()>, f64)>, // seconds
 
 	to_decode:   Sender<TookAudioBuffer>,
 	from_decode: Receiver<(AudioBuffer<f32>, Time)>,
@@ -69,9 +69,6 @@ struct Channels {
 	from_kernel: Receiver<KernelToAudio>,
 
 	to_kernel_error:   Sender<OutputError>,
-	// If this is `Some`, we must hang on the channel until `Kernel`
-	// responds, else, we can continue, as in [`ErrorCallback::Continue`].
-	from_kernel_error: Option<Receiver<()>>,
 }
 
 //---------------------------------------------------------------------------------------------------- (Actual) Messages
@@ -106,13 +103,12 @@ pub(crate) struct InitArgs {
 	pub(crate) shutdown_wait:     Arc<Barrier>,
 	pub(crate) shutdown:          Receiver<()>,
 	pub(crate) to_gc:             Sender<AudioBuffer<f32>>,
-	pub(crate) to_caller_elapsed: Option<(Sender<()>, f64)>,
+	pub(crate) to_caller_elapsed: Option<(Sender<()>, f64)>, // seconds
 	pub(crate) to_decode:         Sender<TookAudioBuffer>,
 	pub(crate) from_decode:       Receiver<(AudioBuffer<f32>, Time)>,
 	pub(crate) to_kernel:         Sender<WroteAudioBuffer>,
 	pub(crate) from_kernel:       Receiver<KernelToAudio>,
 	pub(crate) to_kernel_error:   Sender<OutputError>,
-	pub(crate) from_kernel_error: Option<Receiver<()>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Audio Impl
@@ -141,7 +137,6 @@ where
 					to_kernel,
 					from_kernel,
 					to_kernel_error,
-					from_kernel_error,
 				} = args;
 
 				let channels = Channels {
@@ -153,7 +148,6 @@ where
 					to_kernel,
 					from_kernel,
 					to_kernel_error,
-					from_kernel_error,
 				};
 
 				// TODO:
@@ -291,9 +285,6 @@ where
 				Err(e) => {
 					error2!("Audio - couldn't re-open AudioOutput: {e:?}");
 					try_send!(c.to_kernel_error, e);
-					if let Some(channel) = c.from_kernel_error.as_ref() {
-						recv!(channel);
-					}
 					return;
 				},
 			}
@@ -304,9 +295,6 @@ where
 		// Write audio buffer (hangs).
 		if let Err(e) = self.output.write(audio, &c.to_gc, volume) {
 			try_send!(c.to_kernel_error, e);
-			if let Some(channel) = c.from_kernel_error.as_ref() {
-				recv!(channel);
-			}
 			return;
 		}
 

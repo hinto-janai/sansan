@@ -128,17 +128,19 @@ pub(crate) struct Channels<Extra: ExtraData> {
 	// [Audio]
 	pub(crate) to_audio:         Sender<KernelToAudio>,
 	pub(crate) from_audio:       Receiver<WroteAudioBuffer>,
-	pub(crate) to_audio_error:   Option<(Sender<()>, ErrorCallback)>,
 	pub(crate) from_audio_error: Receiver<OutputError>,
 
 	// [Decode]
-	pub(crate) to_decode:           Sender<KernelToDecode<Extra>>,
-	pub(crate) from_decode_seek:    Receiver<Result<SeekedTime, SeekError>>,
-	pub(crate) from_decode_source:  Receiver<Result<(), SourceError>>,
-	pub(crate) to_decode_error_d:   Option<(Sender<()>, ErrorCallback)>,
-	pub(crate) from_decode_error_d: Receiver<DecodeError>,
-	pub(crate) to_decode_error_s:   Option<(Sender<()>, ErrorCallback)>,
-	pub(crate) from_decode_error_s: Receiver<SourceError>,
+	pub(crate) to_decode:                Sender<KernelToDecode<Extra>>,
+	pub(crate) from_decode_seek:         Receiver<Result<SeekedTime, SeekError>>,
+	pub(crate) from_decode_source:       Receiver<Result<(), SourceError>>,
+	pub(crate) from_decode_error_decode: Receiver<DecodeError>,
+	pub(crate) from_decode_error_source: Receiver<SourceError>,
+
+	// [Caller]
+	pub(crate) to_caller_error_decode: (Sender<DecodeError>, bool), // Should we `pause()`?
+	pub(crate) to_caller_error_source: (Sender<SourceError>, bool), // Should we `pause()`?
+	pub(crate) to_caller_error_output: (Sender<OutputError>, bool), // Should we `pause()`?
 
 	// [Gc]
 	pub(crate) to_gc: Sender<KernelToGc<Extra>>,
@@ -228,7 +230,7 @@ where
 	#[inline(never)]
 	#[allow(clippy::cognitive_complexity)]
 	/// `Kernel`'s main function.
-	fn main(mut self, mut c: Channels<Extra>) {
+	fn main(mut self, c: Channels<Extra>) {
 		// Create channels that we will
 		// be selecting/listening to for all time.
 		let mut select = Select::new();
@@ -261,8 +263,8 @@ where
 		assert_eq!(19, select.recv(&c.recv_remove_range));
 		// Errors
 		assert_eq!(20, select.recv(&c.from_audio_error));
-		assert_eq!(21, select.recv(&c.from_decode_error_d));
-		assert_eq!(22, select.recv(&c.from_decode_error_s));
+		assert_eq!(21, select.recv(&c.from_decode_error_decode));
+		assert_eq!(22, select.recv(&c.from_decode_error_source));
 		// Shutdown
 		assert_eq!(23, select.recv(&c.shutdown));
 		assert_eq!(24, select.recv(&c.shutdown_hang));
@@ -309,9 +311,9 @@ where
 				19 => self.remove_range( select_recv!(c.recv_remove_range), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_remove_range),
 
 				// Errors.
-				20 => self.handle_error(select_recv!(c.from_audio_error).into(), c.to_audio_error.as_mut()),
-				21 => self.handle_error(select_recv!(c.from_decode_error_d).into(), c.to_decode_error_d.as_mut()),
-				22 => self.handle_error(select_recv!(c.from_decode_error_s).into(), c.to_decode_error_s.as_mut()),
+				20 => self.error_output(select_recv!(c.from_audio_error), &c.to_caller_error_output),
+				21 => self.error_decode(select_recv!(c.from_decode_error_decode), &c.to_caller_error_decode),
+				22 => self.error_source(select_recv!(c.from_decode_error_source), &c.to_caller_error_source),
 
 				// Shutdown.
 				23 => {
@@ -354,25 +356,40 @@ where
 	}
 
 	//---------------------------------------------------------------------------------------------------- Error handling
-	#[cold]
-	#[inline(never)]
 	/// TODO
-	fn handle_error(
+	fn error_decode(
 		&mut self,
-		error: SansanError,
-		channel_and_callback: Option<&mut (Sender<()>, ErrorCallback)>,
+		error: DecodeError,
+		to_caller: &(Sender<DecodeError>, bool),
 	) {
-		if let Some((channel, callback)) = channel_and_callback {
-			match callback {
-				ErrorCallback::Pause => self.pause_inner(),
-				ErrorCallback::PauseAndFn(f) => {
-					self.pause_inner();
-					f(error);
-				},
-				ErrorCallback::Fn(f) => f(error),
-			}
-			try_send!(channel, ());
+		if to_caller.1 {
+			self.pause_inner();
 		}
+		try_send!(to_caller.0, error);
+	}
+
+	/// TODO
+	fn error_source(
+		&mut self,
+		error: SourceError,
+		to_caller: &(Sender<SourceError>, bool),
+	) {
+		if to_caller.1 {
+			self.pause_inner();
+		}
+		try_send!(to_caller.0, error);
+	}
+
+	/// TODO
+	fn error_output(
+		&mut self,
+		error: OutputError,
+		to_caller: &(Sender<OutputError>, bool),
+	) {
+		if to_caller.1 {
+			self.pause_inner();
+		}
+		try_send!(to_caller.0, error);
 	}
 
 	//---------------------------------------------------------------------------------------------------- From Audio
