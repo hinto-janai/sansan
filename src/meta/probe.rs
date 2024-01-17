@@ -16,6 +16,7 @@ use symphonia::core::{
 	probe::{Hint,ProbeResult},
 };
 use crate::{
+	meta::ProbeConfig,
 	meta::Metadata,
 	source::source_decode::{
 		MEDIA_SOURCE_STREAM_OPTIONS,
@@ -30,17 +31,20 @@ impl Metadata {
 	///
 	/// # Errors
 	/// TODO
-	pub fn probe_path(audio_path: impl AsRef<Path>) -> Result<Self, ProbeError> {
+	pub fn probe_path(audio_path: impl AsRef<Path>, probe_config: ProbeConfig) -> Result<Self, ProbeError> {
 		let audio_file = std::fs::File::open(audio_path.as_ref())?;
-		Self::probe_file(audio_file)
+		Self::probe_file(audio_file, probe_config)
 	}
 
 	/// TODO
 	///
 	/// # Errors
 	/// TODO
-	pub fn probe_file(audio_file: File) -> Result<Self, ProbeError> {
+	pub fn probe_file(audio_file: File, probe_config: ProbeConfig) -> Result<Self, ProbeError> {
 		let mut this = Self::DEFAULT;
+		if probe_config == ProbeConfig::NONE {
+			return Ok(this);
+		}
 
 		let mss  = MediaSourceStream::new(Box::new(audio_file), MEDIA_SOURCE_STREAM_OPTIONS);
 		let probe = symphonia::default::get_probe();
@@ -52,7 +56,7 @@ impl Metadata {
 			&METADATA_OPTIONS,
 		)?;
 
-		this.probe_inner(probe_result);
+		this.probe_inner(probe_result, probe_config);
 		Ok(this)
 	}
 
@@ -60,8 +64,11 @@ impl Metadata {
 	///
 	/// # Errors
 	/// TODO
-	pub fn probe_bytes(audio_bytes: impl AsRef<[u8]>) -> Result<Self, ProbeError> {
+	pub fn probe_bytes(audio_bytes: impl AsRef<[u8]>, probe_config: ProbeConfig) -> Result<Self, ProbeError> {
 		let mut this = Self::DEFAULT;
+		if probe_config == ProbeConfig::NONE {
+			return Ok(this);
+		}
 
 		// SAFETY:
 		// The MediaSourceStream constructor needs static
@@ -89,7 +96,7 @@ impl Metadata {
 			&METADATA_OPTIONS,
 		)?;
 
-		this.probe_inner(probe_result);
+		this.probe_inner(probe_result, probe_config);
 		Ok(this)
 	}
 
@@ -99,10 +106,10 @@ impl Metadata {
 	///
 	/// This is the high-level functions that calls all the
 	/// individual parser functions below to fill out the metadata.
-	fn probe_inner(&mut self, mut probe_result: ProbeResult) {
+	fn probe_inner(&mut self, mut probe_result: ProbeResult, config: ProbeConfig) {
 		if let Some(track) = probe_result.format.tracks().first() {
-			self.sample_rate   = sample_rate(track);
-			self.total_runtime = total_runtime(track);
+			if config.sample_rate   { self.sample_rate   = sample_rate(track);   }
+			if config.total_runtime { self.total_runtime = total_runtime(track); }
 		}
 
 		// Extract a usable `MetadataRevision` from a `ProbeResult`.
@@ -134,16 +141,15 @@ impl Metadata {
 		let visuals = md.visuals();
 
 		// Attempt to get metadata.
-		self.artist_name   = artist_name(tags).map(Arc::from);
-		self.album_title   = album_title(tags).map(Arc::from);
-		self.track_title   = track_title(tags).map(Arc::from);
-		// self.cover_path    =
-		self.track_number  = track_number(tags);
-		self.disc_number   = disc_number(tags);
-		self.cover_art     = cover_art(visuals).map(Arc::from);
-		self.release_date  = release_date(tags).map(Arc::from);
-		self.genre         = genre(tags).map(Arc::from);
-		self.compilation   = compilation(tags);
+		if config.artist_name  { self.artist_name  = artist_name(tags).map(Arc::from);  }
+		if config.album_title  { self.album_title  = album_title(tags).map(Arc::from);  }
+		if config.track_title  { self.track_title  = track_title(tags).map(Arc::from);  }
+		if config.track_number { self.track_number = track_number(tags);                }
+		if config.disc_number  { self.disc_number  = disc_number(tags);                 }
+		if config.cover_art    { self.cover_art    = cover_art(visuals).map(Arc::from); }
+		if config.release_date { self.release_date = release_date(tags).map(Arc::from); }
+		if config.genre        { self.genre        = genre(tags).map(Arc::from);        }
+		if config.compilation  { self.compilation  = compilation(tags);                 }
 	}
 }
 
@@ -152,7 +158,7 @@ impl TryFrom<&Path> for Metadata {
 	type Error = ProbeError;
 	/// Calls [`Self::probe_path`].
 	fn try_from(path: &Path) -> Result<Self, Self::Error> {
-		Self::probe_path(path)
+		Self::probe_path(path, ProbeConfig::ALL)
 	}
 }
 
@@ -160,7 +166,7 @@ impl TryFrom<File> for Metadata {
 	type Error = ProbeError;
 	/// Calls [`Self::probe_file`]
 	fn try_from(file: File) -> Result<Self, Self::Error> {
-		Self::probe_file(file)
+		Self::probe_file(file, ProbeConfig::ALL)
 	}
 }
 
@@ -168,7 +174,7 @@ impl TryFrom<&[u8]> for Metadata {
 	type Error = ProbeError;
 	/// Calls [`Self::probe_bytes`]
 	fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-		Self::probe_bytes(bytes)
+		Self::probe_bytes(bytes, ProbeConfig::ALL)
 	}
 }
 
