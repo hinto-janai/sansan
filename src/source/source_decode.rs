@@ -223,10 +223,7 @@ impl TryFrom<MediaSourceStream> for SourceDecode {
 }
 
 //---------------------------------------------------------------------------------------------------- Source -> SourceDecode
-impl<Extra> TryFrom<Source<Extra>> for SourceDecode
-where
-	Extra: ExtraData
-{
+impl<Extra: ExtraData> TryFrom<Source<Extra>> for SourceDecode {
 	type Error = SourceError;
 
 	fn try_from(source: Source<Extra>) -> Result<Self, Self::Error> {

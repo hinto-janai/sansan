@@ -57,10 +57,7 @@ pub enum Source<Extra: ExtraData> {
 }
 
 //---------------------------------------------------------------------------------------------------- Source Impl
-impl<Extra> Source<Extra>
-where
-	Extra: ExtraData
-{
+impl<Extra: ExtraData> Source<Extra> {
 	#[inline]
 	/// TODO
 	pub const fn extra(&self) -> &Extra {

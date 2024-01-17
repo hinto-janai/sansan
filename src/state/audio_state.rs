@@ -21,10 +21,7 @@ use std::{
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq)]
-pub struct AudioState<Extra>
-where
-	Extra: ExtraData,
-{
+pub struct AudioState<Extra: ExtraData> {
 	/// Are we playing audio right now?
 	pub playing: bool,
 
@@ -46,10 +43,7 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- AudioState Impl
-impl<Extra> AudioState<Extra>
-where
-	Extra: ExtraData,
-{
+impl<Extra: ExtraData> AudioState<Extra> {
 	/// TODO
 	pub const DEFAULT: Self = Self {
 		playing: false,

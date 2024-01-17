@@ -26,10 +26,7 @@ use crossbeam::channel::Sender;
 /// # Safety Notes
 /// Implementors are expected to implement these functions
 /// correctly according to the documentation invariants.
-pub(crate) trait AudioOutput
-where
-	Self: Sized,
-{
+pub(crate) trait AudioOutput: Sized {
 	/// Fully write an audio buffer to the hardware/server (or internal buffer).
 	///
 	/// `Audio` will be calling this function so `gc` is where the `audio`

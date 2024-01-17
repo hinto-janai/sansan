@@ -20,10 +20,7 @@ use std::{
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq)]
-pub struct Current<Extra>
-where
-	Extra: ExtraData
-{
+pub struct Current<Extra: ExtraData> {
 	/// TODO
 	pub source: Source<Extra>,
 	/// TODO
@@ -32,10 +29,7 @@ where
 	pub elapsed: f64,
 }
 
-impl<Extra> Current<Extra>
-where
-	Extra: ExtraData
-{
+impl<Extra: ExtraData> Current<Extra> {
 	/// Returns an `Option<Current>` with:
 	/// - a new `Source`
 	/// - 0th index

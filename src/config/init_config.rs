@@ -24,10 +24,7 @@ use strum::{
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug)]
 /// TODO
-pub struct InitConfig<Extra>
-where
-	Extra: ExtraData,
-{
+pub struct InitConfig<Extra: ExtraData> {
 	//------------------------------------------ Engine
 	/// TODO
 	pub callbacks: Callbacks,
@@ -48,10 +45,7 @@ where
 }
 
 //---------------------------------------------------------------------------------------------------- InitConfig Impl
-impl<Extra> InitConfig<Extra>
-where
-	Extra: ExtraData,
-{
+impl<Extra: ExtraData> InitConfig<Extra> {
 	/// Return a reasonable default [`InitConfig`].
 	///
 	/// For the generics:

@@ -16,10 +16,7 @@ use crate::{
 // #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq,PartialOrd,Eq,Ord,Hash)]
-pub struct Add<Extra>
-where
-	Extra: ExtraData
-{
+pub struct Add<Extra: ExtraData> {
 	/// The [`Source`] to add to the queue
 	pub source: Source<Extra>,
 	/// How should we add this [`Source`] to the queue?
@@ -77,10 +74,7 @@ impl<Extra: ExtraData> From<Source<Extra>> for Add<Extra> {
 // #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,Debug,PartialEq,PartialOrd)]
-pub struct AddMany<Extra>
-where
-	Extra: ExtraData
-{
+pub struct AddMany<Extra: ExtraData> {
 	/// The [`Sources`] to add to the queue
 	pub sources: Sources<Extra>,
 	/// How should we add these [`Source`]'s to the queue?

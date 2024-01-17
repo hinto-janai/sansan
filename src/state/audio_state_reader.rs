@@ -17,10 +17,7 @@ use crate::Engine;
 pub struct AudioStateReader<Extra: ExtraData>(pub(crate) Reader<AudioState<Extra>>);
 
 //---------------------------------------------------------------------------------------------------- AudioStateReader Impl
-impl<Extra> AudioStateReader<Extra>
-where
-	Extra: ExtraData,
-{
+impl<Extra: ExtraData> AudioStateReader<Extra> {
 	#[inline]
 	#[must_use]
 	/// TODO

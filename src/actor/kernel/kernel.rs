@@ -191,10 +191,7 @@ pub(crate) struct InitArgs<Extra: ExtraData> {
 }
 
 //---------------------------------------------------------------------------------------------------- Kernel Impl
-impl<Extra> Kernel<Extra>
-where
-	Extra: ExtraData
-{
+impl<Extra: ExtraData> Kernel<Extra> {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]

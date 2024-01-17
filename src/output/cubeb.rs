@@ -32,10 +32,7 @@ use std::sync::{
 
 //----------------------------------------------------------------------------------------------- Cubeb
 /// TODO
-pub(crate) struct Cubeb<R>
-where
-	R: Resampler,
-{
+pub(crate) struct Cubeb<R: Resampler> {
 	/// We send audio data to this channel which
 	/// the audio stream will receive and write.
 	sender: Sender<StereoFrame<f32>>,
@@ -76,10 +73,7 @@ where
 }
 
 //----------------------------------------------------------------------------------------------- `AudioOutput` Impl
-impl<R> AudioOutput for Cubeb<R>
-where
-	R: Resampler,
-{
+impl<R: Resampler> AudioOutput for Cubeb<R> {
 	fn write(
 		&mut self,
 		mut audio: AudioBuffer<f32>,

@@ -246,7 +246,7 @@ impl<Extra: ExtraData> Decode<Extra> {
 					decoded.convert(&mut audio);
 
 					// Calculate timestamp.
-					let time  = self.source.timebase.calc_time(packet.ts);
+					let time = self.source.timebase.calc_time(packet.ts);
 					self.set_current_audio_time(time);
 
 					// Send to [Audio] if we can, else store locally.

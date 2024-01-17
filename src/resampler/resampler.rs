@@ -16,10 +16,7 @@ use std::num::NonZeroUsize;
 
 //----------------------------------------------------------------------------------------------- Resampler
 /// TODO
-pub(crate) trait Resampler
-where
-	Self: Sized,
-{
+pub(crate) trait Resampler: Sized {
 	/// Create a new [`Resampler`] with according to provided values.
 	///
 	/// This function is heavy, allocates many vectors and space.

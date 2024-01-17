@@ -41,10 +41,7 @@ pub(crate) const AUDIO_BUFFER_LEN: usize = 64;
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
 #[derive(Debug)]
-pub(crate) struct Audio<Output>
-where
-	Output: AudioOutput,
-{
+pub(crate) struct Audio<Output: AudioOutput> {
 	atomic_state:        Arc<AtomicState>, // Shared atomic audio state with the rest of the actors
 	playing:             bool,             // A local boolean so we don't have to atomic access each loop
 	elapsed_callback:    f64,              // Elapsed time, used for the elapsed callback (f64 is reset each call)
@@ -113,10 +110,7 @@ pub(crate) struct InitArgs {
 }
 
 //---------------------------------------------------------------------------------------------------- Audio Impl
-impl<Output> Audio<Output>
-where
-	Output: AudioOutput,
-{
+impl<Output: AudioOutput> Audio<Output> {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]

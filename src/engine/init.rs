@@ -52,10 +52,7 @@ use crate::resampler::ResamplerStruct;
 const ACTOR_COUNT: usize = 6;
 
 //---------------------------------------------------------------------------------------------------- Engine Impl
-impl<Extra> Engine<Extra>
-where
-	Extra: ExtraData,
-{
+impl<Extra: ExtraData> Engine<Extra> {
 	//---------------------------------------------------------------------------------------------------- Init
 	#[cold]
 	#[inline(never)]

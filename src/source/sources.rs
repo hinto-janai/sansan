@@ -32,14 +32,9 @@ use crate::state::AudioState;
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug,Clone,PartialEq,PartialOrd)]
 /// TODO
-pub struct Sources<Extra>(SourcesInner<Extra>)
-where
-	Extra: ExtraData;
+pub struct Sources<Extra: ExtraData>(SourcesInner<Extra>);
 
-impl<Extra> Sources<Extra>
-where
-	Extra: ExtraData,
-{
+impl<Extra: ExtraData> Sources<Extra> {
 	/// TODO
 	pub fn as_slice(&self) -> &[Source<Extra>] {
 		use SourcesInner as S;

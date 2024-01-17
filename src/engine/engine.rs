@@ -52,10 +52,7 @@ use crate::resampler::ResamplerStruct;
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
 #[derive(Debug)]
-pub struct Engine<Extra>
-where
-	Extra: ExtraData,
-{
+pub struct Engine<Extra: ExtraData> {
 	/// Data and objects.
 	pub(super) reader: AudioStateReader<Extra>,
 	pub(super) config: LiveConfig,
