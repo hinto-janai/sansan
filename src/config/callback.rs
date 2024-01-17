@@ -2,7 +2,9 @@
 
 //---------------------------------------------------------------------------------------------------- use
 use crate::{
+	extra_data::ExtraData,
 	config::error_callback::ErrorCallback,
+	error::{DecodeError, SourceError, OutputError},
 };
 use std::{
 	fmt,
@@ -18,49 +20,109 @@ use crate::{
 };
 
 //---------------------------------------------------------------------------------------------------- Callbacks
-/// Boxed, dynamically dispatched function with access to the current audio state.
-pub(crate) type Callback = Box<dyn FnMut() + Send + 'static>;
-
-/// TODO
-pub struct Callbacks {
+/// Various callbacks to execute upon certain conditions being met.
+///
+/// This struct is used solely in [`InitConfig`], where you
+/// get to define what `sansan` does upon certain states.
+///
+/// ## Callback
+/// Each time the condition is met, the provided callback will be executed.
+///
+/// For example, we can pass a function to run each time the [`Current`] track changes:
+///
+/// ```rust
+/// # use sansan::{config::*,error::*,source::*,state::*};
+/// let mut callbacks = Callbacks::<()>::new();
+/// let (tx, rx) = std::sync::mpsc::channel();
+///
+/// # tx.send(Current { source: Source::dummy(), index: 0, elapsed: 0.0 });
+///
+/// callbacks.current_new(move |current: Current<()>| {
+///     // A new `Current` was set!
+///     //
+///     // This closure decides what `sansan` does after this happens.
+///     // In this case, we just send a channel message re-sending
+///     // the new `Current`.
+///     tx.send(current);
+/// });
+///
+/// // Meanwhile in another thread...
+/// while let Ok(current) = rx.recv() {
+///     // We received a message from `sansan`
+///     // that we set a new `Current`, print
+///     // its metadata if available.
+///     println!("{:#?}", current.source.metadata());
+///     # break;
+/// }
+/// ```
+///
+/// ## `ErrorCallback`
+/// These are "special" callbacks that can do other things on-top
+/// of user-passed closures, namely, pause the audio playback.
+///
+/// These are executed when errors occur.
+///
+/// See [`ErrorCallback`] for more info.
+///
+/// ## `None` error behavior
+/// `sansan` will do nothing upon errors if `None`
+/// is passed in the `error_*` fields.
+///
+/// The tracks in the queue will continue to be decoded and played,
+/// even if the audio output device is not connected.
+///
+/// I.e, track progress will continue regardless of errors.
+///
+/// ## Safety
+/// `sansan` assumes none of these callbacks will panic.
+///
+/// Also note that there is only 1 thread executing these
+/// callbacks at any given time, so any callback that hangs
+/// or otherwise takes a long time to return will prevent
+/// other callbacks from being executed - and should thus be avoided.
+pub struct Callbacks<Extra: ExtraData> {
 	/// Called when the [`Current`] in the [`AudioState`] was set to a new value.
 	///
 	/// Either to [`None`] or to some new [`Source`] (e.g, the next track in the queue).
 	///
+	/// The available `Current` passed in the function is the new `Current` that was set.
+	///
 	/// This is called even if the [`LiveConfig`]'s repeat mode is set to [`Repeat::Current`],
 	/// i.e, if the current track repeats after finishing, this callback will still be called.
-	pub current_new: Option<Callback>,
+	pub current_new: Option<Box<dyn FnMut(Current<Extra>) + Send + 'static>>,
 
 	/// Called when the last track in the queue in the [`AudioState`] ends.
 	///
 	/// This is called even if the [`LiveConfig`]'s repeat mode is set to [`Repeat::Queue`],
 	/// i.e, if the queue repeats after finishing, this callback will still be called.
-	pub queue_end: Option<Callback>,
+	pub queue_end: Option<Box<dyn FnMut() + Send + 'static>>,
 
 	/// Called each time playback has elapsed the given [`Duration`].
 	///
 	/// For example, if `Duration::from_secs(5)` were given,
 	/// this callback would be called each 5 seconds.
-	pub elapsed: Option<(Callback, Duration)>,
+	///
+	/// The [`f32`] passed in the function is the value of [`Current::elapsed`].
+	pub elapsed: Option<(Box<dyn FnMut(f32) + Send + 'static>, Duration)>,
 
-	/// TODO
-	pub error_decode: Option<ErrorCallback>,
+	/// The action `sansan` will take on various [`DecodeError`]'s.
+	pub error_decode: Option<ErrorCallback<DecodeError>>,
 
-	/// TODO
-	pub error_source: Option<ErrorCallback>,
+	/// The action `sansan` will take on various [`OutputError`]'s.
+	pub error_output: Option<ErrorCallback<OutputError>>,
 
-	/// TODO
-	pub error_output: Option<ErrorCallback>,
+	/// The action `sansan` will take on various [`SourceError`]'s.
+	pub error_source: Option<ErrorCallback<SourceError>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Callbacks Impl
-impl Callbacks {
+impl<Extra: ExtraData> Callbacks<Extra> {
 	/// A fresh [`Self`] with no callbacks.
 	///
 	/// ```rust
 	/// # use sansan::*;
 	/// # use sansan::config::*;
-	/// let callbacks: Callbacks = Callbacks::DEFAULT;
+	/// let callbacks: Callbacks<()> = Callbacks::DEFAULT;
 	/// assert!(callbacks.all_none());
 	/// ```
 	pub const DEFAULT: Self = Self {
@@ -68,9 +130,17 @@ impl Callbacks {
 		queue_end:      None,
 		elapsed:        None,
 		error_decode:   None,
-		error_source:   None,
 		error_output:   None,
+		error_source:   None,
 	};
+
+	#[must_use]
+	/// A fresh [`Self`] with no callbacks.
+	///
+	/// Same as [`Self::DEFAULT`].
+	pub const fn new() -> Self {
+		Self::DEFAULT
+	}
 
 	/// TODO
 	#[must_use]
@@ -79,8 +149,8 @@ impl Callbacks {
 		self.queue_end.is_none()    &&
 		self.elapsed.is_none()      &&
 		self.error_decode.is_none() &&
-		self.error_source.is_none() &&
-		self.error_output.is_none()
+		self.error_output.is_none() &&
+		self.error_source.is_none()
 	}
 
 	/// TODO
@@ -90,21 +160,19 @@ impl Callbacks {
 		self.queue_end.is_some()    &&
 		self.elapsed.is_some()      &&
 		self.error_decode.is_some() &&
-		self.error_source.is_some() &&
-		self.error_output.is_some()
+		self.error_output.is_some() &&
+		self.error_source.is_some()
 	}
 
-	#[cold]
 	/// TODO
 	pub fn current_new<F>(&mut self, callback: F) -> &mut Self
 	where
-		F: FnMut() + Send + Sync + 'static
+		F: FnMut(Current<Extra>) + Send + Sync + 'static
 	{
 		self.current_new = Some(Box::new(callback));
 		self
 	}
 
-	#[cold]
 	/// TODO
 	pub fn queue_end<F>(&mut self, callback: F) -> &mut Self
 	where
@@ -114,56 +182,100 @@ impl Callbacks {
 		self
 	}
 
-	#[cold]
 	/// TODO
-	///
-	/// ## Panics
-	/// `duration` must be:
-	///
-	/// - Positive
-	/// - Non-zero
-	/// - Not an abnormal float ([`f64::NAN`], [`f64::INFINITY`], etc)
-	///
-	/// or [`Engine::init`] will panic.
 	pub fn elapsed<F>(&mut self, callback: F, duration: Duration) -> &mut Self
 	where
-		F: FnMut() + Send + Sync + 'static
+		F: FnMut(f32) + Send + Sync + 'static
 	{
 		self.elapsed = Some((Box::new(callback), duration));
 		self
 	}
 
-	#[cold]
-	/// TODO
-	pub fn error_decode(&mut self, error_callback: ErrorCallback) -> &mut Self {
+	/// Set the behavior for when [`DecodeError`]'s occur.
+	///
+	/// The provided [`ErrorCallback`] has access to the specific [`DecodeError`] that occured.
+	///
+	/// ```rust
+	/// # use sansan::{config::*,error::*};
+	/// let mut callbacks = Callbacks::<()>::new();
+	///
+	/// // A decode error occured!
+	/// //
+	/// // This input decides how `sansan` handles it.
+	/// // This one in particular just makes
+	/// // `sansan` pause the audio playback.
+	/// callbacks.error_decode(ErrorCallback::Pause);
+	/// ```
+	pub fn error_decode(&mut self, error_callback: ErrorCallback<DecodeError>) -> &mut Self {
 		self.error_decode = Some(error_callback);
 		self
 	}
 
-	#[cold]
-	/// TODO
-	pub fn error_source(&mut self, error_callback: ErrorCallback) -> &mut Self {
-		self.error_source = Some(error_callback);
+	/// Set the behavior for when [`OutputError`]'s occur.
+	///
+	/// The provided [`ErrorCallback`] has access to the specific [`OutputError`] that occured.
+	///
+	/// ```rust
+	/// # use sansan::{config::*,error::*,source::*,state::*};
+	/// let mut callbacks = Callbacks::<()>::new();
+	/// let (tx, rx) = std::sync::mpsc::channel();
+	///
+	/// # tx.send(OutputError::StreamClosed);
+	///
+	/// callbacks.error_output(ErrorCallback::new_pause_and_fn(move |output_error| {
+	///     // An output error occured!
+	///     //
+	///     // This closure decides how `sansan` handles it.
+	///     // This one in particular will make `sansan` pause
+	///     // the audio playback, print the error, then send a
+	///     // channel message.
+	///     tx.send(output_error);
+	/// }));
+	///
+	/// // Meanwhile in another thread...
+	/// while let Ok(output_error) = rx.recv() {
+	///     // We received an error from `sansan`, print it.
+	///     eprintln!("{output_error}");
+	///     # break;
+	/// }
+	/// ```
+	pub fn error_output(&mut self, error_callback: ErrorCallback<OutputError>) -> &mut Self {
+		self.error_output = Some(error_callback);
 		self
 	}
 
-	#[cold]
-	/// TODO
-	pub fn error_output(&mut self, error_callback: ErrorCallback) -> &mut Self {
-		self.error_output = Some(error_callback);
+	/// Set the behavior for when [`SourceError`]'s occur.
+	///
+	/// The provided [`ErrorCallback`] has access to the specific [`SourceError`] that occured.
+	///
+	/// ```rust
+	/// # use sansan::{config::*,error::*};
+	/// let mut callbacks = Callbacks::<()>::new();
+	///
+	/// callbacks.error_source(ErrorCallback::new_fn(|source_error| {
+	///     // A source error occured!
+	///     //
+	///     // This closure decides how `sansan` handles it.
+	///     // This one in particular will make `sansan`
+	///     // print the error and continue as normal.
+	///     eprintln!("{source_error}");
+	/// }));
+	/// ```
+	pub fn error_source(&mut self, error_callback: ErrorCallback<SourceError>) -> &mut Self {
+		self.error_source = Some(error_callback);
 		self
 	}
 }
 
 //---------------------------------------------------------------------------------------------------- Callbacks Trait Impl
-impl Default for Callbacks {
+impl<Extra: ExtraData> Default for Callbacks<Extra> {
 	#[cold]
 	/// Same as [`Self::DEFAULT`].
 	///
 	/// ```rust
 	/// # use sansan::*;
 	/// # use sansan::config::*;
-	/// let callbacks: Callbacks = Callbacks::default();
+	/// let callbacks: Callbacks<()> = Callbacks::default();
 	/// assert!(callbacks.all_none());
 	/// ```
 	fn default() -> Self {
@@ -171,7 +283,7 @@ impl Default for Callbacks {
 	}
 }
 
-impl fmt::Debug for Callbacks {
+impl<Extra: ExtraData> fmt::Debug for Callbacks<Extra> {
 	#[allow(clippy::missing_docs_in_private_items)]
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.debug_struct("Callbacks")

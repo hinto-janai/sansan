@@ -7,14 +7,14 @@ use crate::source::Source;
 #[derive(thiserror::Error, Debug)]
 /// Errors when loading a [`Source`]
 ///
-/// This `enum` represents all the potential errors that can
-/// occur when attempting to load a [`Source`] into a viable
-/// audio container.
+/// This represents all the potential errors that can occur when
+/// attempting to load a [`Source`] into a viable audio container.
 ///
 /// This includes things like:
-/// - The data not actually be audio
+/// - The data is not actually audio
 /// - File IO errors (non-existent PATH, lacking-permissions, etc)
 /// - Unsupported audio codec
+/// - Missing/malformed data
 pub enum SourceError {
 	#[error("failed to open file: {0}")]
 	/// Error occurred while reading a [`std::fs::File`] (most likely missing)

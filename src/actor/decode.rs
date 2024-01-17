@@ -10,7 +10,7 @@ use crate::{
 	extra_data::ExtraData,
 	actor::{audio::TookAudioBuffer,kernel::KernelToDecode},
 	macros::{recv,send,try_send,try_recv,debug2,trace2,select_recv, error2},
-	error::{SourceError,DecodeError, SansanError},
+	error::{SourceError,DecodeError},
 };
 use symphonia::core::{
 	audio::AudioBuffer,

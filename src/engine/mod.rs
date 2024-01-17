@@ -3,7 +3,7 @@
 mod engine;
 pub use engine::Engine;
 
-mod error;
+// mod error;
 mod init;
 mod functions;
 

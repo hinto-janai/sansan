@@ -5,7 +5,6 @@ use crate::Engine;
 
 mod callback;
 pub use callback::Callbacks;
-pub(crate) use callback::Callback;
 
 mod error_callback;
 pub use error_callback::ErrorCallback;

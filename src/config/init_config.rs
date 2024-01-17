@@ -3,7 +3,6 @@
 //---------------------------------------------------------------------------------------------------- use
 use std::marker::PhantomData;
 use crate::{
-	error::SansanError,
 	config::{Callbacks,LiveConfig},
 	engine::Engine,
 	state::AudioState,
@@ -27,7 +26,7 @@ use strum::{
 pub struct InitConfig<Extra: ExtraData> {
 	//------------------------------------------ Engine
 	/// TODO
-	pub callbacks: Callbacks,
+	pub callbacks: Callbacks<Extra>,
 	/// TODO
 	pub callback_low_priority: bool,
 	/// TODO

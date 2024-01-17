@@ -26,7 +26,7 @@ pub(crate) fn sources() -> Sources<usize> {
 
 /// Init the `Engine` with a default `InitConfig`.
 pub(crate) fn init() -> Engine::<usize> {
-	Engine::<usize>::init(InitConfig::DEFAULT).unwrap()
+	Engine::<usize>::init(InitConfig::DEFAULT)
 }
 
 /// Init the `Engine` with 10 sources in the queue and a modified audio state.

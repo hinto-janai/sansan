@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	engine::{Engine, error::EngineInitError},
+	engine::Engine,
 	extra_data::ExtraData,
 	macros::{try_send,debug2,info2},
 	state::{
@@ -66,7 +66,7 @@ impl<Extra: ExtraData> Engine<Extra> {
 	///
 	/// # Panics
 	/// TODO
-	pub fn init(mut config: InitConfig<Extra>) -> Result<Self, EngineInitError> {
+	pub fn init(mut config: InitConfig<Extra>) -> Self {
 		info2!("Engine - initializing...");
 		info2!("Engine - audio output backend: [{AUDIO_OUTPUT_BACKEND}], resampler backend: [{RESAMPLER_BACKEND}]");
 		debug2!("Engine - init config:\n{config:#?}");
@@ -147,10 +147,7 @@ impl<Extra: ExtraData> Engine<Extra> {
 				// This means we can test `sansan` in CI as if it were actually being used.
 				debug2!("Engine - spawning: {}", $actor_name);
 				if let Err(error) = $($spawn_fn)*($init_args) {
-					return Err(EngineInitError::ThreadSpawn {
-						name: $actor_name,
-						error,
-					});
+					panic!("failed to spawn thread `{}`: {}", $actor_name, error);
 				}
 			};
 		}
@@ -404,19 +401,16 @@ impl<Extra: ExtraData> Engine<Extra> {
 			send_remove_range: k_send_remove_range,
 			recv_remove_range: k_recv_remove_range,
 		};
-		// Don't use `spawn_actor!()`, we need `Kernel` alive for testing.
-		let init_args = crate::actor::kernel::InitArgs {
-			init_barrier,
-			atomic_state:  Arc::clone(&atomic_state),
-			shutdown_wait: Arc::clone(&shutdown_wait),
-			w: audio_state_writer,
-			channels,
-		};
-		if let Err(error) = Kernel::<Extra>::init(init_args) {
-			return Err(EngineInitError::ThreadSpawn {
-				name: "Kernel",
-				error,
-			});
+		spawn_actor! {
+			"Kernel",
+			crate::actor::kernel::InitArgs {
+				init_barrier,
+				atomic_state:  Arc::clone(&atomic_state),
+				shutdown_wait: Arc::clone(&shutdown_wait),
+				w: audio_state_writer,
+				channels,
+			},
+			Kernel::<Extra>::init
 		}
 
 		// TODO: hand until ready before returning.
@@ -431,7 +425,7 @@ impl<Extra: ExtraData> Engine<Extra> {
 		let repeat = atomic_state.repeat.load();
 		let volume = atomic_state.volume.load();
 		info2!("Engine - initialization complete");
-		Ok(Self {
+		Self {
 			reader: audio_state_reader,
 			config: live_config,
 			atomic_state,
@@ -469,7 +463,7 @@ impl<Extra: ExtraData> Engine<Extra> {
 			recv_remove:       e_recv_remove,
 			send_remove_range: e_send_remove_range,
 			recv_remove_range: e_recv_remove_range,
-		})
+		}
 	}
 }
 

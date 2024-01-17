@@ -43,7 +43,7 @@ use crate::{
 		RemoveError,
 		RemoveRange,
 	},
-	error::{SourceError, OutputError, DecodeError, SansanError},
+	error::{SourceError, OutputError, DecodeError},
 	source::Source, config::ErrorCallback,
 };
 use std::collections::VecDeque;

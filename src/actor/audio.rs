@@ -58,7 +58,7 @@ struct Channels {
 	shutdown: Receiver<()>,
 
 	to_gc:             Sender<AudioBuffer<f32>>,
-	to_caller_elapsed: Option<(Sender<()>, f32)>, // seconds
+	to_caller_elapsed: Option<(Sender<Time>, f32)>, // seconds
 
 	to_decode:   Sender<TookAudioBuffer>,
 	from_decode: Receiver<(AudioBuffer<f32>, Time)>,
@@ -101,7 +101,7 @@ pub(crate) struct InitArgs {
 	pub(crate) shutdown_wait:     Arc<Barrier>,
 	pub(crate) shutdown:          Receiver<()>,
 	pub(crate) to_gc:             Sender<AudioBuffer<f32>>,
-	pub(crate) to_caller_elapsed: Option<(Sender<()>, f32)>, // seconds
+	pub(crate) to_caller_elapsed: Option<(Sender<Time>, f32)>, // seconds
 	pub(crate) to_decode:         Sender<TookAudioBuffer>,
 	pub(crate) from_decode:       Receiver<(AudioBuffer<f32>, Time)>,
 	pub(crate) to_kernel:         Sender<WroteAudioBuffer>,
@@ -286,7 +286,7 @@ impl<Output: AudioOutput> Audio<Output> {
 		if let Some((sender, elapsed_target)) = c.to_caller_elapsed.as_ref() {
 			self.elapsed_callback += nominal_seconds;
 			if self.elapsed_callback >= *elapsed_target {
-				try_send!(sender, ());
+				try_send!(sender, time);
 				self.elapsed_callback = 0.0;
 			}
 		}

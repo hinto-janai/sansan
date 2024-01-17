@@ -1,48 +1,45 @@
 //! TODO
 
 //---------------------------------------------------------------------------------------------------- use
-use crate::error::SansanError;
 use std::fmt;
 
 #[allow(unused_imports)] // docs
 use crate::{
 	Engine,
-	config::InitConfig,
+	config::{InitConfig,Callbacks},
 	source::Source,
 	state::AudioState,
 };
 
 //---------------------------------------------------------------------------------------------------- ErrorCallback
-/// The action `sansan` will take on various errors
+/// The action `sansan` will take on various errors.
 ///
 /// `sansan` can error in various situations:
-/// - During playback (e.g, audio device was unplugged)
 /// - During decoding (e.g, corrupted data)
+/// - During playback (e.g, audio device was unplugged)
 /// - During [`Source`] loading (e.g, file doesn't exist)
 ///
 /// When these errors occur, what should `sansan` do?
 ///
-/// These are solely used in [`InitConfig`], where each particular
-/// error point can be given a variant of [`ErrorCallback`] that
-/// determines what action `sansan` will take in the case.
+/// These are solely used in [`Callbacks`] which solely exist in [`InitConfig`],
+/// where each particular type of error can be given a variant of [`ErrorCallback`]
+/// that determines what action `sansan` will take in the case.
 ///
-/// # TODO - `None` behavior
-/// Continue playback.
+/// The generic `<Error>` parameter is never meant to be set by you,
+/// the user, it is just so that this can be generic over:
+/// - [`DecodeError`]
+/// - [`OutputError`]
+/// - [`SourceError`]
 ///
-/// `sansan` will essentially do nothing
-/// when this behavior is selected.
+/// If a function is passed, you'll get the specific error as an argument.
 ///
-/// The tracks in the queue will continue
-/// to be decoded and played, even if the
-/// audio output device is not connected.
+/// See:
+/// [`Callbacks::error_decode`]
+/// [`Callbacks::error_output`]
+/// [`Callbacks::error_source`]
 ///
-/// I.e, track progress will continue regardless of errors.
-///
-/// For `audio_source_behavior` in [`InitConfig`], this does the same as [`Self::Skip`]
-/// since we cannot "continue" a [`Source`] that does not work (i.e, missing file).
-///
-/// This is the default behavior.
-pub enum ErrorCallback {
+/// for usage.
+pub enum ErrorCallback<Error> {
 	/// Pause the audio stream.
 	///
 	/// This will set the [`AudioState`]'s `playing`
@@ -50,25 +47,25 @@ pub enum ErrorCallback {
 	Pause,
 
 	/// TODO
-	PauseAndFn(Box<dyn FnMut(SansanError) + Send + Sync + 'static>),
+	PauseAndFn(Box<dyn FnMut(Error) + Send + Sync + 'static>),
 
 	/// TODO
-	Fn(Box<dyn FnMut(SansanError) + Send + Sync + 'static>),
+	Fn(Box<dyn FnMut(Error) + Send + Sync + 'static>),
 }
 
-impl ErrorCallback {
+impl<Error> ErrorCallback<Error> {
 	/// ```rust
 	/// # use sansan::config::*;
-	/// assert!(ErrorCallback::DEFAULT.is_pause());
+	/// assert!(ErrorCallback::<()>::DEFAULT.is_pause());
 	/// ```
 	pub const DEFAULT: Self = Self::Pause;
 
 	#[cold]
 	#[must_use]
 	/// TODO
-	pub fn new_pause_and_fn<F>(&mut self, callback: F) -> Self
+	pub fn new_pause_and_fn<F>(callback: F) -> Self
 	where
-		F: FnMut(SansanError) + Send + Sync + 'static
+		F: FnMut(Error) + Send + Sync + 'static
 	{
 		Self::PauseAndFn(Box::new(callback))
 	}
@@ -76,9 +73,9 @@ impl ErrorCallback {
 	#[cold]
 	#[must_use]
 	/// TODO
-	pub fn new_fn<F>(&mut self, callback: F) -> Self
+	pub fn new_fn<F>(callback: F) -> Self
 	where
-		F: FnMut(SansanError) + Send + Sync + 'static
+		F: FnMut(Error) + Send + Sync + 'static
 	{
 		Self::Fn(Box::new(callback))
 	}
@@ -108,13 +105,13 @@ impl ErrorCallback {
 	}
 }
 
-impl Default for ErrorCallback {
+impl<Error> Default for ErrorCallback<Error> {
 	fn default() -> Self {
 		Self::DEFAULT
 	}
 }
 
-impl fmt::Debug for ErrorCallback {
+impl<Error> fmt::Debug for ErrorCallback<Error> {
 	#[allow(clippy::missing_docs_in_private_items)]
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.write_fmt(

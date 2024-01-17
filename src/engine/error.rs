@@ -6,7 +6,7 @@ use std::time::Duration;
 //---------------------------------------------------------------------------------------------------- EngineInitError
 #[derive(thiserror::Error)]
 #[derive(Debug)]
-///
+/// TODO
 pub enum EngineInitError {
 	#[error("failed to spawn thread `{name}`: {error}")]
 	/// Failed to spawn an OS thread
