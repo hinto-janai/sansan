@@ -373,7 +373,7 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 		debug2!("AudioOutput - play()");
 		match self.stream.play() {
 			Ok(()) => { self.playing = true; Ok(()) },
-			Err(e) => Err(OutputError::Unknown(Cow::Owned(format!("cpal play error: {e:?}")))),
+			Err(e) => Err(e.into()),
 		}
 	}
 
@@ -381,7 +381,7 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 		debug2!("AudioOutput - pause()");
 		match self.stream.pause() {
 			Ok(()) => { self.playing = false; Ok(()) },
-			Err(e) => Err(OutputError::Unknown(Cow::Owned(format!("cpal pause error: {e:?}")))),
+			Err(e) => Err(e.into()),
 		}
 	}
 
@@ -434,6 +434,16 @@ impl From<cpal::BuildStreamError> for OutputError {
 impl From<cpal::PlayStreamError> for OutputError {
 	fn from(error: cpal::PlayStreamError) -> Self {
 		use cpal::PlayStreamError as E;
+		match error {
+			E::DeviceNotAvailable => Self::DeviceUnavailable,
+			E::BackendSpecific { err } => Self::Unknown(Cow::Owned(err.description)),
+		}
+	}
+}
+
+impl From<cpal::PauseStreamError> for OutputError {
+	fn from(error: cpal::PauseStreamError) -> Self {
+		use cpal::PauseStreamError as E;
 		match error {
 			E::DeviceNotAvailable => Self::DeviceUnavailable,
 			E::BackendSpecific { err } => Self::Unknown(Cow::Owned(err.description)),
