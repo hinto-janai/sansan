@@ -1,8 +1,9 @@
 //! TODO
 
 //---------------------------------------------------------------------------------------------------- use
-use crate::atomic::AtomicF32;
 use std::sync::atomic::Ordering;
+use crossbeam::atomic::AtomicCell;
+
 #[allow(unused_imports)] // docs
 use crate::engine::Engine;
 
@@ -248,49 +249,37 @@ impl From<f32> for Volume {
 
 //---------------------------------------------------------------------------------------------------- AtomicVolume
 /// TODO
-pub(crate) struct AtomicVolume(AtomicF32);
+pub(crate) struct AtomicVolume(AtomicCell<f32>);
 
 impl AtomicVolume {
 	/// TODO
 	#[allow(clippy::declare_interior_mutable_const)]
-	pub(crate) const DEFAULT: Self = Self(AtomicF32::SELF_0_25);
+	pub(crate) const DEFAULT: Self = Self(AtomicCell::new(Volume::DEFAULT.inner()));
 
 	#[cold]
 	#[inline(never)]
 	/// TODO
-	pub(crate) fn new(volume: Volume) -> Self {
-		Self(AtomicF32::new(volume.inner()))
+	pub(crate) const fn new(volume: Volume) -> Self {
+		Self(AtomicCell::new(volume.inner()))
 	}
 
 	#[inline]
 	/// TODO
-	pub(crate) fn store(&self, volume: Volume, ordering: Ordering) {
-		self.0.store(volume.inner(), ordering);
+	pub(crate) fn store(&self, volume: Volume) {
+		self.0.store(volume.inner());
 	}
 
 	#[inline]
 	/// TODO
-	pub(crate) fn load(&self, ordering: Ordering) -> Volume {
-		Volume(self.0.load(ordering))
-	}
-
-	#[inline]
-	/// TODO
-	pub(crate) fn set(&self, volume: Volume) {
-		self.store(volume, Ordering::Release);
-	}
-
-	#[inline]
-	/// TODO
-	pub(crate) fn get(&self) -> Volume {
-		self.load(Ordering::Acquire)
+	pub(crate) fn load(&self) -> Volume {
+		Volume(self.0.load())
 	}
 }
 
 impl std::fmt::Debug for AtomicVolume {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_tuple("AtomicVolume")
-			.field(&self.0.load(Ordering::Relaxed))
+			.field(&self.0.load())
 			.finish()
 	}
 }
@@ -303,7 +292,7 @@ mod tests {
 
 	#[test]
 	fn atomic_volume_default() {
-		assert_eq!(Volume::DEFAULT, AtomicVolume::DEFAULT.get());
+		assert_eq!(Volume::DEFAULT, AtomicVolume::DEFAULT.load());
 	}
 
 	#[test]
@@ -311,7 +300,7 @@ mod tests {
 		let mut v = 0.0;
 		while v <= 1.0 {
 			let atomic = AtomicVolume::new(v.into());
-			assert_eq!(atomic.get().inner(), v);
+			assert_eq!(atomic.load().inner(), v);
 			v += 0.1;
 		}
 	}

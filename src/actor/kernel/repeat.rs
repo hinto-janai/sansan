@@ -27,7 +27,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 			return;
 		}
 
-		self.atomic_state.repeat.set(repeat);
+		self.atomic_state.repeat.store(repeat);
 
 		self.w.add_commit_push(|w, _| w.repeat = repeat);
 

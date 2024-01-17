@@ -336,7 +336,7 @@ impl<Extra: ExtraData> Decode<Extra> {
 			SeekMode::Coarse,
 			SeekTo::Time { time, track_id: None },
 		) {
-			Ok(_)  => try_send!(to_kernel_seek, Ok(time.seconds as f64 + time.frac)),
+			Ok(_)  => try_send!(to_kernel_seek, Ok(time.seconds as f32 + time.frac as f32)),
 			Err(e) => try_send!(to_kernel_seek, Err(e.into())),
 		}
 	}

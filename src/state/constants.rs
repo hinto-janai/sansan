@@ -7,6 +7,3 @@
 /// occurs (in most situations) but not too big incase
 /// the generic [Data] the user provides is large.
 pub(crate) const QUEUE_LEN: usize = 256;
-
-/// TODO
-pub const BACK_THRESHOLD: f64 = 3.0;

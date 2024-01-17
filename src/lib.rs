@@ -146,6 +146,14 @@
 #[cfg(not(any(target_pointer_width = "64", target_pointer_width = "32")))]
 compile_error!("sansan is only compatible with 64/32-bit CPUs");
 
+/// Static assertion to make sure atomic floats are lock-free.
+const _: () = {
+	assert!(
+		crossbeam::atomic::AtomicCell::<f32>::is_lock_free(),
+		"crossbeam::atomic::AtomicCell::<f32> is not lock-free on the target platform.",
+	);
+};
+
 //---------------------------------------------------------------------------------------------------- Public API
 mod engine;
 pub use engine::Engine;
@@ -163,7 +171,6 @@ pub mod meta;
 //---------------------------------------------------------------------------------------------------- Private Usage
 mod actor;
 mod macros;
-mod atomic;
 mod output;
 mod resampler;
 

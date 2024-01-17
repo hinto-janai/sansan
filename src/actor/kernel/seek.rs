@@ -35,13 +35,14 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		time_now_frac:    f64, // `SourceDecode::time_now.frac`
 	) -> Time {
 		// Re-map weird floats.
-		let remap = |time: f64| -> f64 {
+		let remap = |time: f32| -> f64 {
 			use std::num::FpCategory as F;
 			match time.classify() {
 				F::Nan => secs_total,
 				F::Infinite => if time.is_sign_negative() { 0.0 } else { secs_total },
 				F::Zero | F::Subnormal => 0.0,
-				F::Normal => if time.is_sign_negative() { 0.0 } else { time },
+				#[allow(clippy::cast_lossless)]
+				F::Normal => if time.is_sign_negative() { 0.0 } else { time as f64 },
 			}
 		};
 
@@ -107,7 +108,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 				150,   // time_now.seconds
 				0.5,   // time_now.frac
 			);
-			time.seconds as f64 + time.frac
+			time.seconds as f32 + time.frac as f32
 		} else {
 			// Tell [Decode] to seek, return error if it errors.
 			try_send!(to_decode, KernelToDecode::Seek(seek));
@@ -207,27 +208,27 @@ mod tests {
 		assert_eq!(resp.current.as_ref().unwrap().elapsed, 0.0);
 
 		//---------------------------------- NaN -> saturate at end/beginning
-		let resp = engine.seek(Seek::Absolute(f64::NAN)).unwrap();
+		let resp = engine.seek(Seek::Absolute(f32::NAN)).unwrap();
 		assert_eq!(resp.current.as_ref().unwrap().elapsed, 300.1);
-		let resp = engine.seek(Seek::Forward(f64::NAN)).unwrap();
+		let resp = engine.seek(Seek::Forward(f32::NAN)).unwrap();
 		assert_eq!(resp.current.as_ref().unwrap().elapsed, 300.1);
-		let resp = engine.seek(Seek::Backward(f64::NAN)).unwrap();
+		let resp = engine.seek(Seek::Backward(f32::NAN)).unwrap();
 		assert_eq!(resp.current.as_ref().unwrap().elapsed, 0.0);
 
 		//---------------------------------- Infinity -> saturate at end
-		let resp = engine.seek(Seek::Absolute(f64::INFINITY)).unwrap();
+		let resp = engine.seek(Seek::Absolute(f32::INFINITY)).unwrap();
 		assert_eq!(resp.current.as_ref().unwrap().elapsed, 300.1);
-		let resp = engine.seek(Seek::Forward(f64::INFINITY)).unwrap();
+		let resp = engine.seek(Seek::Forward(f32::INFINITY)).unwrap();
 		assert_eq!(resp.current.as_ref().unwrap().elapsed, 300.1);
-		let resp = engine.seek(Seek::Backward(f64::INFINITY)).unwrap();
+		let resp = engine.seek(Seek::Backward(f32::INFINITY)).unwrap();
 		assert_eq!(resp.current.as_ref().unwrap().elapsed, 0.0);
 
 		//---------------------------------- Negative Infinity -> 0.0
-		let resp = engine.seek(Seek::Absolute(f64::NEG_INFINITY)).unwrap();
+		let resp = engine.seek(Seek::Absolute(f32::NEG_INFINITY)).unwrap();
 		assert_eq!(resp.current.as_ref().unwrap().elapsed, 0.0);
-		let resp = engine.seek(Seek::Forward(f64::NEG_INFINITY)).unwrap();
+		let resp = engine.seek(Seek::Forward(f32::NEG_INFINITY)).unwrap();
 		assert_eq!(resp.current.as_ref().unwrap().elapsed, 150.5);
-		let resp = engine.seek(Seek::Backward(f64::NEG_INFINITY)).unwrap();
+		let resp = engine.seek(Seek::Backward(f32::NEG_INFINITY)).unwrap();
 		assert_eq!(resp.current.as_ref().unwrap().elapsed, 150.5);
 
 		//---------------------------------- Negative -> 0.0

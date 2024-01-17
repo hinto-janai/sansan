@@ -1,9 +1,9 @@
 //! Audio state.
 
 //---------------------------------------------------------------------------------------------------- Use
-use crate::{
-	signal::{Volume,Repeat,AtomicVolume,AtomicRepeat},
-	atomic::AtomicF64,
+use crate::config::{
+	DEFAULT_BACK_THRESHOLD,
+	DEFAULT_ELAPSED_REFRESH_RATE,
 };
 use std::{
 	sync::atomic::{AtomicBool, Ordering},
@@ -103,10 +103,24 @@ pub struct LiveConfig {
 
 impl LiveConfig {
 	/// TODO
+	///
+	/// ```rust
+	/// # use sansan::config::*;
+	/// # use std::time::*;
+	/// assert_eq!(
+	///     LiveConfig::DEFAULT,
+	///     LiveConfig {
+	///         back_threshold:       Duration::from_secs(3),
+	///         elapsed_refresh_rate: Duration::from_millis(33),
+	///         queue_end_clear:      true,
+	///         shutdown_blocking:    true,
+	///     },
+	/// );
+	/// ```
 	#[allow(clippy::declare_interior_mutable_const)]
 	pub const DEFAULT: Self = Self {
-		back_threshold: Duration::from_secs(3),
-		elapsed_refresh_rate: Duration::from_millis(33),
+		back_threshold: DEFAULT_BACK_THRESHOLD,
+		elapsed_refresh_rate: DEFAULT_ELAPSED_REFRESH_RATE,
 		queue_end_clear: true,
 		shutdown_blocking: true,
 	};

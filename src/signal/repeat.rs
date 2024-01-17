@@ -67,26 +67,14 @@ impl AtomicRepeat {
 
 	#[inline]
 	/// TODO
-	pub(crate) fn load(&self, ordering: Ordering) -> Repeat {
-		Repeat::from_u8(self.0.load(ordering))
+	pub(crate) fn load(&self) -> Repeat {
+		Repeat::from_u8(self.0.load(Ordering::Acquire))
 	}
 
 	#[inline]
 	/// TODO
-	pub(crate) fn store(&self, repeat: Repeat, ordering: Ordering) {
-		self.0.store(repeat.to_u8(), ordering);
-	}
-
-	#[inline]
-	/// TODO
-	pub(crate) fn set(&self, repeat: Repeat) {
-		self.store(repeat, Ordering::Release);
-	}
-
-	#[inline]
-	/// TODO
-	pub(crate) fn get(&self) -> Repeat {
-		self.load(Ordering::Acquire)
+	pub(crate) fn store(&self, repeat: Repeat) {
+		self.0.store(repeat.to_u8(), Ordering::Release);
 	}
 }
 
@@ -109,8 +97,8 @@ mod tests {
 		let atomic = AtomicRepeat::DEFAULT;
 
 		for (i, repeat) in Repeat::iter().enumerate() {
-			atomic.set(repeat);
-			assert_eq!(atomic.get(), repeat);
+			atomic.store(repeat);
+			assert_eq!(atomic.load(), repeat);
 			assert_eq!(repeat.to_u8() as usize, i);
 		}
 	}

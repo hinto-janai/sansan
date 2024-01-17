@@ -44,8 +44,8 @@ pub(crate) const AUDIO_BUFFER_LEN: usize = 64;
 pub(crate) struct Audio<Output: AudioOutput> {
 	atomic_state:        Arc<AtomicState>, // Shared atomic audio state with the rest of the actors
 	playing:             bool,             // A local boolean so we don't have to atomic access each loop
-	elapsed_callback:    f64,              // Elapsed time, used for the elapsed callback (f64 is reset each call)
-	elapsed_audio_state: f64,              // Elapsed time, used for the `atomic_state.elapsed_refresh_rate`
+	elapsed_callback:    f32,              // Elapsed time, used for the elapsed callback (f32 is reset each call)
+	elapsed_audio_state: f32,              // Elapsed time, used for the `atomic_state.elapsed_refresh_rate`
 	ready_to_recv:       Arc<AtomicBool>,  // [Audio]'s way of telling [Decode] it is ready for samples
 	shutdown_wait:       Arc<Barrier>,     // Shutdown barrier between all actors
 	output:              Output,           // Audio hardware/server connection
@@ -58,7 +58,7 @@ struct Channels {
 	shutdown: Receiver<()>,
 
 	to_gc:             Sender<AudioBuffer<f32>>,
-	to_caller_elapsed: Option<(Sender<()>, f64)>, // seconds
+	to_caller_elapsed: Option<(Sender<()>, f32)>, // seconds
 
 	to_decode:   Sender<TookAudioBuffer>,
 	from_decode: Receiver<(AudioBuffer<f32>, Time)>,
@@ -101,7 +101,7 @@ pub(crate) struct InitArgs {
 	pub(crate) shutdown_wait:     Arc<Barrier>,
 	pub(crate) shutdown:          Receiver<()>,
 	pub(crate) to_gc:             Sender<AudioBuffer<f32>>,
-	pub(crate) to_caller_elapsed: Option<(Sender<()>, f64)>, // seconds
+	pub(crate) to_caller_elapsed: Option<(Sender<()>, f32)>, // seconds
 	pub(crate) to_decode:         Sender<TookAudioBuffer>,
 	pub(crate) from_decode:       Receiver<(AudioBuffer<f32>, Time)>,
 	pub(crate) to_kernel:         Sender<WroteAudioBuffer>,
@@ -271,12 +271,12 @@ impl<Output: AudioOutput> Audio<Output> {
 		//
 		// To account for oversleeping and other stuff,
 		// set the multiplier slightly lower.
-		let nominal_seconds = duration as f64 / spec.rate as f64;
+		let nominal_seconds = duration as f32 / spec.rate as f32;
 
 		// If we're past the refresh rate for `AudioState`,
 		// tell [Kernel] to update with the new timestamp.
 		self.elapsed_audio_state += nominal_seconds;
-		if self.elapsed_audio_state >= self.atomic_state.elapsed_refresh_rate.get() {
+		if self.elapsed_audio_state >= self.atomic_state.elapsed_refresh_rate.load() {
 			try_send!(c.to_kernel, time);
 			self.elapsed_audio_state = 0.0;
 		}
@@ -315,7 +315,7 @@ impl<Output: AudioOutput> Audio<Output> {
 			}
 		}
 
-		let volume = self.atomic_state.volume.get();
+		let volume = self.atomic_state.volume.load();
 
 		// Write audio buffer (hangs).
 		if let Err(e) = self.output.write(audio, &c.to_gc, volume) {

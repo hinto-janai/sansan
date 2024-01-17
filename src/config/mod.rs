@@ -15,3 +15,11 @@ pub use init_config::InitConfig;
 
 mod live_config;
 pub use live_config::LiveConfig;
+
+mod constants;
+pub(crate) use constants::{
+	DEFAULT_BACK_THRESHOLD,
+	DEFAULT_BACK_THRESHOLD_F32,
+	DEFAULT_ELAPSED_REFRESH_RATE,
+	DEFAULT_ELAPSED_REFRESH_RATE_F32,
+};

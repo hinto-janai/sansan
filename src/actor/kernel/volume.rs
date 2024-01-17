@@ -23,7 +23,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 			return;
 		}
 
-		self.atomic_state.volume.set(volume);
+		self.atomic_state.volume.store(volume);
 		self.w.add_commit_push(|w, _| {
 			w.volume = volume;
 		});

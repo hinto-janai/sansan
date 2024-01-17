@@ -47,7 +47,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		// Get the previous `Source` index.
 		let index = match self.w.current.as_ref() {
 			Some(current) => {
-				let back_threshold = self.atomic_state.back_threshold.get();
+				let back_threshold = self.atomic_state.back_threshold.load();
 				// If we're past the back threshold then the
 				// track should restart instead of going back.
 				if back_threshold.is_normal() && current.elapsed > back_threshold {

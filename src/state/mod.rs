@@ -1,7 +1,6 @@
 //! Audio state.
 
 mod constants;
-pub use constants::BACK_THRESHOLD;
 pub(crate) use constants::QUEUE_LEN;
 
 mod audio_state;

@@ -26,7 +26,7 @@ pub struct Current<Extra: ExtraData> {
 	/// TODO
 	pub index: usize,
 	/// TODO
-	pub elapsed: f64,
+	pub elapsed: f32,
 }
 
 impl<Extra: ExtraData> Current<Extra> {

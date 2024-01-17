@@ -2,21 +2,28 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	config::LiveConfig,
-	atomic::AtomicF64,
 	signal::{AtomicVolume,AtomicRepeat},
+	config::{
+		LiveConfig,
+		DEFAULT_BACK_THRESHOLD_F32,
+		DEFAULT_ELAPSED_REFRESH_RATE_F32,
+	},
 };
 use std::sync::atomic::{AtomicBool,Ordering};
+use crossbeam::atomic::AtomicCell;
 
 //---------------------------------------------------------------------------------------------------- AtomicState
 /// TODO
+///
+/// `AtomicCell<f32>` is used over `f64` in case the
+/// target does not support atomic 64-bit operations.
 #[derive(Debug)]
 pub(crate) struct AtomicState {
 	//--- LiveConfig
 	/// The track threshold when using `back()`/`previous()`.
-	pub(crate) back_threshold: AtomicF64,
+	pub(crate) back_threshold: AtomicCell<f32>,
 	/// How often to update the audio state.
-	pub(crate) elapsed_refresh_rate: AtomicF64,
+	pub(crate) elapsed_refresh_rate: AtomicCell<f32>,
 	/// TODO
 	pub(crate) queue_end_clear: AtomicBool,
 
@@ -36,8 +43,8 @@ impl AtomicState {
 	#[allow(clippy::declare_interior_mutable_const)]
 	pub(crate) const DEFAULT: Self = Self {
 		audio_ready_to_recv: AtomicBool::new(false),
-		back_threshold: AtomicF64::SELF_3,
-		elapsed_refresh_rate: AtomicF64::SELF_0_033,
+		back_threshold: AtomicCell::new(DEFAULT_BACK_THRESHOLD_F32),
+		elapsed_refresh_rate: AtomicCell::new(DEFAULT_ELAPSED_REFRESH_RATE_F32),
 
 		queue_end_clear: AtomicBool::new(true),
 		playing: AtomicBool::new(false),
@@ -47,8 +54,8 @@ impl AtomicState {
 
 	///
 	pub(crate) fn update_from_config(&self, config: &LiveConfig) {
-		self.back_threshold.set(config.back_threshold.as_secs_f64());
-		self.elapsed_refresh_rate.set(config.elapsed_refresh_rate.as_secs_f64());
+		self.back_threshold.store(config.back_threshold.as_secs_f32());
+		self.elapsed_refresh_rate.store(config.elapsed_refresh_rate.as_secs_f32());
 		self.queue_end_clear.store(config.queue_end_clear, Ordering::Release);
 	}
 }
@@ -56,8 +63,8 @@ impl AtomicState {
 impl From<LiveConfig> for AtomicState {
 	fn from(s: LiveConfig) -> Self {
 		Self {
-			back_threshold: AtomicF64::new(s.back_threshold.as_secs_f64()),
-			elapsed_refresh_rate: AtomicF64::new(s.elapsed_refresh_rate.as_secs_f64()),
+			back_threshold: AtomicCell::new(s.back_threshold.as_secs_f32()),
+			elapsed_refresh_rate: AtomicCell::new(s.elapsed_refresh_rate.as_secs_f32()),
 			queue_end_clear: AtomicBool::new(s.queue_end_clear),
 			..Self::DEFAULT
 		}

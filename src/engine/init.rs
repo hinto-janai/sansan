@@ -177,7 +177,7 @@ impl<Extra: ExtraData> Engine<Extra> {
 		// and that it should [call()] the callback.
 		let to_caller_current_new = if callbacks.current_new.is_some() { Some(k_to_caller_current_new) } else { None };
 		let to_caller_queue_end   = if callbacks.queue_end.is_some()   { Some(k_to_caller_queue_end)   } else { None };
-		let to_caller_elapsed     = callbacks.elapsed.as_ref().map(|(_, dur)| (k_to_caller_elapsed, dur.as_secs_f64()));
+		let to_caller_elapsed     = callbacks.elapsed.as_ref().map(|(_, dur)| (k_to_caller_elapsed, dur.as_secs_f32()));
 		let caller_error_decode_pause = callbacks.error_decode.as_ref().is_some_and(ErrorCallback::will_pause);
 		let caller_error_source_pause = callbacks.error_source.as_ref().is_some_and(ErrorCallback::will_pause);
 		let caller_error_output_pause = callbacks.error_output.as_ref().is_some_and(ErrorCallback::will_pause);
@@ -428,8 +428,8 @@ impl<Extra: ExtraData> Engine<Extra> {
 		}
 
 		//-------------------------------------------------------------- Return
-		let repeat = atomic_state.repeat.get();
-		let volume = atomic_state.volume.get();
+		let repeat = atomic_state.repeat.load();
+		let volume = atomic_state.volume.load();
 		info2!("Engine - initialization complete");
 		Ok(Self {
 			reader: audio_state_reader,

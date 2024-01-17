@@ -60,8 +60,8 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		}
 
 		// Update atomic audio state.
-		self.atomic_state.repeat.set(atomic_state_repeat);
-		self.atomic_state.volume.set(atomic_state_volume);
+		self.atomic_state.repeat.store(atomic_state_repeat);
+		self.atomic_state.volume.store(atomic_state_volume);
 		if self.current_is_some() {
 			self.atomic_state.playing.store(atomic_state_playing, Ordering::Release);
 		} else {
