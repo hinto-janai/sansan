@@ -140,7 +140,7 @@ pub(crate) struct Channels<Extra: ExtraData> {
 	// [Caller]
 	// `to_caller_elapsed` is handled by `Audio`
 	// since it has the 1st access to time data.
-	pub(crate) to_caller_current_new: Sender<Current<Extra>>,
+	pub(crate) to_caller_source_new: Sender<Source<Extra>>,
 	pub(crate) to_caller_queue_end: Sender<()>,
 	pub(crate) to_caller_error_decode: (Sender<DecodeError>, bool), // Should we `pause()`?
 	pub(crate) to_caller_error_source: (Sender<SourceError>, bool), // Should we `pause()`?
@@ -285,31 +285,51 @@ impl<Extra: ExtraData> Kernel<Extra> {
 			// and error) if invalid.
 			match select.ready() {
 				// From `Audio`.
+				//
+				// Should be at the top of the list since this
+				// channel will probably be received the most
+				// during runtime.
 				0 => {
 					let time = select_recv!(c.from_audio);
 					self.wrote_audio_buffer(time);
 				},
 
 				// Signals.
-				1  =>                  { select_recv!(c.recv_toggle); self.toggle(&c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state) },
-				2  =>                  { select_recv!(c.recv_play); self.play(&c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state) },
-				3  =>                  { select_recv!(c.recv_pause); self.pause(&c.send_audio_state) },
-				4  =>                  { select_recv!(c.recv_stop); self.stop(&c.send_audio_state) },
-				5  =>                  { select_recv!(c.recv_next); self.next(&c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state) },
-				6  =>                  { select_recv!(c.recv_previous); self.previous(&c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state) },
-				7  => self.clear       ( select_recv!(c.recv_clear), &c.to_gc, &c.send_audio_state),
-				8  => self.shuffle     ( select_recv!(c.recv_shuffle), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state),
-				9  => self.repeat      ( select_recv!(c.recv_repeat), &c.send_audio_state),
-				10 => self.volume      ( select_recv!(c.recv_volume), &c.send_audio_state),
-				11 => self.restore     ( select_recv!(c.recv_restore), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state),
-				12 => self.add         ( select_recv!(c.recv_add), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state),
-				13 => self.add_many    ( select_recv!(c.recv_add_many), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state),
-				14 => self.seek        ( select_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),
-				15 => self.skip        ( select_recv!(c.recv_skip), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_skip),
-				16 => self.back        ( select_recv!(c.recv_back), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_back),
-				17 => self.set_index   ( select_recv!(c.recv_set_index), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_set_index),
-				18 => self.remove      ( select_recv!(c.recv_remove), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_remove),
-				19 => self.remove_range( select_recv!(c.recv_remove_range), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_remove_range),
+				//
+				// This essentially maps `Engine` signals to
+				// functions that do stuff, then returns the result back.
+				//
+				// Since this is pretty ugly to read, a visual guide:
+				//
+				//  This `try_recv`'s a channel
+				//  message `continue`'ing if it failed
+				//  (might be a spuriously select failure)
+				//      |
+				//      |                        The function to call            The necessary, and _only_ the
+				//      |                      (defined somewhere below)       necessary inputs that are required
+				//      |                       upon successful receive                 by the function
+				//      |                                 |                                 |
+				//      |                                 |      |------------------------------------------------------|
+				//      v                                 v      v                                                      v
+				1  => { select_recv!(c.recv_toggle); self.toggle(&c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state); },
+				2  => { select_recv!(c.recv_play); self.play(&c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state); },
+				3  => { select_recv!(c.recv_pause); self.pause(&c.send_audio_state); },
+				4  => { select_recv!(c.recv_stop); self.stop(&c.send_audio_state); },
+				5  => { select_recv!(c.recv_next); self.next(&c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state); },
+				6  => { select_recv!(c.recv_previous); self.previous(&c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state); },
+				7  => self.clear(select_recv!(c.recv_clear), &c.to_gc, &c.send_audio_state),
+				8  => self.shuffle(select_recv!(c.recv_shuffle), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state),
+				9  => self.repeat(select_recv!(c.recv_repeat), &c.send_audio_state),
+				10 => self.volume(select_recv!(c.recv_volume), &c.send_audio_state),
+				11 => self.restore(select_recv!(c.recv_restore), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state),
+				12 => self.add(select_recv!(c.recv_add), &c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_audio_state),
+				13 => self.add_many(select_recv!(c.recv_add_many), &c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_audio_state),
+				14 => self.seek(select_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),
+				15 => self.skip(select_recv!(c.recv_skip), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_skip),
+				16 => self.back(select_recv!(c.recv_back), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_back),
+				17 => self.set_index(select_recv!(c.recv_set_index), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_set_index),
+				18 => self.remove(select_recv!(c.recv_remove), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_remove),
+				19 => self.remove_range(select_recv!(c.recv_remove_range), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_remove_range),
 
 				// Errors.
 				20 => self.error_output(select_recv!(c.from_audio_error), &c.to_caller_error_output),

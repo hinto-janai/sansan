@@ -162,7 +162,7 @@ impl<Extra: ExtraData> Engine<Extra> {
 
 		// Initialize [Caller]'s channels.
 		let (c_shutdown,               shutdown)     = bounded(1);
-		let (k_to_caller_current_new,  current_new)  = unbounded();
+		let (k_to_caller_source_new,   source_new)   = unbounded();
 		let (k_to_caller_queue_end,    queue_end)    = unbounded();
 		let (a_to_caller_elapsed,      elapsed)      = unbounded();
 		let (k_to_caller_error_decode, error_decode) = unbounded();
@@ -185,7 +185,7 @@ impl<Extra: ExtraData> Engine<Extra> {
 		// [Receiver] end of the channels.
 		if callbacks.all_none() {
 			debug2!("Engine - no callbacks, skipping `Caller`");
-			drop((shutdown, current_new, queue_end, elapsed));
+			drop((shutdown, source_new, queue_end, elapsed));
 		} else {
 			spawn_actor!(
 				"Caller",
@@ -195,7 +195,7 @@ impl<Extra: ExtraData> Engine<Extra> {
 					low_priority:  config.callback_low_priority,
 					shutdown_wait: Arc::clone(&shutdown_wait),
 					shutdown,
-					current_new,
+					source_new,
 					queue_end,
 					elapsed,
 					error_decode,
@@ -375,7 +375,7 @@ impl<Extra: ExtraData> Engine<Extra> {
 			from_decode_source:       k_from_d_source,
 			from_decode_error_decode: err_decode_k_from_d,
 			from_decode_error_source: err_source_k_from_d,
-			to_caller_current_new:    k_to_caller_current_new,
+			to_caller_source_new:     k_to_caller_source_new,
 			to_caller_queue_end:      k_to_caller_queue_end,
 			to_caller_error_decode:   (k_to_caller_error_decode, caller_error_decode_pause),
 			to_caller_error_source:   (k_to_caller_error_source, caller_error_source_pause),

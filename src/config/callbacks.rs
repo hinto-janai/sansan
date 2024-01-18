@@ -37,20 +37,20 @@ use crate::{
 /// let (tx, rx) = std::sync::mpsc::sync_channel(1);
 /// # tx.send(Current { source: Source::dummy(), index: 0, elapsed: 0.0 });
 ///
-/// callbacks.current_new(move |current: Current<()>| {
-///     // A new `Current` was set!
+/// callbacks.source_new(move |source: Source<()>| {
+///     // A new `Current` was set to this `source`!
 ///     //
 ///     // This closure decides what the `Engine` does after this happens.
 ///     // In this case, we just send a channel message re-sending
-///     // the new `Current`.
-///     tx.send(current);
+///     // the new `Source`.
+///     tx.send(source);
 /// });
 ///
 /// // Meanwhile in another thread...
-/// while let Ok(current) = rx.recv() {
+/// while let Ok(source) = rx.recv() {
 ///     // We received a message from the `Engine`
-///     // that we set a new `Current`, print its metadata.
-///     println!("New track: {:#?}", current.source.metadata());
+///     // that we set a new `Source`, print its metadata.
+///     println!("New track: {:#?}", source.metadata());
 ///     # break;
 /// }
 /// ```
@@ -80,15 +80,15 @@ use crate::{
 /// or otherwise takes a long time to return will prevent
 /// other callbacks from being executed - and should thus be avoided.
 pub struct Callbacks<Extra: ExtraData> {
-	/// Called when the [`Current`] in the [`AudioState`] was set to a new value.
+	/// Called when the [`Current`] in the [`AudioState`] was set to a new [`Source`].
 	///
 	/// Either to [`None`] or to some new [`Source`] (e.g, the next track in the queue).
 	///
-	/// The available `Current` passed in the function is the new `Current` that was set.
+	/// The available `Source` passed in the function is the new `Source` that was set.
 	///
 	/// This is called even if the [`RuntimeConfig`]'s repeat mode is set to [`Repeat::Current`],
 	/// i.e, if the current track repeats after finishing, this callback will still be called.
-	pub current_new: Option<Box<dyn FnMut(Current<Extra>) + Send + 'static>>,
+	pub source_new: Option<Box<dyn FnMut(Source<Extra>) + Send + 'static>>,
 
 	/// Called when the last track in the queue in the [`AudioState`] ends.
 	///
@@ -125,7 +125,7 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 	/// assert!(callbacks.all_none());
 	/// ```
 	pub const DEFAULT: Self = Self {
-		current_new:    None,
+		source_new:    None,
 		queue_end:      None,
 		elapsed:        None,
 		error_decode:   None,
@@ -147,7 +147,7 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 	/// ```
 	/// # use sansan::config::*;
 	/// let callbacks: Callbacks<()> = Callbacks {
-	///     current_new:  None,
+	///     source_new:  None,
 	///     queue_end:    None,
 	///     elapsed:      None,
 	///     error_decode: None,
@@ -157,7 +157,7 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 	/// assert!(callbacks.all_none());
 	/// ```
 	pub const fn all_none(&self) -> bool {
-		self.current_new.is_none()  &&
+		self.source_new.is_none()  &&
 		self.queue_end.is_none()    &&
 		self.elapsed.is_none()      &&
 		self.error_decode.is_none() &&
@@ -172,7 +172,7 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 	/// # use sansan::config::*;
 	/// # use std::time::*;
 	/// let callbacks: Callbacks<()> = Callbacks {
-	///     current_new:  Some(Box::new(|_| {})),
+	///     source_new:  Some(Box::new(|_| {})),
 	///     queue_end:    Some(Box::new(||  {})),
 	///     elapsed:      Some((Box::new(|_| {}), Duration::ZERO)),
 	///     error_decode: Some(ErrorCallback::Pause),
@@ -182,7 +182,7 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 	/// assert!(callbacks.all_some());
 	/// ```
 	pub const fn all_some(&self) -> bool {
-		self.current_new.is_some()  &&
+		self.source_new.is_some()  &&
 		self.queue_end.is_some()    &&
 		self.elapsed.is_some()      &&
 		self.error_decode.is_some() &&
@@ -192,7 +192,7 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 
 	/// Set the behavior for when the a new [`AudioState::current`] is set.
 	///
-	/// The function has access to the new [`Current`].
+	/// The function has access to the new [`Source`].
 	///
 	/// ```rust
 	/// # use sansan::{config::*,error::*};
@@ -202,13 +202,13 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 	/// // Called when the last track of the queue finishes.
 	/// //
 	/// // This input decides how the `Engine` handles it.
-	/// callbacks.current_new(|current| println!("new current: {current:#?}"));
+	/// callbacks.source_new(|source| println!("new source: {source:#?}"));
 	/// ```
-	pub fn current_new<F>(&mut self, callback: F) -> &mut Self
+	pub fn source_new<F>(&mut self, callback: F) -> &mut Self
 	where
-		F: FnMut(Current<Extra>) + Send + Sync + 'static
+		F: FnMut(Source<Extra>) + Send + Sync + 'static
 	{
-		self.current_new = Some(Box::new(callback));
+		self.source_new = Some(Box::new(callback));
 		self
 	}
 
@@ -355,7 +355,7 @@ impl<Extra: ExtraData> fmt::Debug for Callbacks<Extra> {
 	#[allow(clippy::missing_docs_in_private_items)]
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.debug_struct("Callbacks")
-			.field("current_new",  &self.current_new.as_ref().map(|_|      "Some(_)"))
+			.field("source_new",  &self.source_new.as_ref().map(|_|      "Some(_)"))
 			.field("queue_end",    &self.queue_end.as_ref().map(|_| "Some(_)"))
 			.field("elapsed",      &self.elapsed.as_ref().map(|o|   format!("Some(_, {:?})", o.1)))
 			.field("error_decode", &self.error_decode)

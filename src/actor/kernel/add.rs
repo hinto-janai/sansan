@@ -7,6 +7,7 @@ use crate::{
 	extra_data::ExtraData,
 	signal::{add::{Add,AddMethod}, AddMany},
 	macros::try_send, source::Sources,
+	source::Source,
 };
 use crossbeam::channel::{Sender,Receiver};
 
@@ -17,12 +18,13 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		&mut self,
 		add: Add<Extra>,
 		to_gc: &Sender<KernelToGc<Extra>>,
+		to_caller_source_new: &Sender<Source<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Extra>>,
 		to_engine: &Sender<AudioStateSnapshot<Extra>>
 	) {
 		// Re-use `add_many()`.
-		self.add_many(add.into(), to_gc, to_audio, to_decode, to_engine);
+		self.add_many(add.into(), to_gc, to_caller_source_new, to_audio, to_decode, to_engine);
 	}
 }
 

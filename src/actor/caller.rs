@@ -10,6 +10,7 @@ use crate::{
 	error::{DecodeError,SourceError,OutputError},
 	state::{AudioState,AudioStateReader,Current},
 	macros::{debug2,trace2,select_recv},
+	source::Source,
 };
 use std::sync::{
 	Arc,
@@ -31,7 +32,7 @@ pub(crate) struct Caller<Extra: ExtraData> {
 #[allow(clippy::missing_docs_in_private_items)]
 struct Channels<Extra: ExtraData> {
 	shutdown:     Receiver<()>,
-	current_new:  Receiver<Current<Extra>>,
+	source_new:   Receiver<Source<Extra>>,
 	queue_end:    Receiver<()>,
 	elapsed:      Receiver<Time>,
 	error_decode: Receiver<DecodeError>,
@@ -48,7 +49,7 @@ pub(crate) struct InitArgs<Extra: ExtraData> {
 	pub(crate) low_priority:  bool,
 	pub(crate) shutdown_wait: Arc<Barrier>,
 	pub(crate) shutdown:      Receiver<()>,
-	pub(crate) current_new:   Receiver<Current<Extra>>,
+	pub(crate) source_new:    Receiver<Source<Extra>>,
 	pub(crate) queue_end:     Receiver<()>,
 	pub(crate) elapsed:       Receiver<Time>,
 	pub(crate) error_decode:  Receiver<DecodeError>,
@@ -72,7 +73,7 @@ impl<Extra: ExtraData> Caller<Extra> {
 					low_priority,
 					shutdown_wait,
 					shutdown,
-					current_new,
+					source_new,
 					queue_end,
 					elapsed,
 					error_decode,
@@ -82,7 +83,7 @@ impl<Extra: ExtraData> Caller<Extra> {
 
 				let channels = Channels {
 					shutdown,
-					current_new,
+					source_new,
 					queue_end,
 					elapsed,
 					error_decode,
@@ -119,7 +120,7 @@ impl<Extra: ExtraData> Caller<Extra> {
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
 
-		assert_eq!(0, select.recv(&channels.current_new));
+		assert_eq!(0, select.recv(&channels.source_new));
 		assert_eq!(1, select.recv(&channels.queue_end));
 		assert_eq!(2, select.recv(&channels.elapsed));
 		assert_eq!(3, select.recv(&channels.error_decode));
@@ -130,7 +131,7 @@ impl<Extra: ExtraData> Caller<Extra> {
 		loop {
 			// Route signal to its appropriate handler function [fn_*()].
 			match select.ready() {
-				0 => { self.current_new(select_recv!(channels.current_new)); },
+				0 => { self.source_new(select_recv!(channels.source_new)); },
 				1 => { select_recv!(channels.queue_end); self.queue_end() },
 				2 => { self.elapsed(select_recv!(channels.elapsed));     },
 				3 => { Self::call_error(&mut self.callbacks.error_decode, select_recv!(channels.error_decode)); },
@@ -160,10 +161,10 @@ impl<Extra: ExtraData> Caller<Extra> {
 
 	/// TODO
 	#[inline]
-	fn current_new(&mut self, current: Current<Extra>) {
-		trace2!("Caller - current_new()");
-		if let Some(callback) = self.callbacks.current_new.as_mut() {
-			callback(current);
+	fn source_new(&mut self, source: Source<Extra>) {
+		trace2!("Caller - source_new()");
+		if let Some(callback) = self.callbacks.source_new.as_mut() {
+			callback(source);
 		}
 	}
 

@@ -7,6 +7,7 @@ use crate::{
 	extra_data::ExtraData,
 	signal::add::{AddMany,AddMethod},
 	macros::try_send,
+	source::Source,
 };
 use crossbeam::channel::{Sender,Receiver};
 use std::sync::atomic::Ordering;
@@ -23,6 +24,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		&mut self,
 		add_many: AddMany<Extra>,
 		to_gc: &Sender<KernelToGc<Extra>>,
+		to_caller_source_new: &Sender<Source<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Extra>>,
 		to_engine: &Sender<AudioStateSnapshot<Extra>>
@@ -180,10 +182,13 @@ impl<Extra: ExtraData> Kernel<Extra> {
 
 		// Forward potentially new `Source`.
 		if let Some(source) = maybe_source {
-			Self::new_source(to_decode, source);
+			Self::new_source(to_decode, source.clone());
+
 			if add_many.play {
 				self.atomic_state.playing.store(true, Ordering::Release);
 			}
+
+			try_send!(to_caller_source_new, source);
 		}
 
 		try_send!(to_engine, self.audio_state_snapshot());
