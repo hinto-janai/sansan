@@ -51,7 +51,7 @@ pub(crate) type SeekedTime = f32;
 #[serde(rename_all = "snake_case")]
 pub enum SeekError {
 	/// TODO
-	NoActiveSource,
+	NoCurrent,
     /// The track is not seekable.
     Unseekable,
     /// The track can only be seeked forward.

@@ -29,20 +29,19 @@ impl<Extra: ExtraData> Kernel<Extra> {
 	/// In tests, this function's return value is similar to `Decode`
 	/// actually sending back a successful response to `Kernel`.
 	pub(crate) fn seek_inner(
-		seek: Seek,
-		secs_total:       f64, // `SourceDecode::secs_total`
-		time_now_seconds: u64, // `SourceDecode::time_now.seconds`
-		time_now_frac:    f64, // `SourceDecode::time_now.frac`
+		seek:       Seek, //
+		secs_total: f32,  // `SourceDecode::secs_total`
+		elapsed:    f32,  // `Current::elapsed`
 	) -> Time {
 		// Re-map weird floats.
-		let remap = |time: f32| -> f64 {
+		let remap = |time: f32| -> f32 {
 			use std::num::FpCategory as F;
 			match time.classify() {
 				F::Nan => secs_total,
 				F::Infinite => if time.is_sign_negative() { 0.0 } else { secs_total },
 				F::Zero | F::Subnormal => 0.0,
 				#[allow(clippy::cast_lossless)]
-				F::Normal => if time.is_sign_negative() { 0.0 } else { time as f64 },
+				F::Normal => if time.is_sign_negative() { 0.0 } else { time },
 			}
 		};
 
@@ -53,32 +52,32 @@ impl<Extra: ExtraData> Kernel<Extra> {
 				if time >= secs_total {
 					// Seeked further than total track time, saturate at the last millisecond.
 					// TODO: maybe just calculate the next track?
-					Time { seconds: secs_total as u64, frac: secs_total.fract() }
+					Time::from(secs_total)
 				} else {
-					Time { seconds: time as u64, frac: time.fract() }
+					Time::from(time)
 				}
 			},
 
 			Seek::Forward(time) => {
 				let time = remap(time);
-				let new = time + (time_now_seconds as f64 + time_now_frac);
+				let new = time + elapsed;
 				if new >= secs_total {
 					// Seeked further than total track time, saturate at the last millisecond.
 					// TODO: maybe just calculate the next track?
-					Time { seconds: secs_total as u64, frac: secs_total.fract() }
+					Time::from(secs_total)
 				} else {
-					Time { seconds: new as u64, frac: new.fract() }
+					Time::from(new)
 				}
 			},
 
 			Seek::Backward(time)  => {
 				let time = remap(time);
-				let new = (time_now_seconds as f64 + time_now_frac) - time;
+				let new = elapsed - time;
 				if new.is_sign_negative() {
 					// Seeked further back than 0.0, saturate.
-					Time { seconds: 0, frac: 0.0 }
+					Time::from(0.0)
 				} else {
-					Time { seconds: new as u64, frac: new.fract() }
+					Time::from(new)
 				}
 			},
 		}
@@ -88,48 +87,60 @@ impl<Extra: ExtraData> Kernel<Extra> {
 	pub(super) fn seek(
 		&mut self,
 		seek: Seek,
+		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Extra>>,
 		from_decode_seek: &Receiver<Result<SeekedTime, SeekError>>,
 		to_engine: &Sender<Result<AudioStateSnapshot<Extra>, SeekError>>,
 	) {
 		// Return error to [Engine] if we don't have a `Current` loaded.
-		if !self.current_is_some() {
-			try_send!(to_engine, Err(SeekError::NoActiveSource));
+		let Some(current) = self.w.current.as_ref() else {
+			try_send!(to_engine, Err(SeekError::NoCurrent));
 			return;
-		}
+		};
 
-		let seeked_time = if cfg!(test) {
+		// Before telling `Decode` to seek,
+		// `Audio` must prepare by closing its channel
+		// and flush its current buffer.
+		self.atomic_state.audio_ready_to_recv.store(false, Ordering::Release);
+
+		let seek_result = if cfg!(test) {
 			// Re-use logic in tests. See above `seek_inner()`
 			// These input values are static, the tests are
 			// built around them.
 			let time = Self::seek_inner(
 				seek,  // `Seek` object
 				300.1, // secs_total
-				150,   // time_now.seconds
-				0.5,   // time_now.frac
+				150.5, // time_now.seconds
 			);
-			time.seconds as f32 + time.frac as f32
+			Ok(time.seconds as f32 + time.frac as f32)
 		} else {
 			// Tell [Decode] to seek, return error if it errors.
-			try_send!(to_decode, KernelToDecode::Seek(seek));
-			match recv!(from_decode_seek) {
-				Ok(st) => st,
-				Err(e) => {
-					try_send!(to_engine, Err(e));
-					return;
-				},
-			}
+			try_send!(to_decode, KernelToDecode::Seek((seek, current.elapsed)));
+			recv!(from_decode_seek)
 		};
 
 		// TODO: debug print.
-		// println!("{seeked_time}");
+		// println!("{seek_result:#?}");
 
-		self.w.add_commit_push(|w, _| {
-			// INVARIANT: we checked the `Current` is `Some` above.
-			w.current.as_mut().unwrap().elapsed = seeked_time;
-		});
+		match seek_result {
+			Ok(seeked_time) => {
+				// INVARIANT:
+				// `Audio` must set `audio_ready_to_recv` back
+				// to `true` upon receiving this signal.
+				try_send!(to_audio, KernelToAudio::DiscardCurrentAudio);
 
-		try_send!(to_engine, Ok(self.audio_state_snapshot()));
+				self.w.add_commit_push(|w, _| {
+					// INVARIANT: we checked the `Current` is `Some` above.
+					w.current.as_mut().unwrap().elapsed = seeked_time;
+				});
+
+				try_send!(to_engine, Ok(self.audio_state_snapshot()));
+			},
+			Err(error) => {
+				self.atomic_state.audio_ready_to_recv.store(true, Ordering::Release);
+				try_send!(to_engine, Err(error));
+			}
+		}
 	}
 
 }
@@ -163,7 +174,7 @@ mod tests {
 
 		//---------------------------------- No `Current`, early return
 		let resp = engine.seek(Seek::Absolute(200.0));
-		assert_eq!(resp, Err(SeekError::NoActiveSource));
+		assert_eq!(resp, Err(SeekError::NoCurrent));
 
 		//---------------------------------- Set-up our baseline `AudioState`
 		let mut audio_state = AudioState::DEFAULT;

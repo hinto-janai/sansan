@@ -81,7 +81,9 @@ pub(crate) enum KernelToDecode<Extra: ExtraData> {
 	NewSource(Source<Extra>),
 	/// Seek to this timestamp in the currently
 	/// playing track and start decoding from there
-	Seek(crate::signal::Seek),
+	///
+	/// The `f32` is [`Current::elapsed`].
+	Seek((crate::signal::Seek, f32)),
 	/// Clear all audio buffers, the current source,
 	/// and stop decoding.
 	DiscardAudioAndStop,
@@ -327,7 +329,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 				11 => self.restore(select_recv!(c.recv_restore), &c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_audio_state),
 				12 => self.add(select_recv!(c.recv_add), &c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_audio_state),
 				13 => self.add_many(select_recv!(c.recv_add_many), &c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_audio_state),
-				14 => self.seek(select_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),
+				14 => self.seek(select_recv!(c.recv_seek), &c.to_audio, &c.to_decode, &c.from_decode_seek, &c.send_seek),
 				15 => self.skip(select_recv!(c.recv_skip), &c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_skip),
 				16 => self.back(select_recv!(c.recv_back), &c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_back),
 				17 => self.set_index(select_recv!(c.recv_set_index), &c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_set_index),

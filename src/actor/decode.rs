@@ -198,9 +198,9 @@ impl<Extra: ExtraData> Decode<Extra> {
 					1 => {
 						let msg = select_recv!(&channels.from_kernel);
 						match msg {
-							KernelToDecode::NewSource(source)   => self.new_source(source, &channels),
-							KernelToDecode::Seek(seek)          => self.seek(seek, &channels.to_kernel_seek),
-							KernelToDecode::DiscardAudioAndStop => self.discard_audio_and_stop(&channels.to_gc),
+							KernelToDecode::NewSource(source)     => self.new_source(source, &channels),
+							KernelToDecode::Seek((seek, elapsed)) => self.seek(seek, elapsed, &channels.to_gc, &channels.to_kernel_seek),
+							KernelToDecode::DiscardAudioAndStop   => self.discard_audio_and_stop(&channels.to_gc),
 						}
 					},
 					2 => {
@@ -227,7 +227,7 @@ impl<Extra: ExtraData> Decode<Extra> {
 				// a [FormatReader] can indicate the media is complete.
 				Err(symphonia::core::errors::Error::IoError(_)) => {
 					debug2!("Decode - done decoding");
-					self.done_decoding();
+					self.done_decoding = true;
 					continue;
 				},
 
@@ -247,7 +247,6 @@ impl<Extra: ExtraData> Decode<Extra> {
 
 					// Calculate timestamp.
 					let time = self.source.timebase.calc_time(packet.ts);
-					self.set_current_audio_time(time);
 
 					// Send to [Audio] if we can, else store locally.
 					self.send_or_store_audio(&channels.to_audio, &channels.to_kernel_next_pls, (audio, time));
@@ -333,17 +332,27 @@ impl<Extra: ExtraData> Decode<Extra> {
 
 	#[inline]
 	/// TODO
-	fn seek(&mut self, seek: signal::Seek, to_kernel_seek: &Sender<Result<SeekedTime, SeekError>>) {
+	fn seek(
+		&mut self,
+		seek: signal::Seek,
+		elapsed: f32,
+		to_gc: &Sender<DecodeToGc>,
+		to_kernel_seek: &Sender<Result<SeekedTime, SeekError>>
+	) {
 		debug2!("Decode - seek(), seek: {seek:?}");
 
 		// Re-use seek logic.
 		// This is in a separate inner function
 		// because it needs to be tested "functionally".
+		//
+		// FIXME(maybe?):
+		// `Decode` calculates this instead of `Kernel`
+		// because only `Decode` has access to the `secs_total`
+		// of the current `Source`.
 		let time = crate::actor::kernel::Kernel::<Extra>::seek_inner(
 			seek,
 			self.source.secs_total,
-			self.source.time_now.seconds,
-			self.source.time_now.frac,
+			elapsed,
 		);
 
 		// Attempt seek.
@@ -351,7 +360,11 @@ impl<Extra: ExtraData> Decode<Extra> {
 			SeekMode::Coarse,
 			SeekTo::Time { time, track_id: None },
 		) {
-			Ok(_)  => try_send!(to_kernel_seek, Ok(time.seconds as f32 + time.frac as f32)),
+			Ok(_) => {
+				try_send!(to_kernel_seek, Ok(time.seconds as f32 + time.frac as f32));
+				self.done_decoding = false;
+				self.clear_audio_buffer(to_gc);
+			},
 			Err(e) => try_send!(to_kernel_seek, Err(e.into())),
 		}
 	}
@@ -374,16 +387,10 @@ impl<Extra: ExtraData> Decode<Extra> {
 
 	#[inline]
 	/// TODO
-	fn set_current_audio_time(&mut self, time: Time) {
-		self.source.time_now = time;
-	}
-
-	#[inline]
-	/// TODO
 	fn discard_audio_and_stop(&mut self, to_gc: &Sender<DecodeToGc>) {
 		trace2!("Decode - discard_audio_and_stop()");
 		self.clear_audio_buffer(to_gc);
-		self.done_decoding();
+		self.done_decoding = true;
 	}
 
 	#[inline]
@@ -392,11 +399,5 @@ impl<Extra: ExtraData> Decode<Extra> {
 		for (audio_buffer, _time) in self.buffer.drain(..) {
 			try_send!(to_gc, DecodeToGc::AudioBuffer(audio_buffer));
 		}
-	}
-
-	#[inline]
-	/// TODO
-	fn done_decoding(&mut self) {
-		self.done_decoding = true;
 	}
 }
