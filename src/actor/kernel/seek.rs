@@ -127,7 +127,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 				// INVARIANT:
 				// `Audio` must set `audio_ready_to_recv` back
 				// to `true` upon receiving this signal.
-				try_send!(to_audio, KernelToAudio::DiscardCurrentAudio);
+				try_send!(to_audio, KernelToAudio::DiscardAudio);
 
 				self.w.add_commit_push(|w, _| {
 					// INVARIANT: we checked the `Current` is `Some` above.

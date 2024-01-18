@@ -48,7 +48,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 					// TODO: debug log
 					// println!("next_index: {next_index}");
 
-					if next_index < self.w.queue.len() {
+					if self.w.queue.get(next_index).is_some() {
 						// Return that index
 						Some(next_index)
 					// Else, we're either:
@@ -81,8 +81,11 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		});
 		// If no `Current`, then we're not `playing` anymore.
 		let playing = current.is_some();
+
 		self.atomic_state.playing.store(playing, Ordering::Release);
+
 		let queue_end_clear = self.atomic_state.queue_end_clear.load(Ordering::Acquire);
+
 		// Set our `Current`.
 		self.w.add_commit_push(|w, _| {
 			w.current = current.clone();

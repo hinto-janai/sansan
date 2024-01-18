@@ -4,6 +4,7 @@
 use std::{thread::JoinHandle, process::Output};
 use crossbeam::channel::{Sender, Receiver, Select};
 use rand::SeedableRng;
+use symphonia::core::units::Time;
 use crate::{
 	macros::{send,recv,try_recv,try_send,debug2,select_recv, trace2},
 	extra_data::ExtraData,
@@ -13,7 +14,7 @@ use crate::{
 		AudioStateSnapshot,
 		Current
 	},
-	actor::audio::{WroteAudioBuffer, TookAudioBuffer},
+	actor::audio::AudioToKernel,
 	signal::{
 		Play,
 		Toggle,
@@ -92,9 +93,9 @@ pub(crate) enum KernelToDecode<Extra: ExtraData> {
 /// TODO
 pub(crate) enum KernelToAudio {
 	/// A signal to start the `Audio` playback loop.
-	StartPlaying,
+	Play,
 	/// Discard all of your current audio buffers.
-	DiscardCurrentAudio,
+	DiscardAudio,
 }
 
 /// TODO
@@ -129,12 +130,11 @@ pub(crate) struct Channels<Extra: ExtraData> {
 
 	// [Audio]
 	pub(crate) to_audio:         Sender<KernelToAudio>,
-	pub(crate) from_audio:       Receiver<WroteAudioBuffer>,
+	pub(crate) from_audio:       Receiver<AudioToKernel>,
 	pub(crate) from_audio_error: Receiver<OutputError>,
 
 	// [Decode]
 	pub(crate) to_decode:                Sender<KernelToDecode<Extra>>,
-	pub(crate) from_decode_next_pls:     Receiver<()>,
 	pub(crate) from_decode_seek:         Receiver<Result<SeekedTime, SeekError>>,
 	pub(crate) from_decode_source:       Receiver<Result<(), SourceError>>,
 	pub(crate) from_decode_error_decode: Receiver<DecodeError>,
@@ -265,15 +265,13 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		assert_eq!(17, select.recv(&c.recv_set_index));
 		assert_eq!(18, select.recv(&c.recv_remove));
 		assert_eq!(19, select.recv(&c.recv_remove_range));
-		// Decode - "next pls"
-		assert_eq!(20, select.recv(&c.from_decode_next_pls));
 		// Errors
-		assert_eq!(21, select.recv(&c.from_audio_error));
-		assert_eq!(22, select.recv(&c.from_decode_error_decode));
-		assert_eq!(23, select.recv(&c.from_decode_error_source));
+		assert_eq!(20, select.recv(&c.from_audio_error));
+		assert_eq!(21, select.recv(&c.from_decode_error_decode));
+		assert_eq!(22, select.recv(&c.from_decode_error_source));
 		// Shutdown
-		assert_eq!(24, select.recv(&c.shutdown));
-		assert_eq!(25, select.recv(&c.shutdown_hang));
+		assert_eq!(23, select.recv(&c.shutdown));
+		assert_eq!(24, select.recv(&c.shutdown_hang));
 
 		loop {
 			// 1. Receive a signal
@@ -295,8 +293,19 @@ impl<Extra: ExtraData> Kernel<Extra> {
 				// channel will probably be received the most
 				// during runtime.
 				0 => {
-					let time = select_recv!(c.from_audio);
-					self.wrote_audio_buffer(time);
+					let msg = select_recv!(c.from_audio);
+					match msg {
+						// `Audio` just played back this audio buffer with
+						// this timestamp, update the `AudioState` with it.
+						AudioToKernel::WroteAudioBuffer(time) => self.wrote_audio_buffer(time),
+						// This message represents that:
+						// 1. `Audio` has played the last audio buffer
+						// 2. `Decode` has sent all its cached audio buffers
+						// 3. `Decode` can start decoding the next track
+						AudioToKernel::EndOfTrack => {
+							self.next_inner(&c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode);
+						},
+					}
 				},
 
 				// Signals.
@@ -336,28 +345,13 @@ impl<Extra: ExtraData> Kernel<Extra> {
 				18 => self.remove(select_recv!(c.recv_remove), &c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_remove),
 				19 => self.remove_range(select_recv!(c.recv_remove_range), &c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_remove_range),
 
-				// Decode - "next pls"
-				//
-				// This signal represents that:
-				// 1. `Audio` has played the last audio buffer
-				// 2. `Decode` has sent all its cached audio buffers
-				// 3. `Decode` wants to start decoding the next track
-				//
-				// Thus, it asking: "send the next Source, pls".
-				// I tried thinking of a better variable name but
-				// `next_pls` kinda describes it the most succinctly.
-				20 => {
-					select_recv!(c.from_decode_next_pls);
-					self.next_inner(&c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode);
-				}
-
 				// Errors.
-				21 => self.error_output(select_recv!(c.from_audio_error), &c.to_caller_error_output),
-				22 => self.error_decode(select_recv!(c.from_decode_error_decode), &c.to_caller_error_decode),
-				23 => self.error_source(select_recv!(c.from_decode_error_source), &c.to_caller_error_source),
+				20 => self.error_output(select_recv!(c.from_audio_error), &c.to_caller_error_output),
+				21 => self.error_decode(select_recv!(c.from_decode_error_decode), &c.to_caller_error_decode),
+				22 => self.error_source(select_recv!(c.from_decode_error_source), &c.to_caller_error_source),
 
 				// Shutdown.
-				24 => {
+				23 => {
 					select_recv!(c.shutdown);
 
 					// Tell all actors to shutdown.
@@ -372,7 +366,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 				// Same as shutdown but sends a message to a
 				// hanging [Engine] indicating we're done, which
 				// allows the caller to return.
-				25 => {
+				24 => {
 					select_recv!(c.shutdown_hang);
 
 					for actor in c.shutdown_actor.iter() {
@@ -429,7 +423,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 	//---------------------------------------------------------------------------------------------------- From Audio
 	#[inline]
 	/// Handler to when `Audio` messages us.
-	fn wrote_audio_buffer(&mut self, time: WroteAudioBuffer) {
+	fn wrote_audio_buffer(&mut self, time: Time) {
 		// Calculate total time elapsed.
 		let elapsed = time.seconds as f32 + time.frac as f32;
 
@@ -462,7 +456,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		//
 		// [Audio] is responsible for setting it back to [true].
 		self.atomic_state.audio_ready_to_recv.store(false, Ordering::Release);
-		try_send!(to_audio, KernelToAudio::DiscardCurrentAudio);
+		try_send!(to_audio, KernelToAudio::DiscardAudio);
 
 		// Tell `Decode` to discard data.
 		try_send!(to_decode, KernelToDecode::DiscardAudioAndStop);

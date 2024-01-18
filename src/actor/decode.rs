@@ -8,7 +8,7 @@ use crate::{
 	source::{Source, source_decode::SourceDecode},
 	state::AudioState,
 	extra_data::ExtraData,
-	actor::{audio::TookAudioBuffer,kernel::KernelToDecode},
+	actor::kernel::KernelToDecode,
 	macros::{recv,send,try_send,try_recv,debug2,trace2,select_recv, error2},
 	error::{SourceError,DecodeError},
 };
@@ -41,19 +41,15 @@ use strum::EnumCount;
 /// so this should never actually resize.
 pub(crate) const DECODE_BUFFER_LEN: usize = 16_000;
 
-//---------------------------------------------------------------------------------------------------- Types
-/// TODO
-type ToAudio = (AudioBuffer<f32>, Time);
-
 //---------------------------------------------------------------------------------------------------- Decode
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct Decode<Extra: ExtraData> {
-	audio_ready_to_recv: Arc<AtomicBool>,             // [Audio]'s way of telling [Decode] it is ready for samples
-	buffer:              VecDeque<ToAudio>,           // Local decoded packets, ready to send to [Audio]
-	source:              SourceDecode,                 // Our current [Source] that we are decoding
-	done_decoding:       bool,                        // Whether we have finished decoding our current [Source]
-	shutdown_wait:       Arc<Barrier>,                // Shutdown barrier between all actors
+	audio_ready_to_recv: Arc<AtomicBool>,                    // [Audio]'s way of telling [Decode] it is ready for samples
+	buffer:              VecDeque<(AudioBuffer<f32>, Time)>, // Local decoded packets, ready to send to [Audio]
+	source:              SourceDecode,                       // Our current [Source] that we are decoding
+	done_decoding:       bool,                               // Whether we have finished decoding our current [Source]
+	shutdown_wait:       Arc<Barrier>,                       // Shutdown barrier between all actors
 	_p:                  PhantomData<Extra>,
 }
 
@@ -62,9 +58,7 @@ pub(crate) struct Decode<Extra: ExtraData> {
 struct Channels<Extra: ExtraData> {
 	shutdown:               Receiver<()>,
 	to_gc:                  Sender<DecodeToGc>,
-	to_audio:               Sender<ToAudio>,
-	from_audio:             Receiver<TookAudioBuffer>,
-	to_kernel_next_pls:     Sender<()>,
+	to_audio:               Sender<DecodeToAudio>,
 	to_kernel_seek:         Sender<Result<SeekedTime, SeekError>>,
 	to_kernel_source:       Sender<Result<(), SourceError>>,
 	from_kernel:            Receiver<KernelToDecode<Extra>>,
@@ -73,6 +67,14 @@ struct Channels<Extra: ExtraData> {
 }
 
 //---------------------------------------------------------------------------------------------------- (Actual) Messages
+/// TODO
+pub(crate) enum DecodeToAudio {
+	/// TODO
+	Buffer((AudioBuffer<f32>, Time)),
+	/// TODO
+	EndOfTrack,
+}
+
 /// TODO
 pub(crate) enum DecodeToGc {
 	/// TODO
@@ -92,9 +94,7 @@ pub(crate) struct InitArgs<Extra: ExtraData> {
 	pub(crate) shutdown_wait:          Arc<Barrier>,
 	pub(crate) shutdown:               Receiver<()>,
 	pub(crate) to_gc:                  Sender<DecodeToGc>,
-	pub(crate) to_audio:               Sender<ToAudio>,
-	pub(crate) from_audio:             Receiver<TookAudioBuffer>,
-	pub(crate) to_kernel_next_pls:     Sender<()>,
+	pub(crate) to_audio:               Sender<DecodeToAudio>,
 	pub(crate) to_kernel_seek:         Sender<Result<SeekedTime, SeekError>>,
 	pub(crate) to_kernel_source:       Sender<Result<(), SourceError>>,
 	pub(crate) from_kernel:            Receiver<KernelToDecode<Extra>>,
@@ -119,8 +119,6 @@ impl<Extra: ExtraData> Decode<Extra> {
 					shutdown,
 					to_gc,
 					to_audio,
-					from_audio,
-					to_kernel_next_pls,
 					to_kernel_seek,
 					to_kernel_source,
 					from_kernel,
@@ -132,8 +130,6 @@ impl<Extra: ExtraData> Decode<Extra> {
 					shutdown,
 					to_gc,
 					to_audio,
-					from_audio,
-					to_kernel_next_pls,
 					to_kernel_seek,
 					to_kernel_source,
 					from_kernel,
@@ -170,9 +166,8 @@ impl<Extra: ExtraData> Decode<Extra> {
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
 
-		assert_eq!(0, select.recv(&channels.from_audio));
-		assert_eq!(1, select.recv(&channels.from_kernel));
-		assert_eq!(2, select.recv(&channels.shutdown));
+		assert_eq!(0, select.recv(&channels.from_kernel));
+		assert_eq!(1, select.recv(&channels.shutdown));
 
 		// The "Decode" loop.
 		loop {
@@ -192,10 +187,6 @@ impl<Extra: ExtraData> Decode<Extra> {
 			if let Ok(signal) = signal {
 				match signal {
 					0 => {
-						select_recv!(&channels.from_audio);
-						self.send_audio_if_ready(&channels.to_audio, &channels.to_kernel_next_pls);
-					},
-					1 => {
 						let msg = select_recv!(&channels.from_kernel);
 						match msg {
 							KernelToDecode::NewSource(source)     => self.new_source(source, &channels),
@@ -203,7 +194,7 @@ impl<Extra: ExtraData> Decode<Extra> {
 							KernelToDecode::DiscardAudioAndStop   => self.discard_audio_and_stop(&channels.to_gc),
 						}
 					},
-					2 => {
+					1 => {
 						select_recv!(&channels.shutdown);
 						crate::free::shutdown("Decode", self.shutdown_wait);
 						return;
@@ -228,6 +219,19 @@ impl<Extra: ExtraData> Decode<Extra> {
 				Err(symphonia::core::errors::Error::IoError(_)) => {
 					debug2!("Decode - done decoding");
 					self.done_decoding = true;
+
+					// INVARIANT: If `Audio` is not ready, it means its
+					// discarding its audio data anyway, so we don't need
+					// to tell it we reached the end.
+					//
+					// TODO: this doesn't account for:
+					// 1. `Audio` not being initialized in the first place
+					// 2. `Decode` somehow decoding the entire track faster
+					// than `Audio` can drain its old buffers
+					while self.audio_ready_to_recv.load(Ordering::Acquire) {
+						try_send!(channels.to_audio, DecodeToAudio::EndOfTrack);
+					}
+
 					continue;
 				},
 
@@ -249,7 +253,7 @@ impl<Extra: ExtraData> Decode<Extra> {
 					let time = self.source.timebase.calc_time(packet.ts);
 
 					// Send to [Audio] if we can, else store locally.
-					self.send_or_store_audio(&channels.to_audio, &channels.to_kernel_next_pls, (audio, time));
+					self.send_or_store_audio(&channels.to_audio, (audio, time));
 				}
 
 				Err(e) => Self::handle_decode_error(&channels, DecodeError::from(e)),
@@ -271,16 +275,15 @@ impl<Extra: ExtraData> Decode<Extra> {
 	/// if they are ready, else, store locally.
 	fn send_or_store_audio(
 		&mut self,
-		to_audio: &Sender<ToAudio>,
-		to_kernel_next_pls: &Sender<()>,
-		data: ToAudio,
+		to_audio: &Sender<DecodeToAudio>,
+		data: (AudioBuffer<f32>, Time),
 	) {
 		trace2!("Decode - send_or_store_audio()");
 
 		// Store the buffer first.
 		self.buffer.push_back(data);
 
-		self.send_audio_if_ready(to_audio, to_kernel_next_pls);
+		self.send_audio_if_ready(to_audio);
 	}
 
 	#[inline]
@@ -288,39 +291,17 @@ impl<Extra: ExtraData> Decode<Extra> {
 	/// if they are ready, else, store locally.
 	fn send_audio_if_ready(
 		&mut self,
-		to_audio: &Sender<ToAudio>,
-		to_kernel_next_pls: &Sender<()>,
+		to_audio: &Sender<DecodeToAudio>,
 	) {
 		trace2!("Decode - send_audio_if_ready()");
-
-		if self.buffer.is_empty() && self.done_decoding {
-			// INVARIANT: this is a (1) bounded channel,
-			// and `Decode` could be clearing out old
-			// signals from `Audio` which causes this
-			// function to be called again.
-			//
-			// So, don't unwrap if there is a full error,
-			// it means we're just waiting on `Kernel`.
-			//
-			// Only panic if the channel is disconnected
-			// (should never happen).
-			assert!(!matches!(
-				to_kernel_next_pls.try_send(()),
-				Err(TrySendError::Disconnected(())),
-			));
-			return;
-		}
 
 		// While `Audio` is ready to accept more,
 		// send all the audio buffers we have.
 		while let Some(data) = self.buffer.pop_front() {
 			if self.audio_ready_to_recv.load(Ordering::Acquire) {
-				// If we failed to send (channel is probably full),
-				// push it back to the front of the buffer for later usage.
-				if let Err(data) = to_audio.try_send(data) {
-					self.buffer.push_front(data.into_inner());
-					return;
-				}
+				try_send!(to_audio, DecodeToAudio::Buffer(data));
+			} else {
+				self.buffer.push_front(data);
 			}
 		}
 	}

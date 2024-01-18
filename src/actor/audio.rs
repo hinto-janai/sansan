@@ -17,7 +17,7 @@ use crate::{
 	output::AudioOutput,
 	error::OutputError,
 	macros::error2,
-	actor::kernel::KernelToAudio,
+	actor::{kernel::KernelToAudio, decode::DecodeToAudio},
 	macros::{debug2,try_send,select_recv,recv,trace2},
 };
 
@@ -63,37 +63,26 @@ struct Channels {
 	to_gc:             Sender<AudioBuffer<f32>>,
 	to_caller_elapsed: Option<(Sender<Time>, f32)>, // seconds
 
-	to_decode:   Sender<TookAudioBuffer>,
-	from_decode: Receiver<(AudioBuffer<f32>, Time)>,
+	from_decode: Receiver<DecodeToAudio>,
 
-	to_kernel:   Sender<WroteAudioBuffer>,
+	to_kernel:   Sender<AudioToKernel>,
 	from_kernel: Receiver<KernelToAudio>,
 
 	to_kernel_error:   Sender<OutputError>,
 }
 
 //---------------------------------------------------------------------------------------------------- (Actual) Messages
-/// Audio -> Decode
-///
-/// There's only 1 message variant,
-/// so this is a ZST struct, not an enum.
-///
-/// We (Audio) took out an audio buffer from
-/// the channel, please send another one :)
-pub(crate) struct TookAudioBuffer;
-
 /// TODO
-// pub(crate) enum AudioToKernel {
-	// /// We (Audio) successfully wrote an audio buffer
-	// /// to the audio output device with this timestamp.
-	// /// (Please update the `AudioState` to reflect this).
-	// WroteAudioBuffer(Time),
-// }
-/// TODO
-/// We (Audio) successfully wrote an audio buffer
-/// to the audio output device with this timestamp.
-/// (Please update the `AudioState` to reflect this).
-pub(crate) type WroteAudioBuffer = Time;
+pub(crate) enum AudioToKernel {
+	/// We (Audio) successfully wrote an audio buffer
+	/// to the audio output device with this timestamp.
+	/// (Please update the `AudioState` to reflect this).
+	WroteAudioBuffer(Time),
+	/// We're at the end of the current track
+	/// We have already written the last audio buffer
+	/// and sent it.
+	EndOfTrack,
+}
 
 //---------------------------------------------------------------------------------------------------- Audio Impl
 #[allow(clippy::missing_docs_in_private_items)]
@@ -106,9 +95,8 @@ pub(crate) struct InitArgs {
 	pub(crate) audio_retry:       Duration,
 	pub(crate) to_gc:             Sender<AudioBuffer<f32>>,
 	pub(crate) to_caller_elapsed: Option<(Sender<Time>, f32)>, // seconds
-	pub(crate) to_decode:         Sender<TookAudioBuffer>,
-	pub(crate) from_decode:       Receiver<(AudioBuffer<f32>, Time)>,
-	pub(crate) to_kernel:         Sender<WroteAudioBuffer>,
+	pub(crate) from_decode:       Receiver<DecodeToAudio>,
+	pub(crate) to_kernel:         Sender<AudioToKernel>,
 	pub(crate) from_kernel:       Receiver<KernelToAudio>,
 	pub(crate) to_kernel_error:   Sender<OutputError>,
 }
@@ -132,7 +120,6 @@ impl<Output: AudioOutput> Audio<Output> {
 					audio_retry,
 					to_gc,
 					to_caller_elapsed,
-					to_decode,
 					from_decode,
 					to_kernel,
 					from_kernel,
@@ -143,7 +130,6 @@ impl<Output: AudioOutput> Audio<Output> {
 					shutdown,
 					to_gc,
 					to_caller_elapsed,
-					to_decode,
 					from_decode,
 					to_kernel,
 					from_kernel,
@@ -209,9 +195,11 @@ impl<Output: AudioOutput> Audio<Output> {
 		loop {
 			// Attempt to receive signal from other actors.
 			let select_index = if self.atomic_state.playing.load(Ordering::Acquire) {
-				if let Ok(data) = c.from_decode.try_recv() {
-					// Play the buffer.
-					self.play_audio_buffer(data, &c);
+				if let Ok(msg) = c.from_decode.try_recv() {
+					match msg {
+						DecodeToAudio::Buffer(data) => self.play_audio_buffer(data, &c),
+						DecodeToAudio::EndOfTrack => Self::end_of_track(&c.to_kernel),
+					}
 				}
 
 				select.try_ready()
@@ -235,13 +223,13 @@ impl<Output: AudioOutput> Audio<Output> {
 				0 => {
 					let msg = select_recv!(c.from_kernel);
 					match msg {
-						KernelToAudio::StartPlaying => {
+						KernelToAudio::Play => {
 							if let Err(e) = self.output.play() {
 								todo!();
 							}
 							continue;
 						},
-						KernelToAudio::DiscardCurrentAudio => self.discard_audio(&c.from_decode, &c.to_gc),
+						KernelToAudio::DiscardAudio => self.discard_audio(&c.from_decode, &c.to_gc),
 					}
 				},
 
@@ -272,10 +260,6 @@ impl<Output: AudioOutput> Audio<Output> {
 	) {
 		trace2!("Audio - play_audio_buffer(), time: {:?}", msg.1);
 
-		// Tell `Decode` we just took an audio
-		// buffer and want a new one sent.
-		try_send!(c.to_decode, TookAudioBuffer);
-
 		let (audio, time) = msg;
 
 		let spec     = *audio.spec();
@@ -296,7 +280,7 @@ impl<Output: AudioOutput> Audio<Output> {
 		// tell [Kernel] to update with the new timestamp.
 		self.elapsed_audio_state += nominal_seconds;
 		if self.elapsed_audio_state >= self.atomic_state.elapsed_refresh_rate.load() {
-			try_send!(c.to_kernel, time);
+			try_send!(c.to_kernel, AudioToKernel::WroteAudioBuffer(time));
 			self.elapsed_audio_state = 0.0;
 		}
 
@@ -326,9 +310,9 @@ impl<Output: AudioOutput> Audio<Output> {
 			) {
 				Ok(o)  => self.output = o,
 				// And if we couldn't, tell `Kernel` we errored.
-				Err(e) => {
-					error2!("Audio - couldn't re-open AudioOutput: {e:?}");
-					try_send!(c.to_kernel_error, e);
+				Err(output_error) => {
+					error2!("Audio - couldn't re-open AudioOutput: {output_error:?}");
+					try_send!(c.to_kernel_error, output_error);
 					return;
 				},
 			}
@@ -337,16 +321,23 @@ impl<Output: AudioOutput> Audio<Output> {
 		let volume = self.atomic_state.volume.load();
 
 		// Write audio buffer (hangs).
-		if let Err(e) = self.output.write(audio, &c.to_gc, volume) {
-			try_send!(c.to_kernel_error, e);
+		if let Err(output_error) = self.output.write(audio, &c.to_gc, volume) {
+			try_send!(c.to_kernel_error, output_error);
 		}
 	}
 
 	#[inline]
 	/// TODO
+	fn end_of_track(to_kernel: &Sender<AudioToKernel>) {
+		debug2!("Audio - end_of_track()");
+		try_send!(to_kernel, AudioToKernel::EndOfTrack);
+	}
+
+	#[inline]
+	/// Discard and all the audio available, _do not_ play it.
 	fn discard_audio(
 		&mut self,
-		from_decode: &Receiver<(AudioBuffer<f32>, Time)>,
+		from_decode: &Receiver<DecodeToAudio>,
 		to_gc: &Sender<AudioBuffer<f32>>,
 	) {
 		debug2!("Audio - discard_audio()");
@@ -370,7 +361,10 @@ impl<Output: AudioOutput> Audio<Output> {
 		// `Time` is just `u64` + `f64`.
 		// Doesn't make sense sending stack variables to GC.
 		while let Ok(msg) = from_decode.try_recv() {
-			try_send!(to_gc, msg.0);
+			match msg {
+				DecodeToAudio::Buffer(msg) => try_send!(to_gc, msg.0),
+				DecodeToAudio::EndOfTrack => continue,
+			}
 		}
 
 		self.ready_to_recv.store(true, Ordering::Release);

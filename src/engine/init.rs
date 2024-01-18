@@ -214,8 +214,7 @@ impl<Extra: ExtraData> Engine<Extra> {
 		// Variables are prefix/suffixed accordingly:
 		// - [Audio]  == [a]
 		// - [Decode] == [d]
-		let (d_to_a, a_from_d) = bounded(AUDIO_BUFFER_LEN);
-		let (a_to_d, d_from_a) = unbounded();
+		let (d_to_a, a_from_d) = unbounded();
 		let (a_to_k, k_from_a) = unbounded();
 		let (k_to_a, a_from_k) = unbounded();
 		let (err_a_to_k, err_k_from_a) = unbounded();
@@ -236,7 +235,6 @@ impl<Extra: ExtraData> Engine<Extra> {
 				audio_retry:       config.audio_retry,
 				to_gc:             a_to_gc,
 				to_caller_elapsed: a_to_caller_elapsed,
-				to_decode:         a_to_d,
 				from_decode:       a_from_d,
 				to_kernel:         a_to_k,
 				from_kernel:       a_from_k,
@@ -246,7 +244,6 @@ impl<Extra: ExtraData> Engine<Extra> {
 		);
 
 		//-------------------------------------------------------------- Spawn [Decode]
-		let (d_to_k_next_pls, k_from_d_next_pls) = bounded(1);
 		let (d_to_k_seek,     k_from_d_seek)     = bounded(1);
 		let (d_to_k_source,   k_from_d_source)   = bounded(1);
 		let (k_to_d,          d_from_k)          = unbounded();
@@ -265,8 +262,6 @@ impl<Extra: ExtraData> Engine<Extra> {
 				shutdown,
 				to_gc:                  d_to_gc,
 				to_audio:               d_to_a,
-				from_audio:             d_from_a,
-				to_kernel_next_pls:     d_to_k_next_pls,
 				to_kernel_seek:         d_to_k_seek,
 				to_kernel_source:       d_to_k_source,
 				from_kernel:            d_from_k,
@@ -375,7 +370,6 @@ impl<Extra: ExtraData> Engine<Extra> {
 			from_audio:               k_from_a,
 			from_audio_error:         err_k_from_a,
 			to_decode:                k_to_d,
-			from_decode_next_pls:     k_from_d_next_pls,
 			from_decode_seek:         k_from_d_seek,
 			from_decode_source:       k_from_d_source,
 			from_decode_error_decode: err_decode_k_from_d,
