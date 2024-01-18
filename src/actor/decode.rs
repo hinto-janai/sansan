@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use std::{thread::JoinHandle, marker::PhantomData};
-use crossbeam::channel::{Receiver, Select, Sender};
+use crossbeam::channel::{Receiver, Select, Sender, TrySendError};
 use crate::{
 	signal::{self,SeekError,SeekedTime},
 	source::{Source, source_decode::SourceDecode},
@@ -294,8 +294,20 @@ impl<Extra: ExtraData> Decode<Extra> {
 		trace2!("Decode - send_audio_if_ready()");
 
 		if self.buffer.is_empty() && self.done_decoding {
-			// TODO: tell `Kernel` we're done the `Current`.
-			try_send!(to_kernel_next_pls, ());
+			// INVARIANT: this is a (1) bounded channel,
+			// and `Decode` could be clearing out old
+			// signals from `Audio` which causes this
+			// function to be called again.
+			//
+			// So, don't unwrap if there is a full error,
+			// it means we're just waiting on `Kernel`.
+			//
+			// Only panic if the channel is disconnected
+			// (should never happen).
+			assert!(!matches!(
+				to_kernel_next_pls.try_send(()),
+				Err(TrySendError::Disconnected(())),
+			));
 			return;
 		}
 
