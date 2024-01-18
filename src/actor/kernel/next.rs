@@ -14,6 +14,23 @@ use crossbeam::channel::{Sender,Receiver};
 //----------------------------------------------------------------------------------------------------
 impl<Extra: ExtraData> Kernel<Extra> {
 	/// TODO
+	///
+	/// Solely a remapping, re-used by `Kernel` <-> `Decode` "next pls".
+	pub(super) fn next_inner(
+		&mut self,
+		to_gc: &Sender<KernelToGc<Extra>>,
+		to_caller_source_new: &Sender<Source<Extra>>,
+		to_audio: &Sender<KernelToAudio>,
+		to_decode: &Sender<KernelToDecode<Extra>>,
+	) {
+		// Re-use `skip()`'s inner function.
+		// INVARIANT: `self.queue_empty()` must be handled by us.
+		self.skip_inner(Skip { skip: 1 }, to_gc, to_caller_source_new, to_audio, to_decode);
+	}
+
+	/// TODO
+	///
+	/// Handles `Engine` responses.
 	pub(super) fn next(
 		&mut self,
 		to_gc: &Sender<KernelToGc<Extra>>,
@@ -27,9 +44,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 			return;
 		}
 
-		// Re-use `skip()`'s inner function.
-		// INVARIANT: `self.queue_empty()` must be handled by us.
-		self.skip_inner(Skip { skip: 1 }, to_gc, to_caller_source_new, to_audio, to_decode);
+		self.next_inner(to_gc, to_caller_source_new, to_audio, to_decode);
 
 		try_send!(to_engine, self.audio_state_snapshot());
 	}

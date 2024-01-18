@@ -64,6 +64,7 @@ struct Channels<Extra: ExtraData> {
 	to_gc:                  Sender<DecodeToGc>,
 	to_audio:               Sender<ToAudio>,
 	from_audio:             Receiver<TookAudioBuffer>,
+	to_kernel_next_pls:     Sender<()>,
 	to_kernel_seek:         Sender<Result<SeekedTime, SeekError>>,
 	to_kernel_source:       Sender<Result<(), SourceError>>,
 	from_kernel:            Receiver<KernelToDecode<Extra>>,
@@ -93,6 +94,7 @@ pub(crate) struct InitArgs<Extra: ExtraData> {
 	pub(crate) to_gc:                  Sender<DecodeToGc>,
 	pub(crate) to_audio:               Sender<ToAudio>,
 	pub(crate) from_audio:             Receiver<TookAudioBuffer>,
+	pub(crate) to_kernel_next_pls:     Sender<()>,
 	pub(crate) to_kernel_seek:         Sender<Result<SeekedTime, SeekError>>,
 	pub(crate) to_kernel_source:       Sender<Result<(), SourceError>>,
 	pub(crate) from_kernel:            Receiver<KernelToDecode<Extra>>,
@@ -118,6 +120,7 @@ impl<Extra: ExtraData> Decode<Extra> {
 					to_gc,
 					to_audio,
 					from_audio,
+					to_kernel_next_pls,
 					to_kernel_seek,
 					to_kernel_source,
 					from_kernel,
@@ -130,6 +133,7 @@ impl<Extra: ExtraData> Decode<Extra> {
 					to_gc,
 					to_audio,
 					from_audio,
+					to_kernel_next_pls,
 					to_kernel_seek,
 					to_kernel_source,
 					from_kernel,
@@ -189,7 +193,7 @@ impl<Extra: ExtraData> Decode<Extra> {
 				match signal {
 					0 => {
 						select_recv!(&channels.from_audio);
-						self.send_audio_if_ready(&channels.to_audio);
+						self.send_audio_if_ready(&channels.to_audio, &channels.to_kernel_next_pls);
 					},
 					1 => {
 						let msg = select_recv!(&channels.from_kernel);
@@ -246,7 +250,7 @@ impl<Extra: ExtraData> Decode<Extra> {
 					self.set_current_audio_time(time);
 
 					// Send to [Audio] if we can, else store locally.
-					self.send_or_store_audio(&channels.to_audio, (audio, time));
+					self.send_or_store_audio(&channels.to_audio, &channels.to_kernel_next_pls, (audio, time));
 				}
 
 				Err(e) => Self::handle_decode_error(&channels, DecodeError::from(e)),
@@ -266,20 +270,35 @@ impl<Extra: ExtraData> Decode<Extra> {
 	#[inline]
 	/// Send decoded audio data to [Audio]
 	/// if they are ready, else, store locally.
-	fn send_or_store_audio(&mut self, to_audio: &Sender<ToAudio>, data: ToAudio) {
+	fn send_or_store_audio(
+		&mut self,
+		to_audio: &Sender<ToAudio>,
+		to_kernel_next_pls: &Sender<()>,
+		data: ToAudio,
+	) {
 		trace2!("Decode - send_or_store_audio()");
 
 		// Store the buffer first.
 		self.buffer.push_back(data);
 
-		self.send_audio_if_ready(to_audio);
+		self.send_audio_if_ready(to_audio, to_kernel_next_pls);
 	}
 
 	#[inline]
 	/// Send decoded audio data to [Audio]
 	/// if they are ready, else, store locally.
-	fn send_audio_if_ready(&mut self, to_audio: &Sender<ToAudio>) {
+	fn send_audio_if_ready(
+		&mut self,
+		to_audio: &Sender<ToAudio>,
+		to_kernel_next_pls: &Sender<()>,
+	) {
 		trace2!("Decode - send_audio_if_ready()");
+
+		if self.buffer.is_empty() && self.done_decoding {
+			// TODO: tell `Kernel` we're done the `Current`.
+			try_send!(to_kernel_next_pls, ());
+			return;
+		}
 
 		// While `Audio` is ready to accept more,
 		// send all the audio buffers we have.

@@ -246,11 +246,12 @@ impl<Extra: ExtraData> Engine<Extra> {
 		);
 
 		//-------------------------------------------------------------- Spawn [Decode]
-		let (d_to_k_seek,   k_from_d_seek)   = bounded(1);
-		let (d_to_k_source, k_from_d_source) = bounded(1);
-		let (k_to_d,        d_from_k)        = unbounded();
-		let (d_to_gc,       gc_from_d)       = unbounded();
-		let (d_shutdown,    shutdown)        = bounded(1);
+		let (d_to_k_next_pls, k_from_d_next_pls) = bounded(1);
+		let (d_to_k_seek,     k_from_d_seek)     = bounded(1);
+		let (d_to_k_source,   k_from_d_source)   = bounded(1);
+		let (k_to_d,          d_from_k)          = unbounded();
+		let (d_to_gc,         gc_from_d)         = unbounded();
+		let (d_shutdown,      shutdown)          = bounded(1);
 
 		let (err_decode_d_to_k, err_decode_k_from_d) = unbounded();
 		let (err_source_d_to_k, err_source_k_from_d) = unbounded();
@@ -265,6 +266,7 @@ impl<Extra: ExtraData> Engine<Extra> {
 				to_gc:                  d_to_gc,
 				to_audio:               d_to_a,
 				from_audio:             d_from_a,
+				to_kernel_next_pls:     d_to_k_next_pls,
 				to_kernel_seek:         d_to_k_seek,
 				to_kernel_source:       d_to_k_source,
 				from_kernel:            d_from_k,
@@ -373,6 +375,7 @@ impl<Extra: ExtraData> Engine<Extra> {
 			from_audio:               k_from_a,
 			from_audio_error:         err_k_from_a,
 			to_decode:                k_to_d,
+			from_decode_next_pls:     k_from_d_next_pls,
 			from_decode_seek:         k_from_d_seek,
 			from_decode_source:       k_from_d_source,
 			from_decode_error_decode: err_decode_k_from_d,

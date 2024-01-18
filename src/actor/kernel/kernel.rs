@@ -132,6 +132,7 @@ pub(crate) struct Channels<Extra: ExtraData> {
 
 	// [Decode]
 	pub(crate) to_decode:                Sender<KernelToDecode<Extra>>,
+	pub(crate) from_decode_next_pls:     Receiver<()>,
 	pub(crate) from_decode_seek:         Receiver<Result<SeekedTime, SeekError>>,
 	pub(crate) from_decode_source:       Receiver<Result<(), SourceError>>,
 	pub(crate) from_decode_error_decode: Receiver<DecodeError>,
@@ -262,13 +263,15 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		assert_eq!(17, select.recv(&c.recv_set_index));
 		assert_eq!(18, select.recv(&c.recv_remove));
 		assert_eq!(19, select.recv(&c.recv_remove_range));
+		// Decode - "next pls"
+		assert_eq!(20, select.recv(&c.from_decode_next_pls));
 		// Errors
-		assert_eq!(20, select.recv(&c.from_audio_error));
-		assert_eq!(21, select.recv(&c.from_decode_error_decode));
-		assert_eq!(22, select.recv(&c.from_decode_error_source));
+		assert_eq!(21, select.recv(&c.from_audio_error));
+		assert_eq!(22, select.recv(&c.from_decode_error_decode));
+		assert_eq!(23, select.recv(&c.from_decode_error_source));
 		// Shutdown
-		assert_eq!(23, select.recv(&c.shutdown));
-		assert_eq!(24, select.recv(&c.shutdown_hang));
+		assert_eq!(24, select.recv(&c.shutdown));
+		assert_eq!(25, select.recv(&c.shutdown_hang));
 
 		loop {
 			// 1. Receive a signal
@@ -331,13 +334,28 @@ impl<Extra: ExtraData> Kernel<Extra> {
 				18 => self.remove(select_recv!(c.recv_remove), &c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_remove),
 				19 => self.remove_range(select_recv!(c.recv_remove_range), &c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_remove_range),
 
+				// Decode - "next pls"
+				//
+				// This signal represents that:
+				// 1. `Audio` has played the last audio buffer
+				// 2. `Decode` has sent all its cached audio buffers
+				// 3. `Decode` wants to start decoding the next track
+				//
+				// Thus, it asking: "send the next Source, pls".
+				// I tried thinking of a better variable name but
+				// `next_pls` kinda describes it the most succinctly.
+				20 => {
+					select_recv!(c.from_decode_next_pls);
+					self.next_inner(&c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode);
+				}
+
 				// Errors.
-				20 => self.error_output(select_recv!(c.from_audio_error), &c.to_caller_error_output),
-				21 => self.error_decode(select_recv!(c.from_decode_error_decode), &c.to_caller_error_decode),
-				22 => self.error_source(select_recv!(c.from_decode_error_source), &c.to_caller_error_source),
+				21 => self.error_output(select_recv!(c.from_audio_error), &c.to_caller_error_output),
+				22 => self.error_decode(select_recv!(c.from_decode_error_decode), &c.to_caller_error_decode),
+				23 => self.error_source(select_recv!(c.from_decode_error_source), &c.to_caller_error_source),
 
 				// Shutdown.
-				23 => {
+				24 => {
 					select_recv!(c.shutdown);
 
 					// Tell all actors to shutdown.
@@ -352,7 +370,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 				// Same as shutdown but sends a message to a
 				// hanging [Engine] indicating we're done, which
 				// allows the caller to return.
-				24 => {
+				25 => {
 					select_recv!(c.shutdown_hang);
 
 					for actor in c.shutdown_actor.iter() {

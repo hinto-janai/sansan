@@ -210,10 +210,6 @@ impl<Output: AudioOutput> Audio<Output> {
 			// Attempt to receive signal from other actors.
 			let select_index = if self.atomic_state.playing.load(Ordering::Acquire) {
 				if let Ok(data) = c.from_decode.try_recv() {
-					// Tell `Decode` we just took an audio
-					// buffer and want a new one sent.
-					try_send!(c.to_decode, TookAudioBuffer);
-
 					// Play the buffer.
 					self.play_audio_buffer(data, &c);
 				}
@@ -275,6 +271,10 @@ impl<Output: AudioOutput> Audio<Output> {
 		c: &Channels,
 	) {
 		trace2!("Audio - play_audio_buffer(), time: {:?}", msg.1);
+
+		// Tell `Decode` we just took an audio
+		// buffer and want a new one sent.
+		try_send!(c.to_decode, TookAudioBuffer);
 
 		let (audio, time) = msg;
 
