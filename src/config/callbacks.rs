@@ -34,7 +34,7 @@ use crate::{
 /// ```rust
 /// # use sansan::{config::*,error::*,source::*,state::*};
 /// let mut callbacks = Callbacks::<()>::new();
-/// let (tx, rx) = std::sync::mpsc::channel();
+/// let (tx, rx) = std::sync::mpsc::sync_channel(1);
 /// # tx.send(Current { source: Source::dummy(), index: 0, elapsed: 0.0 });
 ///
 /// callbacks.current_new(move |current: Current<()>| {
@@ -287,7 +287,7 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 	/// ```rust
 	/// # use sansan::{config::*,error::*,source::*,state::*};
 	/// let mut callbacks = Callbacks::<()>::new();
-	/// let (tx, rx) = std::sync::mpsc::channel();
+	/// let (tx, rx) = std::sync::mpsc::sync_channel(1);
 	/// # tx.send(OutputError::StreamClosed);
 	///
 	/// callbacks.error_output(ErrorCallback::new_pause_and_fn(move |output_error| {
