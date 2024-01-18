@@ -164,7 +164,7 @@ impl<Extra: ExtraData> Engine<Extra> {
 		let (c_shutdown,               shutdown)     = bounded(1);
 		let (k_to_caller_current_new,  current_new)  = unbounded();
 		let (k_to_caller_queue_end,    queue_end)    = unbounded();
-		let (k_to_caller_elapsed,      elapsed)      = unbounded();
+		let (a_to_caller_elapsed,      elapsed)      = unbounded();
 		let (k_to_caller_error_decode, error_decode) = unbounded();
 		let (k_to_caller_error_source, error_source) = unbounded();
 		let (k_to_caller_error_output, error_output) = unbounded();
@@ -172,9 +172,7 @@ impl<Extra: ExtraData> Engine<Extra> {
 		// The channels _other_ actors use to tell
 		// [Caller] that some event has gone off
 		// and that it should [call()] the callback.
-		let to_caller_current_new = if callbacks.current_new.is_some() { Some(k_to_caller_current_new) } else { None };
-		let to_caller_queue_end   = if callbacks.queue_end.is_some()   { Some(k_to_caller_queue_end)   } else { None };
-		let to_caller_elapsed     = callbacks.elapsed.as_ref().map(|(_, dur)| (k_to_caller_elapsed, dur.as_secs_f32()));
+		let a_to_caller_elapsed = callbacks.elapsed.as_ref().map(|(_, dur)| (a_to_caller_elapsed, dur.as_secs_f32()));
 		let caller_error_decode_pause = callbacks.error_decode.as_ref().is_some_and(ErrorCallback::will_pause);
 		let caller_error_source_pause = callbacks.error_source.as_ref().is_some_and(ErrorCallback::will_pause);
 		let caller_error_output_pause = callbacks.error_output.as_ref().is_some_and(ErrorCallback::will_pause);
@@ -235,7 +233,7 @@ impl<Extra: ExtraData> Engine<Extra> {
 				shutdown_wait:     Arc::clone(&shutdown_wait),
 				audio_retry:       config.audio_retry,
 				to_gc:             a_to_gc,
-				to_caller_elapsed,
+				to_caller_elapsed: a_to_caller_elapsed,
 				to_decode:         a_to_d,
 				from_decode:       a_from_d,
 				to_kernel:         a_to_k,
@@ -377,6 +375,8 @@ impl<Extra: ExtraData> Engine<Extra> {
 			from_decode_source:       k_from_d_source,
 			from_decode_error_decode: err_decode_k_from_d,
 			from_decode_error_source: err_source_k_from_d,
+			to_caller_current_new:    k_to_caller_current_new,
+			to_caller_queue_end:      k_to_caller_queue_end,
 			to_caller_error_decode:   (k_to_caller_error_decode, caller_error_decode_pause),
 			to_caller_error_source:   (k_to_caller_error_source, caller_error_source_pause),
 			to_caller_error_output:   (k_to_caller_error_output, caller_error_output_pause),

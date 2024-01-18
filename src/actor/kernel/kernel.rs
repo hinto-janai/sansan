@@ -138,6 +138,10 @@ pub(crate) struct Channels<Extra: ExtraData> {
 	pub(crate) from_decode_error_source: Receiver<SourceError>,
 
 	// [Caller]
+	// `to_caller_elapsed` is handled by `Audio`
+	// since it has the 1st access to time data.
+	pub(crate) to_caller_current_new: Sender<Current<Extra>>,
+	pub(crate) to_caller_queue_end: Sender<()>,
 	pub(crate) to_caller_error_decode: (Sender<DecodeError>, bool), // Should we `pause()`?
 	pub(crate) to_caller_error_source: (Sender<SourceError>, bool), // Should we `pause()`?
 	pub(crate) to_caller_error_output: (Sender<OutputError>, bool), // Should we `pause()`?
@@ -248,7 +252,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		assert_eq!(7,  select.recv(&c.recv_clear));
 		assert_eq!(8,  select.recv(&c.recv_shuffle));
 		assert_eq!(9,  select.recv(&c.recv_repeat));
-		assert_eq!(10,  select.recv(&c.recv_volume));
+		assert_eq!(10, select.recv(&c.recv_volume));
 		assert_eq!(11, select.recv(&c.recv_restore));
 		assert_eq!(12, select.recv(&c.recv_add));
 		assert_eq!(13, select.recv(&c.recv_add_many));
