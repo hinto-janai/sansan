@@ -262,13 +262,13 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 
 	/// Set the behavior for when [`DecodeError`]'s occur.
 	///
-	/// The provided [`ErrorCallback`] has access to the specific [`DecodeError`] that occured.
+	/// The provided [`ErrorCallback`] has access to the specific [`DecodeError`] that occurred.
 	///
 	/// ```rust
 	/// # use sansan::{config::*,error::*};
 	/// let mut callbacks = Callbacks::<()>::new();
 	///
-	/// // A decode error occured!
+	/// // A decode error occurred!
 	/// //
 	/// // This input decides how the `Engine` handles it.
 	/// // This one in particular just makes the
@@ -282,7 +282,7 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 
 	/// Set the behavior for when [`OutputError`]'s occur.
 	///
-	/// The provided [`ErrorCallback`] has access to the specific [`OutputError`] that occured.
+	/// The provided [`ErrorCallback`] has access to the specific [`OutputError`] that occurred.
 	///
 	/// ```rust
 	/// # use sansan::{config::*,error::*,source::*,state::*};
@@ -291,7 +291,7 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 	/// # tx.send(OutputError::StreamClosed);
 	///
 	/// callbacks.error_output(ErrorCallback::new_pause_and_fn(move |output_error| {
-	///     // An output error occured!
+	///     // An output error occurred!
 	///     //
 	///     // This closure decides how the `Engine` handles it.
 	///     // This one in particular will make `Engine` pause
@@ -314,14 +314,14 @@ impl<Extra: ExtraData> Callbacks<Extra> {
 
 	/// Set the behavior for when [`SourceError`]'s occur.
 	///
-	/// The provided [`ErrorCallback`] has access to the specific [`SourceError`] that occured.
+	/// The provided [`ErrorCallback`] has access to the specific [`SourceError`] that occurred.
 	///
 	/// ```rust
 	/// # use sansan::{config::*,error::*};
 	/// let mut callbacks = Callbacks::<()>::new();
 	///
 	/// callbacks.error_source(ErrorCallback::new_fn(|source_error| {
-	///     // A source error occured!
+	///     // A source error occurred!
 	///     //
 	///     // This closure decides how the `Engine` handles it.
 	///     // This one in particular will make the `Engine`

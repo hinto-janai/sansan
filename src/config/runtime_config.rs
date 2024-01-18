@@ -13,10 +13,10 @@ use std::{
 #[allow(unused_imports)] // docs
 use crate::{
 	Engine,
-	state::{AudioState, Current},
+	state::{AudioState,AudioStateReader,Current},
 	source::Source,
 	signal::Repeat,
-	config::InitConfig,
+	config::{InitConfig,Callbacks},
 };
 
 //---------------------------------------------------------------------------------------------------- RuntimeConfig
@@ -121,6 +121,11 @@ pub struct RuntimeConfig {
 	///
 	/// Setting this to [`Duration::ZERO`] will make the `AudioState`
 	/// update _every_ single time a new audio buffer is played.
+	///
+	/// If all you need from the `AudioState` is the `Current::elapsed` field,
+	/// consider using [`Callbacks::elapsed`] to access the value instead of
+	/// setting a low value here and constantly using [`AudioStateReader::get`],
+	/// as it is cheaper for the [`Engine`] internally.
 	pub elapsed_refresh_rate: Duration,
 }
 

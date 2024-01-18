@@ -17,7 +17,7 @@
 //!
 //! Using the `dummy` backend will allow perfectly normal `sansan` usage, with the
 //! exception that no audio will ever actually be played back, however, tracks will continue
-//! to play as normal and audio state will be updated _as if_ audio were actually being played.
+//! to progress as normal and audio state will be updated _as if_ audio were actually being played.
 
 #![doc(html_logo_url = "https://raw.githubusercontent.com/hinto-janai/sansan/main/assets/img/icon_640_640.png")]
 

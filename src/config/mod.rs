@@ -12,8 +12,8 @@ pub use error_callback::ErrorCallback;
 mod init_config;
 pub use init_config::InitConfig;
 
-mod live_config;
-pub use live_config::RuntimeConfig;
+mod runtime_config;
+pub use runtime_config::RuntimeConfig;
 
 mod constants;
 pub(crate) use constants::{
