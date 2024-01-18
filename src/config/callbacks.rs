@@ -16,7 +16,7 @@ use crate::{
 	Engine,
 	source::Source,
 	state::{AudioState,Current},
-	config::{LiveConfig,InitConfig},
+	config::{RuntimeConfig,InitConfig},
 	signal::Repeat,
 };
 
@@ -86,13 +86,13 @@ pub struct Callbacks<Extra: ExtraData> {
 	///
 	/// The available `Current` passed in the function is the new `Current` that was set.
 	///
-	/// This is called even if the [`LiveConfig`]'s repeat mode is set to [`Repeat::Current`],
+	/// This is called even if the [`RuntimeConfig`]'s repeat mode is set to [`Repeat::Current`],
 	/// i.e, if the current track repeats after finishing, this callback will still be called.
 	pub current_new: Option<Box<dyn FnMut(Current<Extra>) + Send + 'static>>,
 
 	/// Called when the last track in the queue in the [`AudioState`] ends.
 	///
-	/// This is called even if the [`LiveConfig`]'s repeat mode is set to [`Repeat::Queue`],
+	/// This is called even if the [`RuntimeConfig`]'s repeat mode is set to [`Repeat::Queue`],
 	/// i.e, if the queue repeats after finishing, this callback will still be called.
 	pub queue_end: Option<Box<dyn FnMut() + Send + 'static>>,
 

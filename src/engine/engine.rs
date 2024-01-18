@@ -13,7 +13,7 @@ use crate::{
 	config::{
 		InitConfig,
 		Callbacks,
-		LiveConfig
+		RuntimeConfig
 	},
 	actor::{
 		audio::{Audio,AUDIO_BUFFER_LEN},
@@ -55,8 +55,9 @@ use crate::resampler::ResamplerStruct;
 pub struct Engine<Extra: ExtraData> {
 	/// Data and objects.
 	pub(super) reader: AudioStateReader<Extra>,
-	pub(super) config: LiveConfig,
+	pub(super) config: RuntimeConfig,
 	pub(super) atomic_state: Arc<AtomicState>,
+	pub(super) shutdown_blocking: bool,
 
 	// Internal mirrored state.
 	pub(super) repeat: Repeat,

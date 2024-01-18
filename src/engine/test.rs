@@ -9,7 +9,7 @@
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
 	engine::Engine,
-	config::LiveConfig,
+	config::RuntimeConfig,
 	state::AtomicState,
 	extra_data::ExtraData,
 };

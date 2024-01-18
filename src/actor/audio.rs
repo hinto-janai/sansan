@@ -1,13 +1,16 @@
 //! TODO
 
 //---------------------------------------------------------------------------------------------------- Use
-use std::thread::JoinHandle;
 use crossbeam::channel::{Receiver, Select, Sender};
 use symphonia::core::{audio::AudioBuffer, units::Time};
-use std::sync::{
-	Arc,
-	Barrier,
-	atomic::{AtomicBool,Ordering},
+use std::{
+	thread::JoinHandle,
+	time::Duration,
+	sync::{
+		Arc,
+		Barrier,
+		atomic::{AtomicBool,Ordering},
+	},
 };
 use crate::{
 	state::AtomicState,
@@ -100,6 +103,7 @@ pub(crate) struct InitArgs {
 	pub(crate) ready_to_recv:     Arc<AtomicBool>,
 	pub(crate) shutdown_wait:     Arc<Barrier>,
 	pub(crate) shutdown:          Receiver<()>,
+	pub(crate) audio_retry:       Duration,
 	pub(crate) to_gc:             Sender<AudioBuffer<f32>>,
 	pub(crate) to_caller_elapsed: Option<(Sender<Time>, f32)>, // seconds
 	pub(crate) to_decode:         Sender<TookAudioBuffer>,
@@ -125,6 +129,7 @@ impl<Output: AudioOutput> Audio<Output> {
 					ready_to_recv,
 					shutdown_wait,
 					shutdown,
+					audio_retry,
 					to_gc,
 					to_caller_elapsed,
 					to_decode,
@@ -147,7 +152,26 @@ impl<Output: AudioOutput> Audio<Output> {
 
 				// TODO:
 				// obtain audio output depending on user config, hang, try again, etc.
-				let output: AudioOutputStruct<ResamplerStruct> = AudioOutputStruct::dummy().unwrap();
+				let audio_retry_secs = audio_retry.as_secs_f32();
+				let output: AudioOutputStruct<ResamplerStruct> = loop {
+					match AudioOutputStruct::dummy() {
+						Ok(output) => break output,
+						Err(e) => {
+							debug2!("Audio (init) - output failed: {e}, sleeping for: {audio_retry_secs}s");
+
+							channels.to_kernel_error.try_send(e);
+							// We need to make sure we don't infinitely
+							// loop and ignore shutdown signals, so handle them.
+							if channels.shutdown.try_recv().is_ok() {
+								debug2!("Audio (init) - reached shutdown");
+								shutdown_wait.wait();
+								return;
+							}
+
+							std::thread::sleep(audio_retry);
+						},
+					}
+				};
 
 				let this = Audio {
 					atomic_state,
@@ -229,9 +253,7 @@ impl<Output: AudioOutput> Audio<Output> {
 				// Shutdown.
 				1 => {
 					select_recv!(c.shutdown);
-					debug2!("Audio - shutting down");
-					// Wait until all threads are ready to shutdown.
-					debug2!("Audio - waiting on others...");
+					debug2!("Audio - reached shutdown");
 					self.shutdown_wait.wait();
 					// Exit loop (thus, the thread).
 					return;

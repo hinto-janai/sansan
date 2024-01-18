@@ -134,6 +134,7 @@
 	clippy::str_to_string,
 	clippy::branches_sharing_code,
 	clippy::impl_trait_in_params,
+	clippy::struct_excessive_bools,
 )]
 
 #![cfg_attr(debug_assertions, allow(clippy::todo))]

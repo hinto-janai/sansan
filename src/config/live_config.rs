@@ -12,18 +12,45 @@ use std::{
 
 #[allow(unused_imports)] // docs
 use crate::{
+	Engine,
 	state::{AudioState, Current},
 	source::Source,
+	signal::Repeat,
+	config::InitConfig,
 };
 
-//---------------------------------------------------------------------------------------------------- LiveConfig
-/// TODO
+//---------------------------------------------------------------------------------------------------- RuntimeConfig
+/// Runtime config for the [`Engine`].
+///
+/// This is a live, runtime configuration
+/// that can be modified after [`Engine::init`].
+///
+/// Unlike [`InitConfig`], `RuntimeConfig` can be modified live with [`Engine::config_update`],
+/// which will modify certain aspects of the `Engine` while it is running.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Copy,Clone,Debug,PartialEq,PartialOrd,Eq,Ord)]
-pub struct LiveConfig {
-	/// The track threshold when using `back()`/`previous()`.
+pub struct RuntimeConfig {
+	/// Should the [`AudioState::queue`] be automatically
+	/// cleared after the last track finishes?
+	///
+	/// If the [`AudioState::repeat`] is [`Repeat::Queue`],
+	/// the queue will not be cleared regardless of this `bool`.
+	pub queue_end_clear: bool,
+
+	/// If the [`Current::elapsed`] time has passed this [`Duration`],
+	/// then back signals such as [`Engine::back`] and [`Engine::previous`]
+	/// will reset the [`Current`] track instead of skipping backwards.
+	///
+	/// For example:
+	/// - A song is 3+ seconds in
+	/// - `Engine::previous` is called
+	/// - It will reset the current song instead of going back
+	/// - Calling `Engine::previous` again immediately will actually goto the previous track
+	///
+	/// Setting this to [`Duration::ZERO`] will signals _always_ go to the previous track.
 	pub back_threshold: Duration,
+
 	/// How often to update the audio state upon a new audio timestamp.
 	///
 	/// [`Current::elapsed`] within [`AudioState`] will be updated
@@ -95,34 +122,28 @@ pub struct LiveConfig {
 	/// Setting this to [`Duration::ZERO`] will make the `AudioState`
 	/// update _every_ single time a new audio buffer is played.
 	pub elapsed_refresh_rate: Duration,
-	/// TODO
-	pub queue_end_clear: bool,
-	/// TODO
-	pub shutdown_blocking: bool,
 }
 
-impl LiveConfig {
+impl RuntimeConfig {
 	/// TODO
 	///
 	/// ```rust
 	/// # use sansan::config::*;
 	/// # use std::time::*;
 	/// assert_eq!(
-	///     LiveConfig::DEFAULT,
-	///     LiveConfig {
+	///     RuntimeConfig::DEFAULT,
+	///     RuntimeConfig {
+	///         queue_end_clear:      true,
 	///         back_threshold:       Duration::from_secs(3),
 	///         elapsed_refresh_rate: Duration::from_millis(33),
-	///         queue_end_clear:      true,
-	///         shutdown_blocking:    true,
 	///     },
 	/// );
 	/// ```
 	#[allow(clippy::declare_interior_mutable_const)]
 	pub const DEFAULT: Self = Self {
+		queue_end_clear: true,
 		back_threshold: DEFAULT_BACK_THRESHOLD,
 		elapsed_refresh_rate: DEFAULT_ELAPSED_REFRESH_RATE,
-		queue_end_clear: true,
-		shutdown_blocking: true,
 	};
 }
 

@@ -10,7 +10,7 @@ use crate::{
 		AudioStateReader,
 		AudioState,
 	},
-	config::LiveConfig,
+	config::RuntimeConfig,
 	signal::{
 		Add,AddMany,Back,Clear,Previous,RemoveRange,Remove,
 		Repeat,Seek,SetIndex,Shuffle,Skip,Volume,AddMethod,
@@ -33,14 +33,14 @@ impl<Extra: ExtraData> Engine<Extra> {
 	#[inline]
 	#[must_use]
 	/// TODO
-	pub const fn config(&self) -> &LiveConfig {
+	pub const fn config(&self) -> &RuntimeConfig {
 		&self.config
 	}
 
 	/// TODO
 	pub fn config_update<F>(&mut self, mut f: F)
 	where
-		F: FnMut(&mut LiveConfig)
+		F: FnMut(&mut RuntimeConfig)
 	{
 		// Update the config.
 		f(&mut self.config);
@@ -239,7 +239,7 @@ impl<Extra: ExtraData> Drop for Engine<Extra> {
 	#[inline(never)]
 	#[allow(clippy::branches_sharing_code)]
 	fn drop(&mut self) {
-		if self.config.shutdown_blocking {
+		if self.shutdown_blocking {
 			info2!("Engine - waiting on shutdown ...");
 			// Tell [Kernel] to shutdown,
 			// and to tell us when it's done.

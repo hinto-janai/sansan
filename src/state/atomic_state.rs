@@ -4,7 +4,7 @@
 use crate::{
 	signal::{AtomicVolume,AtomicRepeat},
 	config::{
-		LiveConfig,
+		RuntimeConfig,
 		DEFAULT_BACK_THRESHOLD_F32,
 		DEFAULT_ELAPSED_REFRESH_RATE_F32,
 	},
@@ -19,7 +19,7 @@ use crossbeam::atomic::AtomicCell;
 /// target does not support atomic 64-bit operations.
 #[derive(Debug)]
 pub(crate) struct AtomicState {
-	//--- LiveConfig
+	//--- RuntimeConfig
 	/// The track threshold when using `back()`/`previous()`.
 	pub(crate) back_threshold: AtomicCell<f32>,
 	/// How often to update the audio state.
@@ -53,15 +53,15 @@ impl AtomicState {
 	};
 
 	///
-	pub(crate) fn update_from_config(&self, config: &LiveConfig) {
+	pub(crate) fn update_from_config(&self, config: &RuntimeConfig) {
 		self.back_threshold.store(config.back_threshold.as_secs_f32());
 		self.elapsed_refresh_rate.store(config.elapsed_refresh_rate.as_secs_f32());
 		self.queue_end_clear.store(config.queue_end_clear, Ordering::Release);
 	}
 }
 
-impl From<LiveConfig> for AtomicState {
-	fn from(s: LiveConfig) -> Self {
+impl From<RuntimeConfig> for AtomicState {
+	fn from(s: RuntimeConfig) -> Self {
 		Self {
 			back_threshold: AtomicCell::new(s.back_threshold.as_secs_f32()),
 			elapsed_refresh_rate: AtomicCell::new(s.elapsed_refresh_rate.as_secs_f32()),

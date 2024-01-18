@@ -13,7 +13,7 @@ use crate::{
 	config::{
 		InitConfig,
 		Callbacks,
-		LiveConfig,
+		RuntimeConfig,
 		ErrorCallback,
 	},
 	actor::{
@@ -71,8 +71,8 @@ impl<Extra: ExtraData> Engine<Extra> {
 		info2!("Engine - audio output backend: [{AUDIO_OUTPUT_BACKEND}], resampler backend: [{RESAMPLER_BACKEND}]");
 		debug2!("Engine - init config:\n{config:#?}");
 
-		// Set a default `LiveConfig` if it doesn't exist.
-		let live_config = config.live_config.unwrap_or(LiveConfig::DEFAULT);
+		// Set a default `RuntimeConfig` if it doesn't exist.
+		let live_config = config.live_config.unwrap_or(RuntimeConfig::DEFAULT);
 
 		// Some initial assertions that must be upheld.
 		// These may or may not have been already checked
@@ -233,6 +233,7 @@ impl<Extra: ExtraData> Engine<Extra> {
 				atomic_state:      Arc::clone(&atomic_state),
 				ready_to_recv:     Arc::clone(&audio_ready_to_recv),
 				shutdown_wait:     Arc::clone(&shutdown_wait),
+				audio_retry:       config.audio_retry,
 				to_gc:             a_to_gc,
 				to_caller_elapsed,
 				to_decode:         a_to_d,
@@ -428,6 +429,7 @@ impl<Extra: ExtraData> Engine<Extra> {
 		Self {
 			reader: audio_state_reader,
 			config: live_config,
+			shutdown_blocking: config.shutdown_blocking,
 			atomic_state,
 
 			repeat,
