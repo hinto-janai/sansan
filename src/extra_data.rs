@@ -31,8 +31,8 @@ macro_rules! generate_docs {
 		/// bounded by as `Engine<Extra: ExtraData>`.
 		///
 		/// ## Cheaply `Clone`-able
-		/// It is extremely recommended to use a type that is cheaply
-		/// [`Clone`]-able when specifying it in `<Extra: ExtraData>`.
+		/// **It is extremely recommended to use a type that is cheaply
+		/// [`Clone`]-able when specifying it in `<Extra: ExtraData>`.**
 		///
 		/// This is due to the fact that the [`Engine`] clones
 		/// data quite often, including your `<Extra: ExtraData>`.
@@ -46,16 +46,40 @@ macro_rules! generate_docs {
 		/// especially as the [`AudioState::queue`] gets longer with more
 		/// expensive objects.
 		///
+		/// Even with an expensive `ExtraData`, the real-time audio playback
+		/// will be fine, however, `Engine` signals (e.g. [`Engine::add`]) and
+		/// general operations on the `AudioState` will be more expensive and
+		/// take longer to execute.
+		///
 		/// ## Opting out
 		/// Note that this extra data field is optional,
 		/// and [`()`](unit) can be used if you do not require
 		/// this extra data field, for example:
 		///
 		/// ```rust
-		/// # use sansan::{*,source::*};
-		/// //                   `ExtraData`
-		/// //                        v
-		/// let mut engine = Engine::<()>::init(Default::default());
+		/// # use sansan::{source::*,config::*};
+		/// #
+		/// # // `cargo test`, when faced with the `Engine`,
+		/// # // will grow exponentially in computation time.
+		/// # // It goes from `0.01s` -> `5s` to run this test.
+		/// # //
+		/// # // I'm assuming this happens because it has to parse and
+		/// # // type-check the `<()>` generic, which when placed on the
+		/// # // `Engine` will basically make it parse the entire codebase.
+		/// # //
+		/// # // This doesn't explain normal non-doc tests executing fast
+		/// # // so maybe it's some weird combination of these macro docs
+		/// # // and generic parsing that causes this explosion in computation.
+		/// # //
+		/// # // Anyway, create and use this fake `Engine` struct instead.
+		/// #
+		/// # struct Engine<T>(T);
+		/// # impl<T> Engine<T> {
+		/// #     fn init(_: ()) {}
+		/// # }
+		/// //               `ExtraData`
+		/// //                    v
+		/// let engine = Engine::<()>::init(Default::default());
 		///
 		/// let source = Source::<()>::dummy();
 		/// assert_eq!(source.extra(), &());
@@ -87,5 +111,4 @@ cfg_if::cfg_if! {
 
 //---------------------------------------------------------------------------------------------------- TESTS
 #[cfg(test)]
-mod tests {
-}
+mod tests {}
