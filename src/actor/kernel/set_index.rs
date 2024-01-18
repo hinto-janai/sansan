@@ -7,6 +7,7 @@ use crate::{
 	extra_data::ExtraData,
 	signal::set_index::{SetIndex,SetIndexError},
 	macros::{try_send,recv},
+	source::Source,
 };
 use crossbeam::channel::Sender;
 use std::sync::atomic::Ordering;
@@ -18,6 +19,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		&mut self,
 		set_index: SetIndex,
 		to_gc: &Sender<KernelToGc<Extra>>,
+		to_caller_source_new: &Sender<Source<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Extra>>,
 		to_engine: &Sender<Result<AudioStateSnapshot<Extra>, SetIndexError>>,
@@ -33,7 +35,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		};
 		let source = source.clone();
 
-		self.reset_source(to_audio, to_decode, source.clone());
+		self.reset_source(to_audio, to_decode, to_caller_source_new, source.clone());
 
 		let start_playing = set_index.start_playing;
 		if start_playing {

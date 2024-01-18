@@ -8,6 +8,7 @@ use crate::{
 	signal::shuffle::Shuffle,
 	signal::seek::{Seek,SeekError,SeekedTime},
 	macros::try_send,
+	source::Source,
 };
 use crossbeam::channel::{Sender,Receiver};
 
@@ -18,6 +19,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		&mut self,
 		shuffle: Shuffle,
 		to_gc: &Sender<KernelToGc<Extra>>,
+		to_caller_source_new: &Sender<Source<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Extra>>,
 		to_engine: &Sender<AudioStateSnapshot<Extra>>,
@@ -35,7 +37,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		if queue_len == 1 {
 			let source = self.w.queue[0].clone();
 
-			self.reset_source(to_audio, to_decode, source.clone());
+			self.reset_source(to_audio, to_decode, to_caller_source_new, source.clone());
 
 			self.w.add_commit_push(|w, _| {
 				Self::replace_current(&mut w.current, Some(Current::new(source.clone())), to_gc);
@@ -163,7 +165,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		// set our [current] to queue[0], so we must forward
 		// it to [Decode].
 		if let Some(source) = maybe_source {
-			self.reset_source(to_audio, to_decode, source);
+			self.reset_source(to_audio, to_decode, to_caller_source_new, source);
 		}
 
 		try_send!(to_engine, self.audio_state_snapshot());

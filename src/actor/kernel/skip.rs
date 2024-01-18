@@ -8,6 +8,7 @@ use crate::{
 	signal::skip::{Skip,SkipError},
 	signal::repeat::Repeat,
 	macros::{try_send,recv},
+	source::Source,
 };
 use crossbeam::channel::{Sender,Receiver};
 use std::sync::atomic::Ordering;
@@ -19,6 +20,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		&mut self,
 		skip: Skip,
 		to_gc: &Sender<KernelToGc<Extra>>,
+		to_caller_source_new: &Sender<Source<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Extra>>,
 	) {
@@ -98,7 +100,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 
 		// Forward potential `Source` to `Audio/Decode`
 		if let Some(current) = current {
-			self.reset_source(to_audio, to_decode, current.source);
+			self.reset_source(to_audio, to_decode, to_caller_source_new, current.source);
 		}
 	}
 
@@ -107,6 +109,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		&mut self,
 		skip: Skip,
 		to_gc: &Sender<KernelToGc<Extra>>,
+		to_caller_source_new: &Sender<Source<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Extra>>,
 		to_engine: &Sender<Result<AudioStateSnapshot<Extra>, SkipError>>
@@ -121,7 +124,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 			return;
 		}
 
-		self.skip_inner(skip, to_gc, to_audio, to_decode);
+		self.skip_inner(skip, to_gc, to_caller_source_new, to_audio, to_decode);
 
 		try_send!(to_engine, Ok(self.audio_state_snapshot()));
 	}

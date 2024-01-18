@@ -8,6 +8,7 @@ use crate::{
 	signal::remove::RemoveError,
 	signal::remove_range::RemoveRange,
 	macros::try_send,
+	source::Source,
 };
 use crossbeam::channel::{Sender,Receiver};
 use std::{
@@ -27,6 +28,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		&mut self,
 		remove_range: RemoveRange,
 		to_gc: &Sender<KernelToGc<Extra>>,
+		to_caller_source_new: &Sender<Source<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Extra>>,
 		to_engine: &Sender<Result<AudioStateSnapshot<Extra>, RemoveError>>
@@ -163,7 +165,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		if index_wiped {
 			if let Some(index) = maybe_source_index {
 				let source = self.w.queue[index].clone();
-				self.reset_source(to_audio, to_decode, source);
+				self.reset_source(to_audio, to_decode, to_caller_source_new, source);
 			}
 		} else {
 			// The queue finished, we must set atomic state.

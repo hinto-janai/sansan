@@ -6,6 +6,7 @@ use crate::{
 	state::{AudioStateSnapshot, Current},
 	extra_data::ExtraData,
 	macros::try_send,
+	source::Source,
 };
 use crossbeam::channel::Sender;
 use std::sync::atomic::Ordering;
@@ -16,6 +17,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 	pub(super) fn play(
 		&mut self,
 		to_gc: &Sender<KernelToGc<Extra>>,
+		to_caller_source_new: &Sender<Source<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Extra>>,
 		to_engine: &Sender<AudioStateSnapshot<Extra>>,
@@ -37,7 +39,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 
 		// Tell audio/decode to start if we're starting a new source.
 		if let Some(source) = maybe_source.clone() {
-			Self::new_source(to_decode, source);
+			Self::new_source(to_decode, to_caller_source_new, source);
 		}
 
 		self.atomic_state.playing.store(true, Ordering::Release);

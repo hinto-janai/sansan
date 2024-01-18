@@ -163,8 +163,7 @@ impl<Output: AudioOutput> Audio<Output> {
 							// We need to make sure we don't infinitely
 							// loop and ignore shutdown signals, so handle them.
 							if channels.shutdown.try_recv().is_ok() {
-								debug2!("Audio (init) - reached shutdown");
-								shutdown_wait.wait();
+								crate::free::shutdown("Audio (init)", shutdown_wait);
 								return;
 							}
 
@@ -253,9 +252,7 @@ impl<Output: AudioOutput> Audio<Output> {
 				// Shutdown.
 				1 => {
 					select_recv!(c.shutdown);
-					debug2!("Audio - reached shutdown");
-					self.shutdown_wait.wait();
-					// Exit loop (thus, the thread).
+					crate::free::shutdown("Audio", self.shutdown_wait);
 					return;
 				},
 

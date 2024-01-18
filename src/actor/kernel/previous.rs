@@ -7,6 +7,7 @@ use crate::{
 	extra_data::ExtraData,
 	signal::back::Back,
 	macros::try_send,
+	source::Source,
 };
 use crossbeam::channel::{Sender,Receiver};
 
@@ -16,6 +17,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 	pub(super) fn previous(
 		&mut self,
 		to_gc: &Sender<KernelToGc<Extra>>,
+		to_caller_source_new: &Sender<Source<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Extra>>,
 		to_engine: &Sender<AudioStateSnapshot<Extra>>,
@@ -30,6 +32,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		self.back_inner(
 			Back { back: 1, threshold: None },
 			to_gc,
+			to_caller_source_new,
 			to_audio,
 			to_decode,
 		);

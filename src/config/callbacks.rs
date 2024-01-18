@@ -35,7 +35,7 @@ use crate::{
 /// # use sansan::{config::*,error::*,source::*,state::*};
 /// let mut callbacks = Callbacks::<()>::new();
 /// let (tx, rx) = std::sync::mpsc::sync_channel(1);
-/// # tx.send(Current { source: Source::dummy(), index: 0, elapsed: 0.0 });
+/// # tx.send(Source::dummy());
 ///
 /// callbacks.source_new(move |source: Source<()>| {
 ///     // A new `Current` was set to this `source`!

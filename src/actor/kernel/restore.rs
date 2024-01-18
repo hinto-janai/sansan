@@ -6,6 +6,7 @@ use crate::{
 	state::{AudioState,AudioStateSnapshot},
 	extra_data::ExtraData,
 	macros::try_send,
+	source::Source,
 };
 use crossbeam::channel::Sender;
 use std::sync::atomic::Ordering;
@@ -17,6 +18,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		&mut self,
 		audio_state: AudioState<Extra>,
 		to_gc: &Sender<KernelToGc<Extra>>,
+		to_caller_source_new: &Sender<Source<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Extra>>,
 		to_engine: &Sender<AudioStateSnapshot<Extra>>,
@@ -70,7 +72,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		}
 
 		if let Some(source) = maybe_source {
-			Self::new_source(to_decode, source);
+			Self::new_source(to_decode, to_caller_source_new, source);
 		}
 
 		try_send!(to_engine, self.audio_state_snapshot());

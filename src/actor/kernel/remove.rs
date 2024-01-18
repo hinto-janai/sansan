@@ -8,6 +8,7 @@ use crate::{
 	signal::remove::{Remove,RemoveError},
 	signal::remove_range::RemoveRange,
 	macros::try_send,
+	source::Source,
 };
 use crossbeam::channel::{Sender,Receiver};
 use std::{
@@ -22,6 +23,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		&mut self,
 		remove: Remove,
 		to_gc: &Sender<KernelToGc<Extra>>,
+		to_caller_source_new: &Sender<Source<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Extra>>,
 		to_engine: &Sender<Result<AudioStateSnapshot<Extra>, RemoveError>>,
@@ -36,6 +38,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 				end_bound: Bound::Included(remove.index),
 			},
 			to_gc,
+			to_caller_source_new,
 			to_audio,
 			to_decode,
 			to_engine

@@ -43,13 +43,12 @@ use crate::resampler::{ResamplerStruct, RESAMPLER_BACKEND};
 /// [0] Audio
 /// [1] Decode
 /// [2] Kernel
-/// [3] Pool
-/// [4] Caller
-/// [5] Mc (Media Control)
-/// [6] Gc (Garbage Collector)
+/// [3] Caller
+/// [4] Mc (Media Control)
+/// [5] Gc (Garbage Collector)
 ///
 /// TODO: finalize all actors
-const ACTOR_COUNT: usize = 6;
+const ACTOR_COUNT: usize = 5;
 
 //---------------------------------------------------------------------------------------------------- Engine Impl
 impl<Extra: ExtraData> Engine<Extra> {
@@ -83,17 +82,17 @@ impl<Extra: ExtraData> Engine<Extra> {
 		// If [config.init_blocking] is true, make a [Some(barrier)]
 		// so all actors can wait on it after successful init, else [None].
 		let effective_actor_count = {
-			let mut count = ACTOR_COUNT;
+			let count = ACTOR_COUNT; // TODO
 
 			// If [Media Control] is not spawned
-			if !config.media_controls {
-				count -= 1;
-			}
+			// if !config.media_controls {
+				// count -= 1;
+			// }
 
 			// If [Caller] is not spawned
-			if config.callbacks.all_none() {
-				count -= 1;
-			}
+			// if config.callbacks.all_none() {
+				// count -= 1;
+			// }
 
 			debug2!("Engine - effective actor count: {count}");
 
@@ -179,32 +178,35 @@ impl<Extra: ExtraData> Engine<Extra> {
 
 		// INVARIANT:
 		//
-		// If all callbacks are set to [None], then the other
-		// actors will never send a message, therefore we
-		// can safely _not_ spawn [Caller] and drop the
-		// [Receiver] end of the channels.
-		if callbacks.all_none() {
-			debug2!("Engine - no callbacks, skipping `Caller`");
-			drop((shutdown, source_new, queue_end, elapsed));
-		} else {
-			spawn_actor!(
-				"Caller",
-				crate::actor::caller::InitArgs {
-					init_barrier:  init_barrier.clone(), // Option<Arc<_>>,
-					callbacks,
-					low_priority:  config.callback_low_priority,
-					shutdown_wait: Arc::clone(&shutdown_wait),
-					shutdown,
-					source_new,
-					queue_end,
-					elapsed,
-					error_decode,
-					error_source,
-					error_output,
-				},
-				Caller::init
-			);
-		}
+		// The other actors will still send messages to
+		// `Caller`, even if it is a `None`, so we cannot
+		// safely _not_ spawn `Caller` as the messages
+		// need to received and dropped.
+		//
+		// FIXME: ideally each actor would know whether
+		// to send a message to `Caller` or not.
+		// if callbacks.all_none() {
+			// debug2!("Engine - no callbacks, skipping `Caller`");
+			// drop((shutdown, source_new, queue_end, elapsed));
+		// } else {
+		spawn_actor!(
+			"Caller",
+			crate::actor::caller::InitArgs {
+				init_barrier:  init_barrier.clone(), // Option<Arc<_>>,
+				callbacks,
+				low_priority:  config.callback_low_priority,
+				shutdown_wait: Arc::clone(&shutdown_wait),
+				shutdown,
+				source_new,
+				queue_end,
+				elapsed,
+				error_decode,
+				error_source,
+				error_output,
+			},
+			Caller::init
+		);
+		// }
 
 		//-------------------------------------------------------------- Spawn [Audio]
 		// Initialize [Audio] channels.

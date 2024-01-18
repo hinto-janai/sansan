@@ -140,11 +140,7 @@ impl<Extra: ExtraData> Caller<Extra> {
 
 				6 => {
 					select_recv!(channels.shutdown);
-					debug2!("Caller - shutting down");
-					// Wait until all threads are ready to shutdown.
-					debug2!("Caller - waiting on others...");
-					self.shutdown_wait.wait();
-					// Exit loop (thus, the thread).
+					crate::free::shutdown("Caller", self.shutdown_wait);
 					return;
 				},
 

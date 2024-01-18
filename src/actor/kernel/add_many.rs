@@ -182,13 +182,11 @@ impl<Extra: ExtraData> Kernel<Extra> {
 
 		// Forward potentially new `Source`.
 		if let Some(source) = maybe_source {
-			Self::new_source(to_decode, source.clone());
+			Self::new_source(to_decode, to_caller_source_new, source);
 
 			if add_many.play {
 				self.atomic_state.playing.store(true, Ordering::Release);
 			}
-
-			try_send!(to_caller_source_new, source);
 		}
 
 		try_send!(to_engine, self.audio_state_snapshot());

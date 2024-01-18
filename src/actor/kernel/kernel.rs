@@ -311,25 +311,25 @@ impl<Extra: ExtraData> Kernel<Extra> {
 				//      |                                 |                                 |
 				//      |                                 |      |------------------------------------------------------|
 				//      v                                 v      v                                                      v
-				1  => { select_recv!(c.recv_toggle); self.toggle(&c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state); },
-				2  => { select_recv!(c.recv_play); self.play(&c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state); },
+				1  => { select_recv!(c.recv_toggle); self.toggle(&c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_audio_state); },
+				2  => { select_recv!(c.recv_play); self.play(&c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_audio_state); },
 				3  => { select_recv!(c.recv_pause); self.pause(&c.send_audio_state); },
 				4  => { select_recv!(c.recv_stop); self.stop(&c.send_audio_state); },
-				5  => { select_recv!(c.recv_next); self.next(&c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state); },
-				6  => { select_recv!(c.recv_previous); self.previous(&c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state); },
+				5  => { select_recv!(c.recv_next); self.next(&c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_audio_state); },
+				6  => { select_recv!(c.recv_previous); self.previous(&c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_audio_state); },
 				7  => self.clear(select_recv!(c.recv_clear), &c.to_gc, &c.send_audio_state),
-				8  => self.shuffle(select_recv!(c.recv_shuffle), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state),
+				8  => self.shuffle(select_recv!(c.recv_shuffle), &c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_audio_state),
 				9  => self.repeat(select_recv!(c.recv_repeat), &c.send_audio_state),
 				10 => self.volume(select_recv!(c.recv_volume), &c.send_audio_state),
-				11 => self.restore(select_recv!(c.recv_restore), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_audio_state),
+				11 => self.restore(select_recv!(c.recv_restore), &c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_audio_state),
 				12 => self.add(select_recv!(c.recv_add), &c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_audio_state),
 				13 => self.add_many(select_recv!(c.recv_add_many), &c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_audio_state),
 				14 => self.seek(select_recv!(c.recv_seek), &c.to_decode, &c.from_decode_seek, &c.send_seek),
-				15 => self.skip(select_recv!(c.recv_skip), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_skip),
-				16 => self.back(select_recv!(c.recv_back), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_back),
-				17 => self.set_index(select_recv!(c.recv_set_index), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_set_index),
-				18 => self.remove(select_recv!(c.recv_remove), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_remove),
-				19 => self.remove_range(select_recv!(c.recv_remove_range), &c.to_gc, &c.to_audio, &c.to_decode, &c.send_remove_range),
+				15 => self.skip(select_recv!(c.recv_skip), &c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_skip),
+				16 => self.back(select_recv!(c.recv_back), &c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_back),
+				17 => self.set_index(select_recv!(c.recv_set_index), &c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_set_index),
+				18 => self.remove(select_recv!(c.recv_remove), &c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_remove),
+				19 => self.remove_range(select_recv!(c.recv_remove_range), &c.to_gc, &c.to_caller_source_new, &c.to_audio, &c.to_decode, &c.send_remove_range),
 
 				// Errors.
 				20 => self.error_output(select_recv!(c.from_audio_error), &c.to_caller_error_output),
@@ -339,18 +339,14 @@ impl<Extra: ExtraData> Kernel<Extra> {
 				// Shutdown.
 				23 => {
 					select_recv!(c.shutdown);
-					debug2!("Kernel - shutting down");
 
 					// Tell all actors to shutdown.
 					for actor in c.shutdown_actor.iter() {
-						drop(actor.try_send(()));
+						try_send!(actor, ());
 					}
 
-					// Wait until all threads are ready to shutdown.
-					debug2!("Kernel - waiting on others...");
-					self.shutdown_wait.wait();
-
 					// Exit loop (thus, the thread).
+					crate::free::shutdown("Kernel", self.shutdown_wait);
 					return;
 				},
 				// Same as shutdown but sends a message to a
@@ -358,16 +354,13 @@ impl<Extra: ExtraData> Kernel<Extra> {
 				// allows the caller to return.
 				24 => {
 					select_recv!(c.shutdown_hang);
-					debug2!("Kernel - shutting down (hang)");
 
 					for actor in c.shutdown_actor.iter() {
-						drop(actor.try_send(()));
+						try_send!(actor, ());
 					}
 
-					debug2!("Kernel - waiting on others...");
-					self.shutdown_wait.wait();
+					crate::free::shutdown("Kernel", self.shutdown_wait);
 					drop(c.shutdown_done.try_send(()));
-
 					return;
 				},
 
@@ -438,6 +431,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		&self,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Extra>>,
+		to_caller_source_new: &Sender<Source<Extra>>,
 		source: Source<Extra>,
 	) {
 		// Tell `Audio` to discard its current audio data.
@@ -454,7 +448,10 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		try_send!(to_decode, KernelToDecode::DiscardAudioAndStop);
 
 		// Send over the new `Source` to be decoded.
-		try_send!(to_decode, KernelToDecode::NewSource(source));
+		try_send!(to_decode, KernelToDecode::NewSource(source.clone()));
+
+		// Tell `Caller` that there is a new source.
+		try_send!(to_caller_source_new, source);
 	}
 
 	#[inline]
@@ -468,9 +465,11 @@ impl<Extra: ExtraData> Kernel<Extra> {
 	/// - `Decode` should get started decoding this new `Source` ASAP
 	pub(super) fn new_source(
 		to_decode: &Sender<KernelToDecode<Extra>>,
+		to_caller_new_source: &Sender<Source<Extra>>,
 		source: Source<Extra>,
 	) {
-		try_send!(to_decode, KernelToDecode::NewSource(source));
+		try_send!(to_decode, KernelToDecode::NewSource(source.clone()));
+		try_send!(to_caller_new_source, source);
 	}
 
 	#[inline]

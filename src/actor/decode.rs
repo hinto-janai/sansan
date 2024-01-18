@@ -200,12 +200,8 @@ impl<Extra: ExtraData> Decode<Extra> {
 						}
 					},
 					2 => {
-						debug2!("Debug - shutting down");
-						channels.shutdown.try_recv().unwrap();
-						debug2!("Debug - waiting on others...");
-						// Wait until all threads are ready to shutdown.
-						self.shutdown_wait.wait();
-						// Exit loop (thus, the thread).
+						select_recv!(&channels.shutdown);
+						crate::free::shutdown("Decode", self.shutdown_wait);
 						return;
 					},
 

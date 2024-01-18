@@ -174,6 +174,7 @@ mod actor;
 mod macros;
 mod output;
 mod resampler;
+mod free;
 
 //---------------------------------------------------------------------------------------------------- Test Init Helpers
 // These are helper functions used for testing throughout the codebase.

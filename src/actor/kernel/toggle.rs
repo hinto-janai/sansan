@@ -5,6 +5,7 @@ use crate::{
 	actor::kernel::{Kernel,KernelToAudio,KernelToDecode,KernelToGc},
 	state::AudioStateSnapshot,
 	extra_data::ExtraData,
+	source::Source,
 };
 use crossbeam::channel::Sender;
 
@@ -14,6 +15,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 	pub(super) fn toggle(
 		&mut self,
 		to_gc: &Sender<KernelToGc<Extra>>,
+		to_caller_source_new: &Sender<Source<Extra>>,
 		to_audio: &Sender<KernelToAudio>,
 		to_decode: &Sender<KernelToDecode<Extra>>,
 		to_engine: &Sender<AudioStateSnapshot<Extra>>,
@@ -22,7 +24,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		if self.playing() {
 			self.pause(to_engine);
 		} else {
-			self.play(to_gc, to_audio, to_decode, to_engine);
+			self.play(to_gc, to_caller_source_new, to_audio, to_decode, to_engine);
 		}
 	}
 }
