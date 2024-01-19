@@ -196,8 +196,9 @@ impl<Output: AudioOutput> Audio<Output> {
 
 				c.from_kernel.try_recv().map_err(|_e| ())
 			} else {
-				if let Err(e) = self.output.stop() {
-					todo!();
+				// Flush audio.
+				if let Err(output_error) = self.output.stop() {
+					try_send!(c.to_kernel_error, output_error);
 				}
 
 				// Else, hang until we receive a message from somebody.
@@ -211,9 +212,9 @@ impl<Output: AudioOutput> Audio<Output> {
 
 			// Route signal to its appropriate handler function [fn_*()].
 			match msg {
-				KernelToAudio::Play => {
-					if let Err(e) = self.output.play() {
-						todo!();
+				KernelToAudio::StartPlaying => {
+					if let Err(output_error) = self.output.play() {
+						try_send!(c.to_kernel_error, output_error);
 					}
 					continue;
 				},

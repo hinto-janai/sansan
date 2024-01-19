@@ -10,13 +10,14 @@ use crate::engine::Engine;
 //---------------------------------------------------------------------------------------------------- Volume
 /// Audio volume level
 ///
-/// This is a wrapper around [`f32`] that is between `0.0..=1.0`,
-/// where `0.0` represents silence and `1.0` represents using the
-/// decoded audio sample as-is, aka, max volume.
+/// This is a wrapper around [`f32`] that is between `0.0..=2.0`, where:
+/// - `0.0` represents silence
+/// - `1.0` represents playing the audio sample as-is, aka, max volume
+/// - Anything past `1.0` will increase gain (and distortion)
 ///
-/// This unit is linear, not logarithmic - so `1.0` is 2x louder than `0.5`.
+/// This unit is linear, not logarithmic - so `1.0` is roughly 2x louder than `0.5`.
 ///
-/// This is the type that the [`Engine`] wants audio volume changes in.
+/// This is the type that the [`Engine`] wants audio volume changes in with [`Engine::volume`].
 #[derive(Copy,Clone,Debug,PartialEq,PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
@@ -36,14 +37,19 @@ macro_rules! impl_const {
 impl Volume {
 	/// ```rust
 	/// # use sansan::signal::*;
-	/// assert_eq!(Volume::MAX.inner(), 1.0);
+	/// assert_eq!(Volume::MAX.inner(), 2.0);
 	/// ```
-	pub const MAX: Self = Self(1.0);
+	pub const MAX: Self = Self(2.0);
 	/// ```rust
 	/// # use sansan::signal::*;
-	/// assert_eq!(Volume::MIN.inner(), 0.0);
+	/// assert_eq!(Volume::ONE.inner(), 1.0);
 	/// ```
-	pub const MIN: Self = Self(0.0);
+	pub const ONE: Self = Self(1.0);
+	/// ```rust
+	/// # use sansan::signal::*;
+	/// assert_eq!(Volume::ZERO.inner(), 0.0);
+	/// ```
+	pub const ZERO: Self = Self(0.0);
 	/// ```rust
 	/// # use sansan::signal::*;
 	/// assert_eq!(Volume::DEFAULT.inner(), 0.25);
@@ -62,7 +68,7 @@ impl Volume {
 
 	#[inline]
 	#[must_use]
-	/// Create a new [`Volume`] from a [`f32`] without checking for correctness
+	/// Create a new [`Volume`] from a [`f32`] without checking for correctness.
 	///
 	/// This takes _any_ [`f32`] and will create a [`Volume`].
 	///
@@ -71,9 +77,11 @@ impl Volume {
 	/// The use case for this function is for creating a `const` [`Volume`], e.g:
 	/// ```rust
 	/// # use sansan::signal::*;
-	/// const VOLUME_F32: f32 = 25.12345;
+	/// const VOLUME_F32: f32 = 0.2512345;
 	/// // SAFETY: The f32 is a safe value according to `Volume::fix`.
 	/// const VOLUME: Volume = unsafe { Volume::new_unchecked(VOLUME_F32) };
+	///
+	/// assert_eq!(VOLUME.inner(), VOLUME.fix().inner());
 	/// ```
 	///
 	/// ## Safety
@@ -87,17 +95,17 @@ impl Volume {
 
 	#[inline]
 	#[must_use]
-	/// Checks a [`Volume`] for correctness and fixes it
+	/// Checks a [`Volume`] for correctness and fixes it.
 	///
 	/// # Saturating
 	/// If the input [`f32`] is greater than [`Volume::MAX`],
 	/// it will saturate and return [`Volume::MAX`]
 	///
 	/// # `NaN` & `infinity` & negatives
-	/// - If [`f32::NAN`] is passed, [`Volume::MIN`] is returned
+	/// - If [`f32::NAN`] is passed, [`Volume::ZERO`] is returned
 	/// - If [`f32::INFINITY`] is passed, [`Volume::MAX`] is returned
-	/// - If [`f32::NEG_INFINITY`] is passed, [`Volume::MIN`] is returned
-	/// - If a negative float is passed, [`Volume::MIN`] is returned
+	/// - If [`f32::NEG_INFINITY`] is passed, [`Volume::ZERO`] is returned
+	/// - If a negative float is passed, [`Volume::ZERO`] is returned
 	///
 	/// ```rust
 	/// # use sansan::signal::*;
@@ -108,23 +116,23 @@ impl Volume {
 	/// assert_eq!(Volume::new(1.00).inner(), 1.00);
 	///
 	/// // Saturating.
-	/// assert_eq!(Volume::new(1.0), Volume::MAX);
-	/// assert_eq!(Volume::new(1.1), Volume::MAX);
+	/// assert_eq!(Volume::new(2.0), Volume::MAX);
+	/// assert_eq!(Volume::new(2.1), Volume::MAX);
 	///
 	/// // Weird floats.
-	/// assert_eq!(Volume::new(f32::NAN),          Volume::MIN);
+	/// assert_eq!(Volume::new(f32::NAN),          Volume::ZERO);
 	/// assert_eq!(Volume::new(f32::INFINITY),     Volume::MAX);
-	/// assert_eq!(Volume::new(f32::NEG_INFINITY), Volume::MIN);
-	/// assert_eq!(Volume::new(-1.0),              Volume::MIN);
+	/// assert_eq!(Volume::new(f32::NEG_INFINITY), Volume::ZERO);
+	/// assert_eq!(Volume::new(-1.0),              Volume::ZERO);
 	/// ```
 	pub fn fix(self) -> Self {
 		use std::num::FpCategory as F;
 		match self.0.classify() {
 			F::Normal => {
-				if self.0 > 1.0 {
+				if self.0 > Self::MAX.inner() {
 					Self::MAX
 				} else if self.0.is_sign_negative() {
-					Self::MIN
+					Self::ZERO
 				} else {
 					Self(self.0)
 				}
@@ -133,23 +141,19 @@ impl Volume {
 				if self.0.is_sign_positive() {
 					Self::MAX
 				} else {
-					Self::MIN
+					Self::ZERO
 				}
 			},
-			F::Zero | F::Nan | F::Subnormal => Self::MIN,
+			F::Zero | F::Nan | F::Subnormal => Self::ZERO,
 		}
 	}
 
 	#[inline]
 	#[must_use]
-	/// Returns the inner [`f32`]
+	/// Returns the inner [`f32`].
 	pub const fn inner(&self) -> f32 {
 		self.0
 	}
-
-	seq_macro::seq!(N in 0..=100 {
-		impl_const!(N);
-	});
 }
 
 impl Default for Volume {
@@ -298,7 +302,7 @@ mod tests {
 	#[test]
 	fn atomic_volume_0_to_100() {
 		let mut v = 0.0;
-		while v <= 1.0 {
+		while v <= 2.0 {
 			let atomic = AtomicVolume::new(v.into());
 			assert_eq!(atomic.load().inner(), v);
 			v += 0.1;

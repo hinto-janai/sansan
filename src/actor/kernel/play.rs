@@ -43,7 +43,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		}
 
 		self.atomic_state.playing.store(true, Ordering::Release);
-		try_send!(to_audio, KernelToAudio::Play);
+		try_send!(to_audio, KernelToAudio::StartPlaying);
 
 		self.w.add_commit_push(|w, _| {
 			w.playing = true;

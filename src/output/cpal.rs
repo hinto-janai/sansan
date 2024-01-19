@@ -105,7 +105,7 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 		// Applying volume after resampling
 		// leads to (less) lossy audio.
 		let volume = volume.inner();
-		debug_assert!((0.0..=1.0).contains(&volume));
+		debug_assert!((0.0..=2.0).contains(&volume));
 
 		// Get raw `[f32]` sample data.
 		let samples = match self.resampler.as_mut() {

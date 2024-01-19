@@ -94,8 +94,8 @@ pub(crate) enum KernelToDecode<Extra: ExtraData> {
 
 /// TODO
 pub(crate) enum KernelToAudio {
-	/// A signal to start the `Audio` playback loop.
-	Play,
+	/// Wake up, and start playing.
+	StartPlaying,
 	/// Discard all of your current audio buffers.
 	DiscardAudio,
 	/// Shutdown and exit thread.

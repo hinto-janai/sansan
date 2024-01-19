@@ -111,7 +111,7 @@ mod tests {
 			queue,
 			playing: true,
 			repeat: Repeat::Current,
-			volume: Volume::NEW_100,
+			volume: Volume::ONE,
 		};
 
 		// Assert our current `AudioState` matches the restored version.
