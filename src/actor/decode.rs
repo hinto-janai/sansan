@@ -56,7 +56,6 @@ pub(crate) struct Decode<Extra: ExtraData> {
 /// See [src/actor/kernel.rs]'s [Channels]
 #[allow(clippy::missing_docs_in_private_items)]
 struct Channels<Extra: ExtraData> {
-	shutdown:               Receiver<()>,
 	to_gc:                  Sender<DecodeToGc>,
 	to_audio:               Sender<DecodeToAudio>,
 	to_kernel_seek:         Sender<Result<SeekedTime, SeekError>>,
@@ -92,7 +91,6 @@ pub(crate) struct InitArgs<Extra: ExtraData> {
 	pub(crate) init_barrier:           Option<Arc<Barrier>>,
 	pub(crate) audio_ready_to_recv:    Arc<AtomicBool>,
 	pub(crate) shutdown_wait:          Arc<Barrier>,
-	pub(crate) shutdown:               Receiver<()>,
 	pub(crate) to_gc:                  Sender<DecodeToGc>,
 	pub(crate) to_audio:               Sender<DecodeToAudio>,
 	pub(crate) to_kernel_seek:         Sender<Result<SeekedTime, SeekError>>,
@@ -116,7 +114,6 @@ impl<Extra: ExtraData> Decode<Extra> {
 					init_barrier,
 					audio_ready_to_recv,
 					shutdown_wait,
-					shutdown,
 					to_gc,
 					to_audio,
 					to_kernel_seek,
@@ -127,7 +124,6 @@ impl<Extra: ExtraData> Decode<Extra> {
 				} = args;
 
 				let channels = Channels {
-					shutdown,
 					to_gc,
 					to_audio,
 					to_kernel_seek,

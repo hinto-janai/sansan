@@ -233,29 +233,6 @@ impl<Extra: ExtraData> Engine<Extra> {
 	}
 }
 
-//---------------------------------------------------------------------------------------------------- Drop
-impl<Extra: ExtraData> Drop for Engine<Extra> {
-	#[cold]
-	#[inline(never)]
-	#[allow(clippy::branches_sharing_code)]
-	fn drop(&mut self) {
-		if self.shutdown_blocking {
-			info2!("Engine - waiting on shutdown ...");
-			// Tell [Kernel] to shutdown,
-			// and to tell us when it's done.
-			self.shutdown_hang.try_send(()).unwrap();
-			// Hang until [Kernel] responds.
-			self.shutdown_done.recv().unwrap();
-			info2!("Engine - waiting on shutdown ... OK");
-		} else {
-			// Tell [Kernel] to shutdown,
-			// and to not notify us.
-			self.shutdown.try_send(()).unwrap();
-			info2!("Engine - async shutdown ... OK");
-		}
-	}
-}
-
 //---------------------------------------------------------------------------------------------------- Tests
 #[cfg(test)]
 mod tests {}

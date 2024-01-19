@@ -65,9 +65,10 @@ pub struct Engine<Extra: ExtraData> {
 
 	/// Signal to [Kernel] to tell all of our internal
 	/// actors (threads) to start shutting down.
-	pub(super) shutdown: S<()>,
-	/// Same as above, but for [shutdown_hang()].
-	pub(super) shutdown_hang: S<()>,
+	///
+	/// Sending `true` means blocking shutdown and
+	/// that we also `recv()` on `shutdown_done.
+	pub(super) shutdown: S<bool>,
 	/// [Kernel] telling us the shutdown
 	/// process has been completed.
 	pub(super) shutdown_done: R<()>,

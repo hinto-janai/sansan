@@ -222,13 +222,11 @@ impl<Extra: ExtraData> Engine<Extra> {
 		// Shared values [Audio] <-> [Kernel].
 		let audio_ready_to_recv = Arc::new(AtomicBool::new(true));
 
-		let (a_shutdown, shutdown) = bounded(1);
 		let (a_to_gc, gc_from_a)   = unbounded();
 		spawn_actor!(
 			"Audio",
 			crate::actor::audio::InitArgs {
 				init_barrier:      init_barrier.clone(), // Option<Arc<_>>,
-				shutdown,
 				atomic_state:      Arc::clone(&atomic_state),
 				ready_to_recv:     Arc::clone(&audio_ready_to_recv),
 				shutdown_wait:     Arc::clone(&shutdown_wait),
@@ -248,7 +246,6 @@ impl<Extra: ExtraData> Engine<Extra> {
 		let (d_to_k_source,   k_from_d_source)   = bounded(1);
 		let (k_to_d,          d_from_k)          = unbounded();
 		let (d_to_gc,         gc_from_d)         = unbounded();
-		let (d_shutdown,      shutdown)          = bounded(1);
 
 		let (err_decode_d_to_k, err_decode_k_from_d) = unbounded();
 		let (err_source_d_to_k, err_source_k_from_d) = unbounded();
@@ -259,7 +256,6 @@ impl<Extra: ExtraData> Engine<Extra> {
 				init_barrier:        init_barrier.clone(), // Option<Arc<_>>,
 				audio_ready_to_recv: Arc::clone(&audio_ready_to_recv),
 				shutdown_wait:       Arc::clone(&shutdown_wait),
-				shutdown,
 				to_gc:                  d_to_gc,
 				to_audio:               d_to_a,
 				to_kernel_seek:         d_to_k_seek,
@@ -348,18 +344,11 @@ impl<Extra: ExtraData> Engine<Extra> {
 
 		//-------------------------------------------------------------- Spawn [Kernel]
 		let (shutdown, k_shutdown)           = bounded(1);
-		let (shutdown_hang, k_shutdown_hang) = bounded(1);
 		let (k_shutdown_done, shutdown_done) = bounded(1);
 		let channels = crate::actor::kernel::Channels {
 			shutdown: k_shutdown,
-			shutdown_hang: k_shutdown_hang,
 			shutdown_done: k_shutdown_done,
-			shutdown_actor: Box::new([
-				a_shutdown,
-				d_shutdown,
-				gc_shutdown,
-				c_shutdown,
-			]),
+			shutdown_actor: [gc_shutdown, c_shutdown],
 			recv_toggle,
 			recv_play,
 			recv_pause,
@@ -435,7 +424,6 @@ impl<Extra: ExtraData> Engine<Extra> {
 			volume,
 
 			shutdown,
-			shutdown_hang,
 			shutdown_done,
 
 			recv_audio_state,

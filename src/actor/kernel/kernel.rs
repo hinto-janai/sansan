@@ -125,12 +125,14 @@ pub(crate) enum KernelToGc<Extra: ExtraData> {
 #[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct Channels<Extra: ExtraData> {
 	// Shutdown signal.
-	pub(crate) shutdown: Receiver<()>,
-	pub(crate) shutdown_hang: Receiver<()>,
+	pub(crate) shutdown: Receiver<bool>, // Should we hang on the engine?
 	pub(crate) shutdown_done: Sender<()>,
 	// Excluding [Kernel] itself, these are
-	// the shutdown channels for all the actors.
-	pub(crate) shutdown_actor: Box<[Sender<()>]>,
+	// the shutdown channels for all the actors
+	// (that don't receive an enum signal).
+	//
+	// Caller, Gc.
+	pub(crate) shutdown_actor: [Sender<()>; 2],
 
 	// [Audio]
 	pub(crate) to_audio:         Sender<KernelToAudio>,
@@ -275,7 +277,6 @@ impl<Extra: ExtraData> Kernel<Extra> {
 		assert_eq!(22, select.recv(&c.from_decode_error_source));
 		// Shutdown
 		assert_eq!(23, select.recv(&c.shutdown));
-		assert_eq!(24, select.recv(&c.shutdown_hang));
 
 		loop {
 			// 1. Receive a signal
@@ -356,29 +357,21 @@ impl<Extra: ExtraData> Kernel<Extra> {
 
 				// Shutdown.
 				23 => {
-					select_recv!(c.shutdown);
+					let blocking = select_recv!(c.shutdown);
 
 					// Tell all actors to shutdown.
-					for actor in c.shutdown_actor.iter() {
+					try_send!(c.to_decode, KernelToDecode::Shutdown);
+					try_send!(c.to_audio, KernelToAudio::Shutdown);
+					for actor in c.shutdown_actor {
 						try_send!(actor, ());
 					}
 
 					// Exit loop (thus, the thread).
 					crate::free::shutdown("Kernel", self.shutdown_wait);
-					return;
-				},
-				// Same as shutdown but sends a message to a
-				// hanging [Engine] indicating we're done, which
-				// allows the caller to return.
-				24 => {
-					select_recv!(c.shutdown_hang);
 
-					for actor in c.shutdown_actor.iter() {
-						try_send!(actor, ());
+					if blocking {
+						try_send!(c.shutdown_done, ());
 					}
-
-					crate::free::shutdown("Kernel", self.shutdown_wait);
-					drop(c.shutdown_done.try_send(()));
 					return;
 				},
 

@@ -58,8 +58,6 @@ pub(crate) struct Audio<Output: AudioOutput> {
 // See [src/actor/kernel.rs]'s [Channels]
 #[allow(clippy::missing_docs_in_private_items)]
 struct Channels {
-	shutdown: Receiver<()>,
-
 	to_gc:             Sender<AudioBuffer<f32>>,
 	to_caller_elapsed: Option<(Sender<Time>, f32)>, // seconds
 
@@ -91,7 +89,6 @@ pub(crate) struct InitArgs {
 	pub(crate) atomic_state:      Arc<AtomicState>,
 	pub(crate) ready_to_recv:     Arc<AtomicBool>,
 	pub(crate) shutdown_wait:     Arc<Barrier>,
-	pub(crate) shutdown:          Receiver<()>,
 	pub(crate) audio_retry:       Duration,
 	pub(crate) to_gc:             Sender<AudioBuffer<f32>>,
 	pub(crate) to_caller_elapsed: Option<(Sender<Time>, f32)>, // seconds
@@ -116,7 +113,6 @@ impl<Output: AudioOutput> Audio<Output> {
 					atomic_state,
 					ready_to_recv,
 					shutdown_wait,
-					shutdown,
 					audio_retry,
 					to_gc,
 					to_caller_elapsed,
@@ -127,7 +123,6 @@ impl<Output: AudioOutput> Audio<Output> {
 				} = args;
 
 				let channels = Channels {
-					shutdown,
 					to_gc,
 					to_caller_elapsed,
 					from_decode,
@@ -144,11 +139,11 @@ impl<Output: AudioOutput> Audio<Output> {
 						Ok(output) => break output,
 						Err(e) => {
 							debug2!("Audio (init) - output failed: {e}, sleeping for: {audio_retry_secs}s");
-
 							channels.to_kernel_error.try_send(e);
+
 							// We need to make sure we don't infinitely
 							// loop and ignore shutdown signals, so handle them.
-							if channels.shutdown.try_recv().is_ok() {
+							if matches!(channels.from_kernel.try_recv(), Ok(KernelToAudio::Shutdown)) {
 								crate::free::shutdown("Audio (init)", shutdown_wait);
 								return;
 							}
@@ -220,7 +215,6 @@ impl<Output: AudioOutput> Audio<Output> {
 				},
 				KernelToAudio::DiscardAudio => self.discard_audio(&c.from_decode, &c.to_gc),
 				KernelToAudio::Shutdown => {
-					select_recv!(c.shutdown);
 					crate::free::shutdown("Audio", self.shutdown_wait);
 					return;
 				},
