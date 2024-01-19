@@ -209,14 +209,7 @@ impl<Extra: ExtraData> Decode<Extra> {
 					// INVARIANT: If `Audio` is not ready, it means its
 					// discarding its audio data anyway, so we don't need
 					// to tell it we reached the end.
-					//
-					// TODO: this doesn't account for:
-					// 1. `Audio` not being initialized in the first place
-					// 2. `Decode` somehow decoding the entire track faster
-					// than `Audio` can drain its old buffers
-					while self.audio_ready_to_recv.load(Ordering::Acquire) {
-						try_send!(c.to_audio, DecodeToAudio::EndOfTrack);
-					}
+					try_send!(c.to_audio, DecodeToAudio::EndOfTrack);
 
 					continue;
 				},

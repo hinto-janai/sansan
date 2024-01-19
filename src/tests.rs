@@ -26,6 +26,14 @@ pub(crate) fn sources() -> Sources<usize> {
 
 /// Init the `Engine` with a default `InitConfig`.
 pub(crate) fn init() -> Engine::<usize> {
+	// Set custom panic hook.
+	// No threads should be panicking in tests.
+	std::panic::set_hook(Box::new(move |panic_info| {
+		// Set stack-trace.
+		println!("{panic_info}: {}", std::backtrace::Backtrace::force_capture());
+		std::process::exit(1);
+	}));
+
 	Engine::<usize>::init(InitConfig::DEFAULT)
 }
 

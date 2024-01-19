@@ -135,6 +135,7 @@
 	clippy::branches_sharing_code,
 	clippy::impl_trait_in_params,
 	clippy::struct_excessive_bools,
+	clippy::exit,
 )]
 
 #![cfg_attr(debug_assertions, allow(clippy::todo))]
