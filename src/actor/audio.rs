@@ -305,6 +305,25 @@ impl<Output: AudioOutput> Audio<Output> {
 
 	#[inline]
 	/// TODO
+	///
+	/// The in-between track handling is walking on
+	/// quite ice for a "real-time" audio system.
+	///
+	/// We are essentially relying on our 50ms~
+	/// audio buffer to give us enough time to:
+	/// 1. Send signals around
+	/// 2. Have `Decode` read an audio file off disk
+	/// 3. Allocate a `Box` (maybe more)
+	/// 4. `Decode` the 1st packet
+	/// 5. Have `Audio` receive that audio that play it
+	///
+	/// Considering a very very slow HDD, this may not be enough.
+	/// <https://en.wikipedia.org/wiki/Hard_disk_drive_performance_characteristics>
+	///
+	/// SOMEDAY: somehow make this buffer larger without:
+	/// - overwriting `AudioState` with a new `Source` before we've finished the `Current`
+	/// - large amounts of complexity
+	/// - doing real-time unsafe stuff
 	fn end_of_track(to_kernel: &Sender<AudioToKernel>) {
 		debug2!("Audio - end_of_track()");
 		try_send!(to_kernel, AudioToKernel::EndOfTrack);
