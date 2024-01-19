@@ -87,89 +87,23 @@ pub(crate) struct Cpal<R: Resampler> {
 
 //----------------------------------------------------------------------------------------------- `AudioOutput` Impl
 impl<R: Resampler> AudioOutput for Cpal<R> {
-	fn write(
-		&mut self,
-		mut audio: AudioBuffer<f32>,
-		to_gc:  &Sender<AudioBuffer<f32>>,
-		volume: Volume,
-	) -> Result<(), OutputError> {
-		trace2!("AudioOutput - write() with volume: {volume}");
+	type E = cpal::StreamError;
+	type R = R;
 
-		// Return if empty audio.
-		if audio.frames() == 0  {
-			trace2!("AudioOutput - audio.frames() == 0, returning early");
-			return Ok(());
-		}
-
-		// PERF:
-		// Applying volume after resampling
-		// leads to (less) lossy audio.
-		let volume = volume.inner();
-		debug_assert!((0.0..=2.0).contains(&volume));
-
-		// Get raw `[f32]` sample data.
-		let samples = match self.resampler.as_mut() {
-			// No resampling required (common path).
-			None => {
-				// Apply volume transformation.
-				audio.transform(|f| f * volume);
-
-				self.sample_buf.copy_interleaved_typed(&audio);
-				self.sample_buf.samples()
-			},
-
-			// We have a `Resampler`.
-			// That means when initializing, the audio device's
-			// preferred sample rate was not equal to the input
-			// audio spec. Assuming all future audio buffers
-			// have the sample spec, we need to resample this.
-			Some(resampler) => {
-				// Resample.
-				let samples = resampler.resample(&audio);
-
-				self.samples.extend_from_slice(samples);
-
-				let capacity = audio.capacity();
-				let frames   = audio.frames();
-
-				// Taken from: https://docs.rs/symphonia-core/0.5.3/src/symphonia_core/audio.rs.html#680-692
-				for plane in self.samples.chunks_mut(capacity) {
-					for sample in &mut plane[0..frames] {
-						*sample *= volume;
-					}
-				}
-
-				&self.samples
-			},
-		};
-
-		// Send audio data to cpal.
-		//
-		// This hangs until we've sent all the samples, which
-		// most likely take a while as [cubeb] will have a
-		// backlog of previous samples.
-		trace2!("AudioOutput - sending {} samples to backend", samples.len());
-		for sample in samples {
-			send!(self.sender, *sample);
-		};
-
-		// Send garbage to GC.
-		try_send!(to_gc, audio);
-		// INVARIANT:
-		// This must be cleared as the next call to this
-		// function assumes our local [Vec<f32>] is emptied.
-		//
-		// Clearing a bunch of [f32]'s locally
-		// is probably faster than swapping with [Pool].
-		self.samples.clear();
-
-		// If the backend errored, forward it.
-		if let Ok(error) = self.error.try_recv() {
-			error2!("AudioOutput - error: {error}");
-			Err(error.into())
-		} else {
-			Ok(())
-		}
+	fn write_pre(&mut self) -> (
+		&mut Option<Self::R>,   // Our resampler (none == no resampling needed)
+		&mut SampleBuffer<f32>, // A local buffer used for sample processing
+		&mut Vec<f32>,          // A local buffer of the _end result_ samples (potentially after resampling)
+		&Sender<f32>,           // Channel to send sample to audio backend
+		&Receiver<Self::E>,     // Channel to potentially receieve an error, after writing the sample
+	) {
+		(
+			&mut self.resampler,
+			&mut self.sample_buf,
+			&mut self.samples,
+			&self.sender,
+			&self.error,
+		)
 	}
 
 	fn flush(&mut self) {

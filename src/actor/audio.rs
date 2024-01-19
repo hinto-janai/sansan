@@ -298,7 +298,7 @@ impl<Output: AudioOutput> Audio<Output> {
 		let volume = self.atomic_state.volume.load();
 
 		// Write audio buffer (hangs).
-		if let Err(output_error) = self.output.write(audio, &c.to_gc, volume) {
+		if let Err(output_error) = self.output.write(audio, volume, &c.to_gc) {
 			try_send!(c.to_kernel_error, output_error);
 		}
 	}
