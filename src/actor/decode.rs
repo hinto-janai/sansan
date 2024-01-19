@@ -159,48 +159,36 @@ impl<Extra: ExtraData> Decode<Extra> {
 	#[cold]
 	#[inline(never)]
 	/// `Decode`'s main function.
-	fn main(mut self, channels: Channels<Extra>) {
+	fn main(mut self, c: Channels<Extra>) {
 		debug2!("Decode - main()");
-
-		// Create channels that we will
-		// be selecting/listening to for all time.
-		let mut select  = Select::new();
-
-		assert_eq!(0, select.recv(&channels.from_kernel));
-		assert_eq!(1, select.recv(&channels.shutdown));
 
 		// The "Decode" loop.
 		loop {
 			// Listen to other actors.
-			let signal = if self.done_decoding {
+			//
+			// Error type is different, which is why we `.map_err()`.
+			let signal: Result<KernelToDecode<Extra>, ()> = if self.done_decoding {
 				// Blocking
-				trace2!("Decode - waiting for msgs on select.ready()");
-				Ok(select.ready())
+				trace2!("Decode - waiting for msgs on recv()");
+				c.from_kernel.recv().map_err(|_e| ())
 			} else {
-				select.try_ready()
+				// Non-blocking
+				c.from_kernel.try_recv().map_err(|_e| ())
 			};
 
 			// Handle signals.
 			//
 			// This falls through and continues
 			// executing the below code.
-			if let Ok(signal) = signal {
-				match signal {
-					0 => {
-						let msg = select_recv!(&channels.from_kernel);
-						match msg {
-							KernelToDecode::NewSource(source)     => self.new_source(source, &channels),
-							KernelToDecode::Seek((seek, elapsed)) => self.seek(seek, elapsed, &channels.to_gc, &channels.to_kernel_seek),
-							KernelToDecode::DiscardAudioAndStop   => self.discard_audio_and_stop(&channels.to_gc),
-						}
-					},
-					1 => {
-						select_recv!(&channels.shutdown);
+			if let Ok(msg) = signal {
+				match msg {
+					KernelToDecode::NewSource(source)     => self.new_source(source, &c),
+					KernelToDecode::Seek((seek, elapsed)) => self.seek(seek, elapsed, &c.to_gc, &c.to_kernel_seek),
+					KernelToDecode::DiscardAudioAndStop   => self.discard_audio_and_stop(&c.to_gc),
+					KernelToDecode::Shutdown => {
 						crate::free::shutdown("Decode", self.shutdown_wait);
 						return;
-					},
-
-					_ => unreachable!(),
+					}
 				}
 			}
 
@@ -229,7 +217,7 @@ impl<Extra: ExtraData> Decode<Extra> {
 					// 2. `Decode` somehow decoding the entire track faster
 					// than `Audio` can drain its old buffers
 					while self.audio_ready_to_recv.load(Ordering::Acquire) {
-						try_send!(channels.to_audio, DecodeToAudio::EndOfTrack);
+						try_send!(c.to_audio, DecodeToAudio::EndOfTrack);
 					}
 
 					continue;
@@ -237,7 +225,7 @@ impl<Extra: ExtraData> Decode<Extra> {
 
 				// An actual error happened.
 				Err(e) => {
-					Self::handle_decode_error(&channels, DecodeError::from(e));
+					Self::handle_decode_error(&c, DecodeError::from(e));
 					continue;
 				},
 			};
@@ -253,14 +241,14 @@ impl<Extra: ExtraData> Decode<Extra> {
 					let time = self.source.timebase.calc_time(packet.ts);
 
 					// Send to [Audio] if we can, else store locally.
-					self.send_or_store_audio(&channels.to_audio, (audio, time));
+					self.send_or_store_audio(&c.to_audio, (audio, time));
 				}
 
-				Err(e) => Self::handle_decode_error(&channels, DecodeError::from(e)),
+				Err(e) => Self::handle_decode_error(&c, DecodeError::from(e)),
 			}
 
 			// Send garbage to [Gc] instead of dropping locally.
-			try_send!(channels.to_gc, DecodeToGc::Packet(packet));
+			try_send!(c.to_gc, DecodeToGc::Packet(packet));
 		}
 	}
 

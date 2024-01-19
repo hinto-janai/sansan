@@ -88,6 +88,8 @@ pub(crate) enum KernelToDecode<Extra: ExtraData> {
 	/// Clear all audio buffers, the current source,
 	/// and stop decoding.
 	DiscardAudioAndStop,
+	/// Shutdown and exit thread.
+	Shutdown,
 }
 
 /// TODO
