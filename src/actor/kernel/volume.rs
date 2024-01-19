@@ -64,6 +64,6 @@ mod tests {
 
 		//---------------------------------- At max
 		let reader = engine.reader();
-		assert_eq!(reader.get().volume.inner(), 1.0);
+		assert_eq!(reader.get().volume.inner(), Volume::MAX.inner());
 	}
 }
