@@ -98,6 +98,8 @@ pub(crate) enum KernelToAudio {
 	Play,
 	/// Discard all of your current audio buffers.
 	DiscardAudio,
+	/// Shutdown and exit thread.
+	Shutdown,
 }
 
 /// TODO

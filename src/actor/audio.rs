@@ -184,17 +184,9 @@ impl<Output: AudioOutput> Audio<Output> {
 	fn main(mut self, c: Channels) {
 		debug2!("Audio - main()");
 
-		// Create channels that we will
-		// be selecting/listening to for all time.
-		let mut select  = Select::new();
-
-		// assert_eq!(0, select.recv(&c.from_decode));
-		assert_eq!(0, select.recv(&c.from_kernel));
-		assert_eq!(1, select.recv(&c.shutdown));
-
 		loop {
 			// Attempt to receive signal from other actors.
-			let select_index = if self.atomic_state.playing.load(Ordering::Acquire) {
+			let msg_result: Result<KernelToAudio, ()> = if self.atomic_state.playing.load(Ordering::Acquire) {
 				if let Ok(msg) = c.from_decode.try_recv() {
 					match msg {
 						DecodeToAudio::Buffer(data) => self.play_audio_buffer(data, &c),
@@ -202,7 +194,7 @@ impl<Output: AudioOutput> Audio<Output> {
 					}
 				}
 
-				select.try_ready()
+				c.from_kernel.try_recv().map_err(|_e| ())
 			} else {
 				if let Err(e) = self.output.stop() {
 					todo!();
@@ -210,37 +202,27 @@ impl<Output: AudioOutput> Audio<Output> {
 
 				// Else, hang until we receive a message from somebody.
 				debug2!("Audio - waiting for msgs on select.ready()");
-				Ok(select.ready())
+				c.from_kernel.recv().map_err(|_e| ())
 			};
 
-			let Ok(select_index) = select_index else {
+			let Ok(msg) = msg_result else {
 				continue;
 			};
 
 			// Route signal to its appropriate handler function [fn_*()].
-			match select_index {
-				// From `Kernel`.
-				0 => {
-					let msg = select_recv!(c.from_kernel);
-					match msg {
-						KernelToAudio::Play => {
-							if let Err(e) = self.output.play() {
-								todo!();
-							}
-							continue;
-						},
-						KernelToAudio::DiscardAudio => self.discard_audio(&c.from_decode, &c.to_gc),
+			match msg {
+				KernelToAudio::Play => {
+					if let Err(e) = self.output.play() {
+						todo!();
 					}
+					continue;
 				},
-
-				// Shutdown.
-				1 => {
+				KernelToAudio::DiscardAudio => self.discard_audio(&c.from_decode, &c.to_gc),
+				KernelToAudio::Shutdown => {
 					select_recv!(c.shutdown);
 					crate::free::shutdown("Audio", self.shutdown_wait);
 					return;
 				},
-
-				_ => unreachable!(),
 			}
 		}
 	}

@@ -165,8 +165,6 @@ impl<Extra: ExtraData> Decode<Extra> {
 		// The "Decode" loop.
 		loop {
 			// Listen to other actors.
-			//
-			// Error type is different, which is why we `.map_err()`.
 			let signal: Result<KernelToDecode<Extra>, ()> = if self.done_decoding {
 				// Blocking
 				trace2!("Decode - waiting for msgs on recv()");
