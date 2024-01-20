@@ -4,6 +4,7 @@
 use crate::{
 	error::SourceError,
 	extra_data::ExtraData,
+	meta::{Probe,ProbeConfig,ProbeError},
 };
 use std::{
 	fmt::{self,Debug},
@@ -72,6 +73,30 @@ impl Metadata {
 		genre:         None,
 		compilation:   None,
 	};
+
+	/// TODO
+	///
+	/// # Errors
+	/// TODO
+	pub fn try_from_path(audio_path: impl AsRef<Path>) -> Result<Self, ProbeError> {
+		Probe::with_capacity(1, 1).probe_path(audio_path)
+	}
+
+	/// TODO
+	///
+	/// # Errors
+	/// TODO
+	pub fn try_from_file(audio_file: File) -> Result<Self, ProbeError> {
+		Probe::with_capacity(1, 1).probe_file(audio_file)
+	}
+
+	/// TODO
+	///
+	/// # Errors
+	/// TODO
+	pub fn try_from_bytes(audio_bytes: impl AsRef<[u8]>) -> Result<Self, ProbeError> {
+		Probe::with_capacity(1, 1).probe_bytes(audio_bytes)
+	}
 
 	#[must_use]
 	/// Returns `true` if all fields are [`None`].
@@ -149,12 +174,39 @@ impl Metadata {
 	}
 }
 
+//---------------------------------------------------------------------------------------------------- TryFrom
+impl TryFrom<&Path> for Metadata {
+	type Error = ProbeError;
+	/// Calls [`Self::try_from_path`]
+	fn try_from(path: &Path) -> Result<Self, Self::Error> {
+		Self::try_from_path(path)
+	}
+}
+
+impl TryFrom<File> for Metadata {
+	type Error = ProbeError;
+	/// Calls [`Self::try_from_file`]
+	fn try_from(file: File) -> Result<Self, Self::Error> {
+		Self::try_from_file(file)
+	}
+}
+
+impl TryFrom<&[u8]> for Metadata {
+	type Error = ProbeError;
+	/// Calls [`Self::try_from_bytes`]
+	fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+		Self::try_from_bytes(bytes)
+	}
+}
+
+//---------------------------------------------------------------------------------------------------- Default
 impl Default for Metadata {
 	fn default() -> Self {
 		Self::DEFAULT
 	}
 }
 
+//---------------------------------------------------------------------------------------------------- Debug
 impl Debug for Metadata {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.debug_struct("Metadata")
