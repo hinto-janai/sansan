@@ -19,7 +19,7 @@ use std::{
 	borrow::Borrow,
 	sync::Arc,
 	fs::File,
-	collections::HashMap,
+	collections::{HashMap,BTreeMap},
 };
 use symphonia::core::io::{MediaSourceStream, MediaSource};
 use crate::{
@@ -39,33 +39,98 @@ use crate::{
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub struct Probe {
 	/// Duplicate artist + album.
-	map: HashMap<Arc<str>, HashMap<Arc<str>, Metadata>>,
-	/// Estimation for how much to allocate for the
-	/// Album HashMap when discovering a new album.
-	album_per_artist: usize,
+	pub map: BTreeMap<Arc<str>, BTreeMap<Arc<str>, Metadata>>,
 }
 
 //---------------------------------------------------------------------------------------------------- Probe Impl
 impl Probe {
 	#[must_use]
 	/// TODO.
-	pub fn new() -> Self {
+	pub const fn new() -> Self {
 		Self {
-			map: HashMap::with_capacity(32),
-			album_per_artist: 4,
+			map: BTreeMap::new(),
 		}
 	}
 
-	#[must_use]
 	/// TODO
-	pub fn with_capacity(
-		artist_count: usize,
-		album_per_artist: usize,
-	) -> Self {
-		Self {
-			map: HashMap::with_capacity(artist_count),
-			album_per_artist,
+	pub fn artists(&self) -> impl Iterator<Item = &Arc<str>> {
+		self.map.keys()
+	}
+
+	/// TODO
+	pub fn albums(&self) -> impl Iterator<Item = &Metadata> {
+		self.map.values().flatten().map(|(_, m)| m)
+	}
+
+	/// TODO
+	pub fn get_artist(&self, artist_name: impl Borrow<str>) -> Option<&BTreeMap<Arc<str>, Metadata>> {
+		self.map.get(artist_name.borrow())
+	}
+
+	/// TODO
+	pub fn get_album(
+		&self,
+		artist_name: impl Borrow<str>,
+		album_title: impl Borrow<str>,
+	) -> Option<&Metadata> {
+		self.map.get(artist_name.borrow()).and_then(|b| b.get(album_title.borrow()))
+	}
+
+	/// TODO
+	///
+	/// # Return
+	/// Returns [`Some`] if:
+	/// - A previous `Artist` + `Album` entry existed (returns the old value)
+	/// - [`Metadata::artist_name`] is missing (returns the input `metadata`)
+	/// - [`Metadata::album_title`] is missing (returns the input `metadata`)
+	///
+	/// Returns [`None`] if no previous entry existed.
+	pub fn insert_metadata(&mut self, metadata: Metadata) -> Option<Metadata> {
+		let Some(b_artist_name) = metadata.artist_name.borrow() else { return Some(metadata); };
+		let Some(b_album_title) = metadata.album_title.borrow() else { return Some(metadata); };
+		let album_title = Arc::clone(b_album_title);
+
+		if let Some(album_map) = self.map.get_mut::<str>(b_artist_name) {
+			album_map.insert(album_title, metadata)
+		} else {
+			let artist_name = Arc::clone(b_artist_name);
+			drop((b_artist_name, b_album_title));
+			let album_map = BTreeMap::from([(album_title, metadata)]);
+			self.map.insert(artist_name, album_map);
+			None
 		}
+	}
+
+	/// TODO
+	pub fn from_metadata(metadata_iter: impl Iterator<Item = Metadata>) -> Self {
+		let mut map = BTreeMap::<Arc<str>, BTreeMap<Arc<str>, Metadata>>::new();
+
+		for metadata in metadata_iter {
+			// `artist/album` are our "keys", so if they're not found, just continue.
+			// Technically `artist_name` could exist _without_ an `album_title` but
+			// that's pretty useless as a cache (`artist_name` without any albums)
+			// so continue in the case as well.
+			let Some(b_artist_name) = metadata.artist_name.as_ref() else { continue; };
+			let Some(b_album_title) = metadata.album_title.as_ref() else { continue; };
+
+			// If the artist exists...
+			if let Some(album_map) = map.get_mut::<str>(b_artist_name) {
+				// Insert the album metadata if not found.
+				if album_map.get::<str>(b_album_title).is_none() {
+					// `entry()` for `BTreeMap` _must_ take in the key by value
+					// (`Arc<T>`), so use `get()` + `insert()` to check instead.
+					album_map.insert(Arc::clone(b_album_title), metadata);
+				}
+			} else {
+				// Artist + album does not exist, insert both.
+				let artist_name = Arc::clone(b_artist_name);
+				let album_title = Arc::clone(b_album_title);
+				let album_map = BTreeMap::from([(album_title, metadata)]);
+				map.insert(artist_name, album_map);
+			}
+		}
+
+		Self { map }
 	}
 
 	/// TODO
@@ -104,33 +169,28 @@ impl Probe {
 		self.probe_inner::<false>(Box::new(Cursor::new(bytes)))
 	}
 
-	/// TODO.
-	fn once() -> Self {
-		Self {
-			map: HashMap::with_capacity(0),
-			album_per_artist: 0,
-		}
-	}
-
 	/// TODO
 	/// # Errors
 	/// TODO
 	pub fn probe_path_once(path: impl AsRef<Path>) -> Result<Metadata, ProbeError> {
-		Self::once().probe_path(path)
+		let file = std::fs::File::open(path.as_ref())?;
+		Self::probe_file_once(file)
 	}
 
 	/// TODO
 	/// # Errors
 	/// TODO
 	pub fn probe_file_once(file: File) -> Result<Metadata, ProbeError> {
-		Self::once().probe_file(file)
+		Self::new().probe_inner::<true>(Box::new(file))
 	}
 
 	/// TODO
 	/// # Errors
 	/// TODO
 	pub fn probe_bytes_once(bytes: impl AsRef<[u8]>) -> Result<Metadata, ProbeError> {
-		Self::once().probe_bytes(bytes)
+		// SAFETY: same as `probe_bytes()`.
+		let bytes: &'static [u8] = unsafe { std::mem::transmute(bytes.as_ref()) };
+		Self::new().probe_inner::<true>(Box::new(Cursor::new(bytes)))
 	}
 
 	/// Private probe function.
@@ -271,8 +331,7 @@ impl Probe {
 			m.artist_name = Some(Arc::clone(&artist_name));
 			m.album_title = Some(Arc::clone(&album_title));
 
-			let mut album_map = HashMap::with_capacity(self.album_per_artist);
-			album_map.insert(album_title, m.clone());
+			let album_map = BTreeMap::from([(album_title, m.clone())]);
 
 			self.map.insert(artist_name, album_map);
 
