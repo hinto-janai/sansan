@@ -1,29 +1,14 @@
 //! TODO
 
 //---------------------------------------------------------------------------------------------------- Use
-use crate::{
-	error::SourceError,
-	extra_data::ExtraData,
-	meta::{Probe,ProbeConfig,ProbeError},
-};
+use crate::meta::{Probe,ProbeError};
 use std::{
 	fmt::{self,Debug},
 	time::Duration,
-	io::Cursor,
 	fs::File,
-	path::{Path,PathBuf},
+	path::Path,
 	sync::Arc,
-	borrow::Cow,
 };
-use symphonia::core::{
-	formats::{FormatReader,FormatOptions},
-	io::{MediaSourceStream, MediaSourceStreamOptions},
-	probe::Hint,
-	meta::{MetadataOptions,Limit},
-	units::{Time,TimeBase},
-	codecs::{Decoder, DecoderOptions},
-};
-use symphonia::default::{get_probe,get_codecs};
 
 #[allow(unused_imports)] // docs
 use crate::state::AudioState;

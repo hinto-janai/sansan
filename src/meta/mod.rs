@@ -4,7 +4,9 @@ mod metadata;
 pub use metadata::Metadata;
 
 mod probe;
-pub use probe::{Probe,ProbeError};
+pub use probe::Probe;
 
-mod probe_config;
-pub use probe_config::ProbeConfig;
+mod probe_error;
+pub use probe_error::ProbeError;
+
+pub(super) mod free;

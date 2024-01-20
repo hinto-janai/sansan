@@ -89,7 +89,7 @@ impl<R: Resampler> AudioOutput for DummyAudioOutput<R> {
 		&mut SampleBuffer<f32>, // A local buffer used for sample processing
 		&mut Vec<f32>,          // A local buffer of the _end result_ samples (potentially after resampling)
 		&Sender<f32>,           // Channel to send sample to audio backend
-		&Receiver<Self::E>,     // Channel to potentially receieve an error, after writing the sample
+		&Receiver<Self::E>,     // Channel to potentially receive an error, after writing the sample
 	) {
 		(
 			&mut self.resampler,
