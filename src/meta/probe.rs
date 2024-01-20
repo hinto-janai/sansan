@@ -193,6 +193,28 @@ impl Probe {
 		Self::new().probe_inner::<true>(Box::new(Cursor::new(bytes)))
 	}
 
+	#[cfg(feature = "rayon")] #[cfg_attr(docsrs, doc(cfg(feature = "rayon")))]
+	/// TODO
+	pub fn probe_path_bulk<P>(paths: &[P]) -> Vec<Result<Metadata, (ProbeError, &P)>>
+	where
+		P: AsRef<Path> + Sync,
+	{
+		use rayon::prelude::*;
+
+		// Only use 25% of threads.
+		// More thread starts impacting negatively due
+		// to this mostly being a heavy I/O operation.
+		let threads = crate::free::threads().get() / 4;
+		let chunk_size = paths.len() / threads;
+
+		paths
+			.par_chunks(chunk_size)
+			.flat_map_iter(|chunk| {
+				let mut probe = Self::new();
+				chunk.iter().map(move |path| probe.probe_path(path).map_err(|err| (err, path)))
+			}).collect()
+	}
+
 	/// Private probe function.
 	///
 	/// Extracts all tags possible from a `ProbeResult`.

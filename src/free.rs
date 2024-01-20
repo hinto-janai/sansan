@@ -2,6 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use std::sync::{Arc,Barrier};
+use std::num::NonZeroUsize;
 use crate::macros::debug2;
 
 //---------------------------------------------------------------------------------------------------- Shutdown
@@ -22,4 +23,11 @@ pub(crate) fn shutdown(
     shutdown_wait.wait();
 
     debug2!("{actor_name} - shutdown ... OK");
+}
+
+//---------------------------------------------------------------------------------------------------- Threads
+/// Get the total amount of CPU threads.
+/// Returns at least 1.
+pub(crate) fn threads() -> NonZeroUsize {
+    std::thread::available_parallelism().unwrap_or(NonZeroUsize::MIN)
 }
