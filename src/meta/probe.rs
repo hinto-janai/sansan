@@ -193,9 +193,9 @@ impl Probe {
 		Self::new().probe_inner::<true>(Box::new(Cursor::new(bytes)))
 	}
 
-	#[cfg(feature = "rayon")] #[cfg_attr(docsrs, doc(cfg(feature = "rayon")))]
+	#[cfg(feature = "bulk")] #[cfg_attr(docsrs, doc(cfg(feature = "bulk")))]
 	/// TODO
-	pub fn probe_path_bulk<P>(paths: &[P]) -> Vec<Result<Metadata, (ProbeError, &P)>>
+	pub fn probe_path_bulk<P>(paths: &[P]) -> Vec<(&P, Result<Metadata, ProbeError>)>
 	where
 		P: AsRef<Path> + Sync,
 	{
@@ -211,7 +211,7 @@ impl Probe {
 			.par_chunks(chunk_size)
 			.flat_map_iter(|chunk| {
 				let mut probe = Self::new();
-				chunk.iter().map(move |path| probe.probe_path(path).map_err(|err| (err, path)))
+				chunk.iter().map(move |path| (path, probe.probe_path(path)))
 			}).collect()
 	}
 

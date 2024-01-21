@@ -36,45 +36,47 @@ opt-level = 1
 [features]
 # TODO: Change default to cubeb after testing.
 # default = ["serde", "cubeb"]
-default = ["serde", "cpal", "rayon"]
+default = ["serde", "cpal", "bulk"]
 dummy   = []
+bulk    = ["dep:rayon", "dep:walkdir", "dep:infer"]
 
 [dev-dependencies]
 bincode = { version = "2.0.0-rc.3", features = ["derive"]  }
-serde   = { version = "1.0.193", features = ["derive", "rc"] }
-log     = { version = "0.4.20", features = ["serde"] }
-pretty_assertions = { version = "1.4.0" }
+serde   = { version = "1", features = ["derive", "rc"] }
+log     = { version = "0.4", features = ["serde"] }
+pretty_assertions = { version = "1" }
 
 [dependencies]
 ### Personal libraries.
 someday  = { git = "https://github.com/hinto-janai/someday" } # TODO: set version on release
-lpt      = { version = "1.0.0" }
+lpt      = { version = "1" }
 
 ## Optional libraries.
 bincode      = { version = "2.0.0-rc.3", features = ["derive"], optional = true }
-serde        = { version = "1.0.193", features = ["derive", "rc"], optional = true }
-log          = { version = "0.4.20", features = ["serde"], optional = true }
+serde        = { version = "1", features = ["derive", "rc"], optional = true }
+log          = { version = "0.4", features = ["serde"], optional = true }
 
 ### Regular libraries.
-arrayvec     = { version = "0.7.4" }
-cfg-if       = { version = "1.0.0" }
-crossbeam    = { version = "0.8.3", features = ["crossbeam-channel"] }
-rand         = { version = "0.8.5" }
-rayon        = { version = "1.8.1", optional = true }
-thiserror    = { version = "1.0.52" }
-seq-macro    = { version = "0.3.5" }
-strum        = { version = "0.25.0", features = ["derive", "phf"] }
-paste        = { version = "1.0.14" }
+cfg-if       = { version = "1" }
+crossbeam    = { version = "0.8", features = ["crossbeam-channel"] }
+infer        = { version = "0.15", optional = true }
+rand         = { version = "0.8" }
+rayon        = { version = "1", optional = true }
+thiserror    = { version = "1" }
+seq-macro    = { version = "0.3" }
+strum        = { version = "0.25", features = ["derive", "phf"] }
+paste        = { version = "1" }
+walkdir      = { version = "2", optional = true }
 
 ### Audio libraries.
-audio_thread_priority = { version = "0.30.0" }
-souvlaki              = { version = "0.6.1" }
-symphonia             = { version = "0.5.3", features = ["all"] }
-rubato                = { version = "0.14.1" }
+audio_thread_priority = { version = "0.30" }
+souvlaki              = { version = "0.6" }
+symphonia             = { version = "0.5", features = ["all"] }
+rubato                = { version = "0.14" }
 
 ### Optional Audio libraries.
-cubeb = { version = "0.10.7", optional = true }
-cpal  = { version = "0.15.2", optional = true }
+cubeb = { version = "0.10", optional = true }
+cpal  = { version = "0.15", optional = true }
 
 ## Windows.
 [target.'cfg(windows)'.dependencies]
