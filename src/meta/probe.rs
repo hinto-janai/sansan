@@ -222,8 +222,8 @@ impl Probe {
 	/// This is the high-level functions that calls all the
 	/// individual parser functions below to fill out the metadata.
 	fn probe_inner<const ONCE: bool>(&mut self, ms: Box<dyn MediaSource>) -> Result<Metadata, ProbeError> {
-		// Parser functions.
-		use crate::meta::free::{
+		// Extraction functions.
+		use crate::meta::extract::{
 			album_title,artist_name,cover_art,sample_rate,
 			release_date,total_runtime,track_number,track_title,
 			disc_number,compilation,genre
