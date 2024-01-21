@@ -36,7 +36,7 @@ use crate::{
 #[allow(clippy::struct_excessive_bools)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
-#[derive(Debug,Clone,PartialEq,Eq)]
+#[derive(Debug,Default,Clone,PartialEq,Eq)]
 pub struct Probe {
 	/// Duplicate artist + album.
 	pub map: BTreeMap<Arc<str>, BTreeMap<Arc<str>, Metadata>>,
@@ -63,16 +63,20 @@ impl Probe {
 	}
 
 	/// TODO
-	pub fn get_artist(&self, artist_name: impl Borrow<str>) -> Option<&BTreeMap<Arc<str>, Metadata>> {
+	pub fn get_artist<S: Borrow<str>>(&self, artist_name: S) -> Option<&BTreeMap<Arc<str>, Metadata>> {
 		self.map.get(artist_name.borrow())
 	}
 
 	/// TODO
-	pub fn get_album(
+	pub fn get_album<S1, S2>(
 		&self,
-		artist_name: impl Borrow<str>,
-		album_title: impl Borrow<str>,
-	) -> Option<&Metadata> {
+		artist_name: S1,
+		album_title: S2,
+	) -> Option<&Metadata>
+	where
+		S1: Borrow<str>,
+		S2: Borrow<str>,
+	{
 		self.map.get(artist_name.borrow()).and_then(|b| b.get(album_title.borrow()))
 	}
 
@@ -137,7 +141,7 @@ impl Probe {
 	///
 	/// # Errors
 	/// TODO
-	pub fn probe_path(&mut self, path: impl AsRef<Path>) -> Result<Metadata, ProbeError> {
+	pub fn probe_path<P: AsRef<Path>>(&mut self, path: P) -> Result<Metadata, ProbeError> {
 		let file = std::fs::File::open(path.as_ref())?;
 		self.probe_file(file)
 	}
@@ -154,7 +158,7 @@ impl Probe {
 	///
 	/// # Errors
 	/// TODO
-	pub fn probe_bytes(&mut self, bytes: impl AsRef<[u8]>) -> Result<Metadata, ProbeError> {
+	pub fn probe_bytes<B: AsRef<[u8]>>(&mut self, bytes: B) -> Result<Metadata, ProbeError> {
 		// SAFETY:
 		// The MediaSourceStream constructor needs static
 		// bytes, although we're taking in a reference with
@@ -335,11 +339,5 @@ impl Probe {
 
 			Ok(m)
 		}
-	}
-}
-
-impl Default for Probe {
-	fn default() -> Self {
-		Self::new()
 	}
 }
