@@ -64,7 +64,7 @@ impl Metadata {
 	/// # Errors
 	/// TODO
 	pub fn try_from_path(audio_path: impl AsRef<Path>) -> Result<Self, ProbeError> {
-		Probe::probe_path_once(audio_path)
+		crate::meta::probe_path(audio_path)
 	}
 
 	/// TODO
@@ -72,7 +72,7 @@ impl Metadata {
 	/// # Errors
 	/// TODO
 	pub fn try_from_file(audio_file: File) -> Result<Self, ProbeError> {
-		Probe::probe_file_once(audio_file)
+		crate::meta::probe_file(audio_file)
 	}
 
 	/// TODO
@@ -80,7 +80,7 @@ impl Metadata {
 	/// # Errors
 	/// TODO
 	pub fn try_from_bytes(audio_bytes: impl AsRef<[u8]>) -> Result<Self, ProbeError> {
-		Probe::probe_bytes_once(audio_bytes)
+		crate::meta::probe_bytes(audio_bytes)
 	}
 
 	#[must_use]

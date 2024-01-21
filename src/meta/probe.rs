@@ -169,30 +169,6 @@ impl Probe {
 		self.probe_inner::<false>(Box::new(Cursor::new(bytes)))
 	}
 
-	/// TODO
-	/// # Errors
-	/// TODO
-	pub fn probe_path_once(path: impl AsRef<Path>) -> Result<Metadata, ProbeError> {
-		let file = std::fs::File::open(path.as_ref())?;
-		Self::probe_file_once(file)
-	}
-
-	/// TODO
-	/// # Errors
-	/// TODO
-	pub fn probe_file_once(file: File) -> Result<Metadata, ProbeError> {
-		Self::new().probe_inner::<true>(Box::new(file))
-	}
-
-	/// TODO
-	/// # Errors
-	/// TODO
-	pub fn probe_bytes_once(bytes: impl AsRef<[u8]>) -> Result<Metadata, ProbeError> {
-		// SAFETY: same as `probe_bytes()`.
-		let bytes: &'static [u8] = unsafe { std::mem::transmute(bytes.as_ref()) };
-		Self::new().probe_inner::<true>(Box::new(Cursor::new(bytes)))
-	}
-
 	#[cfg(feature = "bulk")] #[cfg_attr(docsrs, doc(cfg(feature = "bulk")))]
 	/// TODO
 	pub fn probe_path_bulk<P>(paths: &[P]) -> Vec<(&P, Result<Metadata, ProbeError>)>
@@ -221,7 +197,7 @@ impl Probe {
 	///
 	/// This is the high-level functions that calls all the
 	/// individual parser functions below to fill out the metadata.
-	fn probe_inner<const ONCE: bool>(&mut self, ms: Box<dyn MediaSource>) -> Result<Metadata, ProbeError> {
+	pub(super) fn probe_inner<const ONCE: bool>(&mut self, ms: Box<dyn MediaSource>) -> Result<Metadata, ProbeError> {
 		// Extraction functions.
 		use crate::meta::extract::{
 			album_title,artist_name,cover_art,sample_rate,
