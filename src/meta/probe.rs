@@ -16,13 +16,14 @@
 use std::{
 	io::Cursor,
 	path::Path,
-	borrow::Borrow,
+	borrow::{Borrow,Cow},
 	sync::Arc,
 	fs::File,
 	collections::{HashMap,BTreeMap},
 };
 use symphonia::core::io::{MediaSourceStream, MediaSource};
 use crate::{
+	meta::constants::INFER_AUDIO_PREFIX_LEN,
 	meta::{ProbeError,Metadata},
 	source::source_decode::{
 		MEDIA_SOURCE_STREAM_OPTIONS,
@@ -39,7 +40,9 @@ use crate::{
 #[derive(Debug,Default,Clone,PartialEq,Eq)]
 pub struct Probe {
 	/// Duplicate artist + album.
-	pub map: BTreeMap<Arc<str>, BTreeMap<Arc<str>, Metadata>>,
+	map: BTreeMap<Arc<str>, BTreeMap<Arc<str>, Metadata>>,
+	/// Re-usable buffer for `infer` usage.
+	infer_buffer: Vec<u8>,
 }
 
 //---------------------------------------------------------------------------------------------------- Probe Impl
@@ -49,6 +52,7 @@ impl Probe {
 	pub const fn new() -> Self {
 		Self {
 			map: BTreeMap::new(),
+			infer_buffer: Vec::new(),
 		}
 	}
 
@@ -134,7 +138,7 @@ impl Probe {
 			}
 		}
 
-		Self { map }
+		Self { map, infer_buffer: Vec::with_capacity(INFER_AUDIO_PREFIX_LEN + 1) }
 	}
 
 	/// TODO
@@ -142,7 +146,7 @@ impl Probe {
 	/// # Errors
 	/// TODO
 	pub fn probe_path<P: AsRef<Path>>(&mut self, path: P) -> Result<Metadata, ProbeError> {
-		let file = std::fs::File::open(path.as_ref())?;
+		let file = std::fs::File::open(path)?;
 		self.probe_file(file)
 	}
 
@@ -151,7 +155,23 @@ impl Probe {
 	/// # Errors
 	/// TODO
 	pub fn probe_file(&mut self, file: File) -> Result<Metadata, ProbeError> {
-		self.probe_inner::<false>(Box::new(file))
+		use std::io::{Read, Seek, SeekFrom};
+
+		// Make sure our buffer is clean.
+		self.infer_buffer.clear();
+
+		// Read the first few bytes of the file.
+		let mut file = crate::meta::free::extract_audio_mime_bytes(
+			file,
+			&mut self.infer_buffer
+		)?;
+
+		// Reset the file to the 0th byte.
+		// This is needed since `probe_inner()`'s symphonia
+		// probe will also check for initial metadata.
+		file.seek(SeekFrom::Start(0))?;
+
+		self.probe_inner(Box::new(file))
 	}
 
 	/// TODO
@@ -170,29 +190,16 @@ impl Probe {
 		// for the entire body of this function, thus we can
 		// get away with pretending it is "static".
 		let bytes: &'static [u8] = unsafe { std::mem::transmute(bytes.as_ref()) };
-		self.probe_inner::<false>(Box::new(Cursor::new(bytes)))
-	}
 
-	#[cfg(feature = "bulk")] #[cfg_attr(docsrs, doc(cfg(feature = "bulk")))]
-	/// TODO
-	pub fn probe_path_bulk<P>(paths: &[P]) -> Vec<(&P, Result<Metadata, ProbeError>)>
-	where
-		P: AsRef<Path> + Sync,
-	{
-		use rayon::prelude::*;
+		// Make sure our buffer is clean.
+		self.infer_buffer.clear();
 
-		// Only use 25% of threads.
-		// More thread starts impacting negatively due
-		// to this mostly being a heavy I/O operation.
-		let threads = crate::free::threads().get() / 4;
-		let chunk_size = paths.len() / threads;
+		// Copy the first few mime bytes.
+		let bytes_len = bytes.len();
+		let bytes_end = std::cmp::max(bytes_len, INFER_AUDIO_PREFIX_LEN);
+		self.infer_buffer.extend_from_slice(&bytes[..bytes_end]);
 
-		paths
-			.par_chunks(chunk_size)
-			.flat_map_iter(|chunk| {
-				let mut probe = Self::new();
-				chunk.iter().map(move |path| (path, probe.probe_path(path)))
-			}).collect()
+		self.probe_inner(Box::new(Cursor::new(bytes)))
 	}
 
 	/// Private probe function.
@@ -201,13 +208,27 @@ impl Probe {
 	///
 	/// This is the high-level functions that calls all the
 	/// individual parser functions below to fill out the metadata.
-	pub(super) fn probe_inner<const ONCE: bool>(&mut self, ms: Box<dyn MediaSource>) -> Result<Metadata, ProbeError> {
+	pub(super) fn probe_inner(
+		&mut self,
+		ms: Box<dyn MediaSource>,
+	) -> Result<Metadata, ProbeError> {
 		// Extraction functions.
 		use crate::meta::extract::{
 			album_title,artist_name,cover_art,sample_rate,
 			release_date,total_runtime,track_number,track_title,
 			disc_number,compilation,genre
 		};
+
+		// Mime + extension.
+		let mut m = Metadata::DEFAULT;
+
+		// Parse the bytes, potentially set metadata.
+		if let Some(infer) = infer::get(&self.infer_buffer) {
+			m.mime = Some(infer.mime_type().into());
+			m.extension = Some(infer.extension().into());
+		} else {
+			return Err(ProbeError::Unsupported("TODO"));
+		}
 
 		let mss = MediaSourceStream::new(ms, MEDIA_SOURCE_STREAM_OPTIONS);
 		let probe = symphonia::default::get_probe();
@@ -220,8 +241,6 @@ impl Probe {
 
 		let mut format = probe_result.format;
 		let mut metadata = probe_result.metadata;
-
-		let mut m = Metadata::DEFAULT;
 
 		if let Some(track) = format.tracks().first() {
 			m.sample_rate   = sample_rate(track);
@@ -277,14 +296,6 @@ impl Probe {
 			};
 		}
 
-		if ONCE {
-			m.artist_name = artist_name.map(Arc::from);
-			m.album_title = album_title.map(Arc::from);
-			fill_track!();
-			fill_metadata!();
-			return Ok(m);
-		}
-
 		let Some(artist_name) = artist_name else {
 			m.album_title = album_title.map(Arc::from);
 			fill_track!();
@@ -309,7 +320,6 @@ impl Probe {
 				// is different and re-parse it, and return.
 				m = metadata.clone();
 				fill_track!();
-				Ok(m)
 			} else {
 				// Else, the artist exists, but not the album.
 				// Create the album and insert it in the map.
@@ -320,8 +330,6 @@ impl Probe {
 				m.album_title = Some(Arc::clone(&album_title));
 
 				album_map.insert(album_title, m.clone());
-
-				Ok(m)
 			}
 		} else {
 			// Else, the artist doesn't exist,
@@ -336,8 +344,8 @@ impl Probe {
 			let album_map = BTreeMap::from([(album_title, m.clone())]);
 
 			self.map.insert(artist_name, album_map);
-
-			Ok(m)
 		}
+
+		Ok(m)
 	}
 }

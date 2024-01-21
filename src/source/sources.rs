@@ -243,6 +243,7 @@ impl_from_array! {
 }
 
 //---------------------------------------------------------------------------------------------------- SourcesInner
+#[allow(clippy::large_enum_variant)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug,Clone,PartialEq,PartialOrd)]

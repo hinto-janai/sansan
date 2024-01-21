@@ -38,7 +38,7 @@ opt-level = 1
 # default = ["serde", "cubeb"]
 default = ["serde", "cpal", "bulk"]
 dummy   = []
-bulk    = ["dep:rayon", "dep:walkdir", "dep:infer"]
+bulk    = ["dep:rayon", "dep:walkdir"]
 mmap    = ["dep:memmap2"]
 
 [dev-dependencies]
@@ -60,7 +60,6 @@ log          = { version = "0.4", features = ["serde"], optional = true }
 ### Regular libraries.
 cfg-if       = { version = "1" }
 crossbeam    = { version = "0.8", features = ["crossbeam-channel"] }
-infer        = { version = "0.15", optional = true }
 memmap2      = { version = "0.9.3", optional = true }
 rand         = { version = "0.8" }
 rayon        = { version = "1", optional = true }

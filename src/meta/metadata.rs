@@ -8,6 +8,7 @@ use std::{
 	fs::File,
 	path::Path,
 	sync::Arc,
+	borrow::Cow,
 };
 
 #[allow(unused_imports)] // docs
@@ -32,6 +33,8 @@ pub struct Metadata {
 	pub release_date:  Option<Arc<str>>,
 	pub genre:         Option<Arc<str>>,
 	pub compilation:   Option<bool>,
+	pub mime:          Option<Arc<str>>,
+	pub extension:     Option<Arc<str>>,
 }
 
 impl Metadata {
@@ -57,6 +60,8 @@ impl Metadata {
 		release_date:  None,
 		genre:         None,
 		compilation:   None,
+		mime:          None,
+		extension:     None,
 	};
 
 	/// TODO
@@ -101,6 +106,8 @@ impl Metadata {
 	///     release_date:  None,
 	///     genre:         None,
 	///     compilation:   None,
+	///     mime:          None,
+	///     extension:     None,
 	/// };
 	/// assert!(metadata.all_none());
 	/// assert!(!metadata.all_some());
@@ -117,7 +124,9 @@ impl Metadata {
 		self.cover_art.is_none()     &&
 		self.release_date.is_none()  &&
 		self.genre.is_none()         &&
-		self.compilation.is_none()
+		self.compilation.is_none()   &&
+		self.mime.is_none()          &&
+		self.extension.is_none()
 	}
 
 	#[must_use]
@@ -139,6 +148,8 @@ impl Metadata {
 	///     release_date:  Some("".into()),
 	///     genre:         Some("".into()),
 	///     compilation:   Some(false),
+	///     mime:          Some(""),
+	///     extension:     Some(""),
 	/// };
 	/// assert!(metadata.all_some());
 	/// assert!(!metadata.all_none());
@@ -155,7 +166,9 @@ impl Metadata {
 		self.cover_art.is_some()     &&
 		self.release_date.is_some()  &&
 		self.genre.is_some()         &&
-		self.compilation.is_some()
+		self.compilation.is_some()   &&
+		self.mime.is_some()          &&
+		self.extension.is_some()
 	}
 }
 
@@ -207,6 +220,8 @@ impl Debug for Metadata {
 			.field("release_date",  &self.release_date)
 			.field("genre",         &self.genre)
 			.field("compilation",   &self.compilation)
+			.field("mime",          &self.mime)
+			.field("extension",     &self.extension)
 			.finish()
 	}
 }

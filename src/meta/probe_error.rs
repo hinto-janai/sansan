@@ -7,20 +7,24 @@ use symphonia::core::errors::Error;
 /// TODO
 #[derive(thiserror::Error, Debug)]
 pub enum ProbeError {
+	//#[error("file/bytes were not audio")]
+	// /// File/bytes were not audio.
+    // NotAudio((&'static str, &'static str)),
+
 	#[error("codec/container is not supported")]
-	/// Codec/container is not supported
+	/// Codec/container is not supported.
     Unsupported(&'static str),
 
 	#[error("a limit was reached while probing")]
-	/// A limit was reached while probing
+	/// A limit was reached while probing.
     Limit(&'static str),
 
 	#[error("probe io error")]
-	/// Probe I/O error
+	/// Probe I/O error.
     Io(#[from] std::io::Error),
 
 	#[error("unknown probing error")]
-	/// Unknown probing error
+	/// Unknown probing error.
 	Unknown,
 }
 
