@@ -7,6 +7,12 @@ pub mod bulk;
 mod metadata;
 pub use metadata::Metadata;
 
+mod map;
+pub use map::Map;
+
+mod track;
+pub use track::Track;
+
 mod probe;
 pub use probe::Probe;
 

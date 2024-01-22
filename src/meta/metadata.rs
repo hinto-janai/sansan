@@ -16,16 +16,16 @@ use crate::state::AudioState;
 
 //---------------------------------------------------------------------------------------------------- Metadata
 /// TODO
-// #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-// #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Clone,PartialEq,PartialOrd,Eq,Ord,Hash)]
 #[allow(missing_docs)]
 pub struct Metadata {
 	// Will always exist after parsing.
 	pub sample_rate:  u32,
 	pub runtime:      Duration,
-	pub mime:         &'static str,
-	pub extension:    &'static str,
+	pub mime:         Arc<str>,
+	pub extension:    Arc<str>,
 
 	pub artist:       Option<Arc<str>>,
 	pub album:        Option<Arc<str>>,
@@ -39,31 +39,31 @@ pub struct Metadata {
 }
 
 impl Metadata {
-	#[must_use]
-	/// TODO
-	pub const DEFAULT: Self = Self {
-		sample_rate: 0,
-		runtime: Duration::ZERO,
-		mime: "",
-		extension: "",
-		artist: None,
-		album: None,
-		track: None,
-		track_number: None,
-		disc: None,
-		art: None,
-		release: None,
-		genre: None,
-		compilation: None,
-	};
+	// #[must_use]
+	// /// TODO
+	// pub const DEFAULT: Self = Self {
+	// 	sample_rate: 0,
+	// 	runtime: Duration::ZERO,
+	// 	mime: "",
+	// 	extension: "",
+	// 	artist: None,
+	// 	album: None,
+	// 	track: None,
+	// 	track_number: None,
+	// 	disc: None,
+	// 	art: None,
+	// 	release: None,
+	// 	genre: None,
+	// 	compilation: None,
+	// };
 
 	#[must_use]
 	/// TODO
 	pub const fn from_base(
 		sample_rate: u32,
 		runtime:     Duration,
-		mime:        &'static str,
-		extension:   &'static str,
+		mime:        Arc<str>,
+		extension:   Arc<str>,
 	) -> Self {
 		Self {
 			sample_rate,
@@ -241,7 +241,23 @@ impl TryFrom<&[u8]> for Metadata {
 //---------------------------------------------------------------------------------------------------- DEFAULT
 impl Default for Metadata {
 	fn default() -> Self {
-		Self::DEFAULT
+		use crate::statics::EMPTY_ARC_STR;
+
+		Self {
+			sample_rate: 0,
+			runtime: Duration::ZERO,
+			mime: EMPTY_ARC_STR(),
+			extension: EMPTY_ARC_STR(),
+			artist: None,
+			album: None,
+			track: None,
+			track_number: None,
+			disc: None,
+			art: None,
+			release: None,
+			genre: None,
+			compilation: None,
+		}
 	}
 }
 

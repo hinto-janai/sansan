@@ -32,6 +32,17 @@ use crate::{
 	},
 };
 
+//---------------------------------------------------------------------------------------------------- Map
+///             artist name         albums belonging to this artist
+///                       v         v
+type ArtistMap = BTreeMap<Arc<str>, AlbumMap>;
+///             album title         tracks belonging to this album
+///                       v         v
+type AlbumMap  = BTreeMap<Arc<str>, TrackMap>;
+///             track title         the tracks metadata
+///                       v         v
+type TrackMap  = BTreeMap<Arc<str>, Metadata>;
+
 //---------------------------------------------------------------------------------------------------- Probe
 /// TODO
 #[allow(clippy::struct_excessive_bools)]
@@ -39,8 +50,8 @@ use crate::{
 // #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug,Default,Clone,PartialEq,Eq,PartialOrd,Ord,Hash)]
 pub struct Probe {
-	/// Duplicate artist + album.
-	map: BTreeMap<Arc<str>, BTreeMap<Arc<str>, Metadata>>,
+	/// Artist + Album + Track map.
+	map: ArtistMap,
 	/// Re-usable buffer for `AudioMime` usage.
 	mime: AudioMimeProbe,
 }
