@@ -41,6 +41,24 @@ pub struct Metadata {
 impl Metadata {
 	#[must_use]
 	/// TODO
+	pub const DEFAULT: Self = Self {
+		sample_rate: 0,
+		runtime: Duration::ZERO,
+		mime: "",
+		extension: "",
+		artist: None,
+		album: None,
+		track: None,
+		track_number: None,
+		disc: None,
+		art: None,
+		release: None,
+		genre: None,
+		compilation: None,
+	};
+
+	#[must_use]
+	/// TODO
 	pub const fn from_base(
 		sample_rate: u32,
 		runtime:     Duration,
@@ -93,6 +111,7 @@ impl Metadata {
 	///
 	/// ```
 	/// # use sansan::meta::*;
+	/// # use std::{time::*,sync::*,path::*,borrow::*};
 	/// let metadata = Metadata {
 	///     sample_rate:  96_000,
 	///     runtime:      Duration::from_secs(1),
@@ -216,6 +235,13 @@ impl TryFrom<&[u8]> for Metadata {
 	/// Calls [`Self::try_from_bytes`]
 	fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
 		Self::try_from_bytes(bytes)
+	}
+}
+
+//---------------------------------------------------------------------------------------------------- DEFAULT
+impl Default for Metadata {
+	fn default() -> Self {
+		Self::DEFAULT
 	}
 }
 
