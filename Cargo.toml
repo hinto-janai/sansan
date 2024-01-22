@@ -36,9 +36,10 @@ opt-level = 1
 [features]
 # TODO: Change default to cubeb after testing.
 # default = ["serde", "cubeb"]
-default = ["serde", "cpal", "bulk"]
+default = ["serde", "cpal", "meta", "bulk"]
 dummy   = []
-bulk    = ["dep:rayon", "dep:walkdir"]
+meta    = []
+bulk    = ["dep:rayon", "dep:walkdir", "meta"]
 mmap    = ["dep:memmap2"]
 
 [dev-dependencies]

@@ -148,6 +148,7 @@ impl AudioMime {
 	}
 
 	#[must_use]
+	/// TODO
 	pub const fn mime_arc(&self) -> &'static Arc<str> {
 		static AAC:  OnceLock<Arc<str>> = OnceLock::new();
 		static ALAC: OnceLock<Arc<str>> = OnceLock::new();

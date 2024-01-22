@@ -33,10 +33,12 @@ use crate::{
 };
 
 //---------------------------------------------------------------------------------------------------- Map
+/// TODO
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug,Default,Clone,PartialEq,Eq)]
 pub struct Map {
+	/// TODO
 	pub map: ArtistMap,
 }
 
@@ -70,16 +72,19 @@ impl Map {
 		}
 	}
 
+	/// TODO
 	pub fn with_capacity(artist_count: usize) -> Self {
 		Self {
 			map: ArtistMap::with_capacity(artist_count)
 		}
 	}
 
+	/// TODO
 	pub fn into_inner(self) -> ArtistMap {
 		self.map
 	}
 
+	/// TODO
 	pub fn shrink_to_fit(&mut self) {
 		self.map.shrink_to_fit();
 

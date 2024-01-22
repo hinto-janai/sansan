@@ -20,6 +20,7 @@
 //! to progress as normal and audio state will be updated _as if_ audio were actually being played.
 
 #![doc(html_logo_url = "https://raw.githubusercontent.com/hinto-janai/sansan/main/assets/img/icon_640_640.png")]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 //---------------------------------------------------------------------------------------------------- Lints
 #![forbid(
@@ -168,6 +169,9 @@ pub mod source;
 pub mod config;
 pub mod signal;
 pub mod error;
+
+#[cfg(feature = "meta")]
+#[cfg_attr(docsrs, doc(cfg(feature = "meta")))]
 pub mod meta;
 
 //---------------------------------------------------------------------------------------------------- Private Usage
