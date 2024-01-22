@@ -13,6 +13,7 @@ use std::{
 	borrow::Cow,
 	time::Duration,
 	io::Cursor,
+	sync::Arc,
 };
 use symphonia::core::{
 	formats::Track,
@@ -113,6 +114,25 @@ impl AudioMime {
 		}
 	}
 
+	/// TODO
+	pub const fn extension_arc(&self) -> &'static Arc<str> {
+		static AAC:  OnceLock<Arc<str>> = OnceLock::new();
+		static ALAC: OnceLock<Arc<str>> = OnceLock::new();
+		static FLAC: OnceLock<Arc<str>> = OnceLock::new();
+		static MP3:  OnceLock<Arc<str>> = OnceLock::new();
+		static OGG:  OnceLock<Arc<str>> = OnceLock::new();
+		static WAV:  OnceLock<Arc<str>> = OnceLock::new();
+
+		match self {
+			Self::Aac  => AAC.get_or_init(|| Arc::from("aac")),
+			Self::Alac => ALAC.get_or_init(|| Arc::from("m4a")),
+			Self::Flac => FLAC.get_or_init(|| Arc::from("flac")),
+			Self::Mp3  => MP3.get_or_init(|| Arc::from("mp3")),
+			Self::Ogg  => OGG.get_or_init(|| Arc::from("ogg")),
+			Self::Wav  => WAV.get_or_init(|| Arc::from("wav")),
+		}
+	}
+
 	#[must_use]
 	/// TODO
 	pub const fn mime(&self) -> &'static str {
@@ -123,6 +143,26 @@ impl AudioMime {
 			Self::Mp3 => "audio/mp3",
 			Self::Ogg => "audio/ogg",
 			Self::Wav => "audio/wav",
+//			"audio/aiff"|"audio/x-aiff" => Self::Aiff, // SOMEDAY
+		}
+	}
+
+	#[must_use]
+	pub const fn mime_arc(&self) -> &'static Arc<str> {
+		static AAC:  OnceLock<Arc<str>> = OnceLock::new();
+		static ALAC: OnceLock<Arc<str>> = OnceLock::new();
+		static FLAC: OnceLock<Arc<str>> = OnceLock::new();
+		static MP3:  OnceLock<Arc<str>> = OnceLock::new();
+		static OGG:  OnceLock<Arc<str>> = OnceLock::new();
+		static WAV:  OnceLock<Arc<str>> = OnceLock::new();
+
+		match self {
+			Self::Aac  => AAC.get_or_init(|| Arc::from("audio/aac")),
+			Self::Alac => ALAC.get_or_init(|| Arc::from("audio/m4a")),
+			Self::Flac => FLAC.get_or_init(|| Arc::from("audio/flac")),
+			Self::Mp3  => MP3.get_or_init(|| Arc::from("audio/mp3")),
+			Self::Ogg  => OGG.get_or_init(|| Arc::from("audio/ogg")),
+			Self::Wav  => WAV.get_or_init(|| Arc::from("audio/wav")),
 //			"audio/aiff"|"audio/x-aiff" => Self::Aiff, // SOMEDAY
 		}
 	}
