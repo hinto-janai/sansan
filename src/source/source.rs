@@ -45,13 +45,11 @@ pub enum Source<Extra: ExtraData> {
 	#[allow(missing_docs)] // TODO
 	Path {
 		source:   Arc<Path>,
-		metadata: Metadata,
 		extra:    Extra,
 	},
 	#[allow(missing_docs)] // TODO
 	Byte {
 		source:   Arc<[u8]>,
-		metadata: Metadata,
 		extra:    Extra,
 	},
 }
@@ -75,24 +73,6 @@ impl<Extra: ExtraData> Source<Extra> {
 		}
 	}
 
-	#[inline]
-	/// TODO
-	pub const fn metadata(&self) -> &Metadata {
-		match self {
-			Self::Path { metadata, .. } |
-			Self::Byte { metadata, .. } => metadata,
-		}
-	}
-
-	#[inline]
-	/// TODO
-	pub fn metadata_mut(&mut self) -> &mut Metadata {
-		match self {
-			Self::Path { metadata, .. } |
-			Self::Byte { metadata, .. } => metadata,
-		}
-	}
-
 	#[must_use]
 	/// TODO
 	pub fn dummy() -> Self
@@ -101,7 +81,6 @@ impl<Extra: ExtraData> Source<Extra> {
 	{
 		Self::Byte {
 			source:   Arc::new([]),
-			metadata: Default::default(),
 			extra:    Default::default(),
 		}
 	}
@@ -136,21 +115,15 @@ macro_rules! impl_from {
 		)*
 	) => {
 		$(
-			impl<Extra: ExtraData> From<($($input)+, Metadata, Extra)> for Source<Extra> {
-				fn from(from: ($($input)+, Metadata, Extra)) -> Self {
-					let ($source, metadata, extra) = from;
-					Self::$enum { source: $map, metadata, extra }
-				}
-			}
 			impl<Extra: ExtraData> From<($($input)+, Extra)> for Source<Extra> {
 				fn from(from: ($($input)+, Extra)) -> Self {
 					let ($source, extra) = from;
-					Self::$enum { source: $map, metadata: Default::default(), extra }
+					Self::$enum { source: $map, extra }
 				}
 			}
 			impl<Extra: ExtraData + Default> From<$($input)+> for Source<Extra> {
 				fn from($source: $($input)+) -> Self {
-					Self::$enum { source: $map, metadata: Default::default(), extra: Default::default(), }
+					Self::$enum { source: $map, extra: Default::default(), }
 				}
 			}
 		)*
@@ -181,17 +154,15 @@ impl_from! { |source|
 impl<Extra: ExtraData + Debug> Debug for Source<Extra> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::Path { source, extra, metadata } => {
+			Self::Path { source, extra } => {
 				f.debug_struct("Source::Path")
 					.field("source", source)
-					.field("metadata", metadata)
 					.field("extra", extra)
 					.finish()
 			},
-			Self::Byte { source, extra, metadata } => {
+			Self::Byte { source, extra } => {
 				f.debug_struct("Source::Byte")
 					.field("source", &source.len())
-					.field("metadata", metadata)
 					.field("extra", extra)
 					.finish()
 			},
