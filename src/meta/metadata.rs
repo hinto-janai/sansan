@@ -134,7 +134,7 @@ impl Metadata {
 	///
 	/// ```
 	/// # use sansan::meta::*;
-	/// # use std::{time::*,sync::*,path::*};
+	/// # use std::{time::*,sync::*,path::*,borrow::*};
 	/// let metadata = Metadata {
 	///     artist_name:   Some("".into()),
 	///     album_title:   Some("".into()),
@@ -148,8 +148,8 @@ impl Metadata {
 	///     release_date:  Some("".into()),
 	///     genre:         Some("".into()),
 	///     compilation:   Some(false),
-	///     mime:          Some(""),
-	///     extension:     Some(""),
+	///     mime:          Some(Cow::Borrowed("")),
+	///     extension:     Some(Cow::Borrowed("")),
 	/// };
 	/// assert!(metadata.all_some());
 	/// assert!(!metadata.all_none());

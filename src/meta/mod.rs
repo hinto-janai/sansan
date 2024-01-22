@@ -1,5 +1,9 @@
 //! Audio metadata.
 
+#[cfg(feature = "bulk")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bulk")))]
+pub mod bulk;
+
 mod metadata;
 pub use metadata::Metadata;
 
