@@ -176,6 +176,7 @@ mod macros;
 mod output;
 mod resampler;
 mod free;
+mod statics;
 
 //---------------------------------------------------------------------------------------------------- Test Init Helpers
 // These are helper functions used for testing throughout the codebase.
