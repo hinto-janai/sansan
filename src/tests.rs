@@ -18,10 +18,10 @@ pub(crate) fn source(data: usize) -> Source<usize> {
 
 /// Returns `Sources` with `0..=9` as the `Data`.
 pub(crate) fn sources() -> Sources<usize> {
-	Sources::from_10([
-		source(0), source(1), source(2), source(3), source(4),
+	Sources::from_1_and_iter(
+		source(0), [source(1), source(2), source(3), source(4),
 		source(5), source(6), source(7), source(8), source(9),
-	])
+	].into_iter())
 }
 
 /// Init the `Engine` with a default `InitConfig`.
@@ -60,30 +60,30 @@ pub(crate) fn init_with_sources() -> Engine::<usize> {
 
 /// Return 3 `Source`'s with `10, 20, 30` as the `Data`.
 pub(crate) fn sources_10_20_30() -> Sources<usize> {
-	Sources::from_3([source(10), source(20), source(30)])
+	Sources::from_1_and_iter(source(10), [source(20), source(30)].into_iter())
 }
 
 /// Return 3 `Source`'s with `11, 22, 33` as the `Data`.
 pub(crate) fn sources_11_22_33() -> Sources<usize> {
-	Sources::from_3([source(11), source(22), source(33)])
+	Sources::from_1_and_iter(source(11), [source(22), source(33)].into_iter())
 }
 
 /// Return 3 `Source`'s with `40, 50, 60` as the `Data`.
 pub(crate) fn sources_40_50_60() -> Sources<usize> {
-	Sources::from_3([source(40), source(50), source(60)])
+	Sources::from_1_and_iter(source(40), [source(50), source(60)].into_iter())
 }
 
 /// Return 3 `Source`'s with `44, 55, 66` as the `Data`.
 pub(crate) fn sources_44_55_66() -> Sources<usize> {
-	Sources::from_3([source(44), source(55), source(66)])
+	Sources::from_1_and_iter(source(44), [source(55), source(66)].into_iter())
 }
 
 /// Return 3 `Source`'s with `70, 80, 90` as the `Data`.
 pub(crate) fn sources_70_80_90() -> Sources<usize> {
-	Sources::from_3([source(70), source(80), source(90)])
+	Sources::from_1_and_iter(source(70), [source(80), source(90)].into_iter())
 }
 
 /// Return 3 `Source`'s with `77, 88, 99` as the `Data`.
 pub(crate) fn sources_77_88_99() -> Sources<usize> {
-	Sources::from_3([source(77), source(88), source(99)])
+	Sources::from_1_and_iter(source(77), [source(88), source(99)].into_iter())
 }
