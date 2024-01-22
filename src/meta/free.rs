@@ -212,7 +212,7 @@ pub fn is_ape<B: AsRef<[u8]>>(bytes: B) -> bool {
 /// If this file is to be used again, the position must
 /// be seeked backwards since we move forwards a little
 /// while reading.
-pub(super) fn extract_audio_mime_bytes(file: File, buf: &mut Vec<u8>) -> std::io::Result<File> {
+pub(crate) fn extract_audio_mime_bytes(file: File, buf: &mut Vec<u8>) -> std::io::Result<File> {
 	use std::io::Read;
 
 	// Read the first few bytes of the file.

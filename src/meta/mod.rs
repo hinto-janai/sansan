@@ -11,6 +11,9 @@ pub use probe_error::ProbeError;
 
 pub(crate) mod extract;
 
+mod mime;
+pub use mime::{AudioMime,AudioMimeProbe};
+
 mod constants;
 pub use constants::{
 	SUPPORTED_AUDIO_MIME_TYPES,

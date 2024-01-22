@@ -7,9 +7,9 @@ use symphonia::core::errors::Error;
 /// TODO
 #[derive(thiserror::Error, Debug)]
 pub enum ProbeError {
-	//#[error("file/bytes were not audio")]
-	// /// File/bytes were not audio.
-    // NotAudio((&'static str, &'static str)),
+	#[error("file/bytes were not audio")]
+	/// File/bytes were not audio.
+	NotAudio,
 
 	#[error("codec/container is not supported")]
 	/// Codec/container is not supported.

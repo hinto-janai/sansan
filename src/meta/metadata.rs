@@ -33,8 +33,8 @@ pub struct Metadata {
 	pub release_date:  Option<Arc<str>>,
 	pub genre:         Option<Arc<str>>,
 	pub compilation:   Option<bool>,
-	pub mime:          Option<Arc<str>>,
-	pub extension:     Option<Arc<str>>,
+	pub mime:          Option<Cow<'static, str>>,
+	pub extension:     Option<Cow<'static, str>>,
 }
 
 impl Metadata {

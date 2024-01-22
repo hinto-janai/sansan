@@ -24,7 +24,7 @@ use std::{
 use symphonia::core::io::{MediaSourceStream, MediaSource};
 use crate::{
 	meta::constants::INFER_AUDIO_PREFIX_LEN,
-	meta::{ProbeError,Metadata},
+	meta::{ProbeError,Metadata,AudioMime,AudioMimeProbe},
 	source::source_decode::{
 		MEDIA_SOURCE_STREAM_OPTIONS,
 		FORMAT_OPTIONS,
@@ -37,12 +37,12 @@ use crate::{
 #[allow(clippy::struct_excessive_bools)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
-#[derive(Debug,Default,Clone,PartialEq,Eq)]
+#[derive(Debug,Default,Clone,PartialEq,Eq,PartialOrd,Ord,Hash)]
 pub struct Probe {
 	/// Duplicate artist + album.
 	map: BTreeMap<Arc<str>, BTreeMap<Arc<str>, Metadata>>,
-	/// Re-usable buffer for `infer` usage.
-	infer_buffer: Vec<u8>,
+	/// Re-usable buffer for `AudioMime` usage.
+	mime: AudioMimeProbe,
 }
 
 //---------------------------------------------------------------------------------------------------- Probe Impl
@@ -52,7 +52,16 @@ impl Probe {
 	pub const fn new() -> Self {
 		Self {
 			map: BTreeMap::new(),
-			infer_buffer: Vec::new(),
+			mime: AudioMimeProbe::new(),
+		}
+	}
+
+	#[must_use]
+	/// TODO.
+	pub fn allocated() -> Self {
+		Self {
+			map: BTreeMap::new(),
+			mime: AudioMimeProbe::allocated(),
 		}
 	}
 
@@ -138,7 +147,7 @@ impl Probe {
 			}
 		}
 
-		Self { map, infer_buffer: Vec::with_capacity(INFER_AUDIO_PREFIX_LEN + 1) }
+		Self { map, mime: AudioMimeProbe::allocated() }
 	}
 
 	/// TODO
@@ -155,23 +164,18 @@ impl Probe {
 	/// # Errors
 	/// TODO
 	pub fn probe_file(&mut self, file: File) -> Result<Metadata, ProbeError> {
-		use std::io::{Read, Seek, SeekFrom};
+		let mut metadata = Metadata::DEFAULT;
 
-		// Make sure our buffer is clean.
-		self.infer_buffer.clear();
+		let (file, mime) = match self.mime.probe_file(file) {
+			Ok((file, Some(mime))) => (file, mime),
+			Ok((_, None)) => return Err(ProbeError::NotAudio),
+			Err(e) => return Err(e.into()),
+		};
 
-		// Read the first few bytes of the file.
-		let mut file = crate::meta::free::extract_audio_mime_bytes(
-			file,
-			&mut self.infer_buffer
-		)?;
+		metadata.mime = Some(Cow::Borrowed(mime.mime()));
+		metadata.extension = Some(Cow::Borrowed(mime.extension()));
 
-		// Reset the file to the 0th byte.
-		// This is needed since `probe_inner()`'s symphonia
-		// probe will also check for initial metadata.
-		file.seek(SeekFrom::Start(0))?;
-
-		self.probe_inner(Box::new(file))
+		self.probe_inner(Box::new(file), metadata)
 	}
 
 	/// TODO
@@ -191,15 +195,16 @@ impl Probe {
 		// get away with pretending it is "static".
 		let bytes: &'static [u8] = unsafe { std::mem::transmute(bytes.as_ref()) };
 
-		// Make sure our buffer is clean.
-		self.infer_buffer.clear();
+		let mut metadata = Metadata::DEFAULT;
 
-		// Copy the first few mime bytes.
-		let bytes_len = bytes.len();
-		let bytes_end = std::cmp::max(bytes_len, INFER_AUDIO_PREFIX_LEN);
-		self.infer_buffer.extend_from_slice(&bytes[..bytes_end]);
+		let Some(mime) = AudioMime::try_from_bytes(bytes) else {
+			return Err(ProbeError::NotAudio);
+		};
 
-		self.probe_inner(Box::new(Cursor::new(bytes)))
+		metadata.mime = Some(Cow::Borrowed(mime.mime()));
+		metadata.extension = Some(Cow::Borrowed(mime.extension()));
+
+		self.probe_inner(Box::new(Cursor::new(bytes)), metadata)
 	}
 
 	/// Private probe function.
@@ -211,6 +216,7 @@ impl Probe {
 	pub(super) fn probe_inner(
 		&mut self,
 		ms: Box<dyn MediaSource>,
+		mut m: Metadata,
 	) -> Result<Metadata, ProbeError> {
 		// Extraction functions.
 		use crate::meta::extract::{
@@ -218,17 +224,6 @@ impl Probe {
 			release_date,total_runtime,track_number,track_title,
 			disc_number,compilation,genre
 		};
-
-		// Mime + extension.
-		let mut m = Metadata::DEFAULT;
-
-		// Parse the bytes, potentially set metadata.
-		if let Some(infer) = infer::get(&self.infer_buffer) {
-			m.mime = Some(infer.mime_type().into());
-			m.extension = Some(infer.extension().into());
-		} else {
-			return Err(ProbeError::Unsupported("TODO"));
-		}
 
 		let mss = MediaSourceStream::new(ms, MEDIA_SOURCE_STREAM_OPTIONS);
 		let probe = symphonia::default::get_probe();
