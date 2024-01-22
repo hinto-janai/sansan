@@ -203,26 +203,6 @@ pub fn is_ape<B: AsRef<[u8]>>(bytes: B) -> bool {
 }
 
 //---------------------------------------------------------------------------------------------------- is_audio_path
-/// Extract the first view bytes needed
-/// to detect if a file is audio or not.
-///
-/// The extracted bytes are _appended_ to `buf`.
-///
-/// # Invariant
-/// If this file is to be used again, the position must
-/// be seeked backwards since we move forwards a little
-/// while reading.
-pub(crate) fn extract_audio_mime_bytes(file: File, buf: &mut Vec<u8>) -> std::io::Result<File> {
-	use std::io::Read;
-
-	// Read the first few bytes of the file.
-	let mut take = file.take(INFER_AUDIO_PREFIX_LEN as u64);
-	take.read_to_end(buf)?;
-
-	// Return the `File`.
-	Ok(take.into_inner())
-}
-
 /// Generate the `Path` version of the above audio byte parsers.
 macro_rules! impl_is_path {
 	($($fn_name:ident => $byte_fn:ident),* $(,)?) => {
@@ -231,19 +211,29 @@ macro_rules! impl_is_path {
 			///
 			/// Returns `Ok(true)` if the [`File`] at the [`Path`] `p` is the correct data type.
 			///
-			/// ## Allocation
-			/// This allocates a small [`Vec`] on each call.
+			/// ## Speed
+			/// This allocates a small but significant stack array on each call.
 			///
-			/// Consider using one of the [`crate::meta::bulk`]
-			/// functions for probing many `Path`'s.
+			/// Consider creating and re-using an [`AudioMimeProbe`] for probing many `Path`'s.
+			///
+			/// [`AudioMimeProbe`]: crate::meta::AudioMimeProbe
 			///
 			/// ## Errors
 			/// This errors if the `File` failed to be opened or read.
 			#[inline]
 			pub fn $fn_name<P: AsRef<Path>>(path: P) -> std::io::Result<bool> {
-				let file = std::fs::File::open(path)?;
-				let mut buf = Vec::with_capacity(INFER_AUDIO_PREFIX_LEN);
-				drop(extract_audio_mime_bytes(file, &mut buf)?);
+				use std::io::Read;
+
+				let mut file = std::fs::File::open(path)?;
+				let mut buf = [0; INFER_AUDIO_PREFIX_LEN];
+
+				match file.read_exact(&mut buf) {
+					Ok(_) => (),
+					// If we reach EOF early, that's fine.
+					Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => (),
+					Err(e) => return Err(e),
+				}
+
 				Ok($byte_fn(buf))
 			}
 		)*
