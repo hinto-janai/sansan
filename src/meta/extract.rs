@@ -14,7 +14,7 @@ use symphonia::core::{
 
 //---------------------------------------------------------------------------------------------------- Extraction functions
 /// Get `artist` tag.
-pub(super) fn artist_name(tags: &[Tag]) -> Option<Cow<'_, str>> {
+pub(super) fn artist(tags: &[Tag]) -> Option<Cow<'_, str>> {
 	if let Some(t) = tags.iter().find(|i| i.std_key == Some(StandardTagKey::AlbumArtist)) {
 		let o = value(t);
 		if o.is_some() { return o; }
@@ -47,7 +47,7 @@ pub(super) fn artist_name(tags: &[Tag]) -> Option<Cow<'_, str>> {
 }
 
 /// Attempt to get album title.
-pub(super) fn album_title(tags: &[Tag]) -> Option<Cow<'_, str>> {
+pub(super) fn album(tags: &[Tag]) -> Option<Cow<'_, str>> {
 	if let Some(t) = tags.iter().find(|i| i.std_key == Some(StandardTagKey::Album)) {
 		let o = value(t);
 		if o.is_some() { return o; }
@@ -62,7 +62,7 @@ pub(super) fn album_title(tags: &[Tag]) -> Option<Cow<'_, str>> {
 }
 
 /// Attempt to get song title.
-pub(super) fn track_title(tags: &[Tag]) -> Option<Cow<'_, str>> {
+pub(super) fn track(tags: &[Tag]) -> Option<Cow<'_, str>> {
 	tags
 		.iter()
 		.find(|i| i.std_key == Some(StandardTagKey::TrackTitle))
@@ -83,7 +83,7 @@ pub(super) const fn sample_rate(track: &Track) -> Option<u32> {
 }
 
 /// Get a tracks runtime.
-pub(super) fn total_runtime(track: &Track) -> Option<Duration> {
+pub(super) fn runtime(track: &Track) -> Option<Duration> {
 	let Some(timestamp) = track.codec_params.n_frames else {
 		return None;
 	};
@@ -99,7 +99,7 @@ pub(super) fn total_runtime(track: &Track) -> Option<Duration> {
 }
 
 /// Attempt to get track disc number.
-pub(super) fn disc_number(tags: &[Tag]) -> Option<u32> {
+pub(super) fn disc(tags: &[Tag]) -> Option<u32> {
 	tags
 		.iter()
 		.find(|i| i.std_key == Some(StandardTagKey::DiscNumber))
@@ -107,7 +107,7 @@ pub(super) fn disc_number(tags: &[Tag]) -> Option<u32> {
 }
 
 /// Attempt to get the release date.
-pub(super) fn release_date(tags: &[Tag]) -> Option<Cow<'_, str>> {
+pub(super) fn release(tags: &[Tag]) -> Option<Cow<'_, str>> {
 	tags
 		.iter()
 		.find(|i| {
@@ -127,7 +127,7 @@ pub(super) fn genre(tags: &[Tag]) -> Option<Cow<'_, str>> {
 }
 
 /// Attempt to get the art bytes.
-pub(super) fn cover_art(visuals: &[Visual]) -> Option<&[u8]> {
+pub(super) fn art(visuals: &[Visual]) -> Option<&[u8]> {
 	// Find the biggest visual and return it.
 	visuals
 		.iter()

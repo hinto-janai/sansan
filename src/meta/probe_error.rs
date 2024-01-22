@@ -11,6 +11,18 @@ pub enum ProbeError {
 	/// File/bytes were not audio.
 	NotAudio,
 
+	#[error("could not find the sample rate")]
+	/// The audio's sample rate could not be found.
+	MissingSampleRate,
+
+	#[error("could not find the runtime")]
+	/// The audio's runtime could not be found.
+	MissingRuntime,
+
+	#[error("could not find the track list")]
+	/// The audio's track list was empty.
+	MissingTracks,
+
 	#[error("codec/container is not supported")]
 	/// Codec/container is not supported.
     Unsupported(&'static str),

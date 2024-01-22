@@ -35,8 +35,8 @@ use crate::{
 //---------------------------------------------------------------------------------------------------- Probe
 /// TODO
 #[allow(clippy::struct_excessive_bools)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
+// #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+// #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[derive(Debug,Default,Clone,PartialEq,Eq,PartialOrd,Ord,Hash)]
 pub struct Probe {
 	/// Duplicate artist + album.
@@ -76,21 +76,21 @@ impl Probe {
 	}
 
 	/// TODO
-	pub fn get_artist<S: Borrow<str>>(&self, artist_name: S) -> Option<&BTreeMap<Arc<str>, Metadata>> {
-		self.map.get(artist_name.borrow())
+	pub fn get_artist<S: Borrow<str>>(&self, artist: S) -> Option<&BTreeMap<Arc<str>, Metadata>> {
+		self.map.get(artist.borrow())
 	}
 
 	/// TODO
 	pub fn get_album<S1, S2>(
 		&self,
-		artist_name: S1,
-		album_title: S2,
+		artist: S1,
+		album: S2,
 	) -> Option<&Metadata>
 	where
 		S1: Borrow<str>,
 		S2: Borrow<str>,
 	{
-		self.map.get(artist_name.borrow()).and_then(|b| b.get(album_title.borrow()))
+		self.map.get(artist.borrow()).and_then(|b| b.get(album.borrow()))
 	}
 
 	/// TODO
@@ -98,22 +98,22 @@ impl Probe {
 	/// # Return
 	/// Returns [`Some`] if:
 	/// - A previous `Artist` + `Album` entry existed (returns the old value)
-	/// - [`Metadata::artist_name`] is missing (returns the input `metadata`)
-	/// - [`Metadata::album_title`] is missing (returns the input `metadata`)
+	/// - [`Metadata::artist`] is missing (returns the input `metadata`)
+	/// - [`Metadata::album`] is missing (returns the input `metadata`)
 	///
 	/// Returns [`None`] if no previous entry existed.
 	pub fn insert_metadata(&mut self, metadata: Metadata) -> Option<Metadata> {
-		let Some(b_artist_name) = metadata.artist_name.borrow() else { return Some(metadata); };
-		let Some(b_album_title) = metadata.album_title.borrow() else { return Some(metadata); };
-		let album_title = Arc::clone(b_album_title);
+		let Some(b_artist) = metadata.artist.borrow() else { return Some(metadata); };
+		let Some(b_album) = metadata.album.borrow() else { return Some(metadata); };
+		let album = Arc::clone(b_album);
 
-		if let Some(album_map) = self.map.get_mut::<str>(b_artist_name) {
-			album_map.insert(album_title, metadata)
+		if let Some(album_map) = self.map.get_mut::<str>(b_artist) {
+			album_map.insert(album, metadata)
 		} else {
-			let artist_name = Arc::clone(b_artist_name);
-			drop((b_artist_name, b_album_title));
-			let album_map = BTreeMap::from([(album_title, metadata)]);
-			self.map.insert(artist_name, album_map);
+			let artist = Arc::clone(b_artist);
+			drop((b_artist, b_album));
+			let album_map = BTreeMap::from([(album, metadata)]);
+			self.map.insert(artist, album_map);
 			None
 		}
 	}
@@ -124,26 +124,26 @@ impl Probe {
 
 		for metadata in metadata_iter {
 			// `artist/album` are our "keys", so if they're not found, just continue.
-			// Technically `artist_name` could exist _without_ an `album_title` but
-			// that's pretty useless as a cache (`artist_name` without any albums)
+			// Technically `artist` could exist _without_ an `album` but
+			// that's pretty useless as a cache (`artist` without any albums)
 			// so continue in the case as well.
-			let Some(b_artist_name) = metadata.artist_name.as_ref() else { continue; };
-			let Some(b_album_title) = metadata.album_title.as_ref() else { continue; };
+			let Some(b_artist) = metadata.artist.as_ref() else { continue; };
+			let Some(b_album) = metadata.album.as_ref() else { continue; };
 
 			// If the artist exists...
-			if let Some(album_map) = map.get_mut::<str>(b_artist_name) {
+			if let Some(album_map) = map.get_mut::<str>(b_artist) {
 				// Insert the album metadata if not found.
-				if album_map.get::<str>(b_album_title).is_none() {
+				if album_map.get::<str>(b_album).is_none() {
 					// `entry()` for `BTreeMap` _must_ take in the key by value
 					// (`Arc<T>`), so use `get()` + `insert()` to check instead.
-					album_map.insert(Arc::clone(b_album_title), metadata);
+					album_map.insert(Arc::clone(b_album), metadata);
 				}
 			} else {
 				// Artist + album does not exist, insert both.
-				let artist_name = Arc::clone(b_artist_name);
-				let album_title = Arc::clone(b_album_title);
-				let album_map = BTreeMap::from([(album_title, metadata)]);
-				map.insert(artist_name, album_map);
+				let artist = Arc::clone(b_artist);
+				let album = Arc::clone(b_album);
+				let album_map = BTreeMap::from([(album, metadata)]);
+				map.insert(artist, album_map);
 			}
 		}
 
@@ -164,18 +164,13 @@ impl Probe {
 	/// # Errors
 	/// TODO
 	pub fn probe_file(&mut self, file: File) -> Result<Metadata, ProbeError> {
-		let mut metadata = Metadata::DEFAULT;
-
 		let (file, mime) = match self.mime.probe_file(file) {
 			Ok((file, Some(mime))) => (file, mime),
 			Ok((_, None)) => return Err(ProbeError::NotAudio),
 			Err(e) => return Err(e.into()),
 		};
 
-		metadata.mime = Some(Cow::Borrowed(mime.mime()));
-		metadata.extension = Some(Cow::Borrowed(mime.extension()));
-
-		self.probe_inner(Box::new(file), metadata)
+		self.probe_inner(Box::new(file), mime)
 	}
 
 	/// TODO
@@ -195,16 +190,11 @@ impl Probe {
 		// get away with pretending it is "static".
 		let bytes: &'static [u8] = unsafe { std::mem::transmute(bytes.as_ref()) };
 
-		let mut metadata = Metadata::DEFAULT;
-
 		let Some(mime) = AudioMime::try_from_bytes(bytes) else {
 			return Err(ProbeError::NotAudio);
 		};
 
-		metadata.mime = Some(Cow::Borrowed(mime.mime()));
-		metadata.extension = Some(Cow::Borrowed(mime.extension()));
-
-		self.probe_inner(Box::new(Cursor::new(bytes)), metadata)
+		self.probe_inner(Box::new(Cursor::new(bytes)), mime)
 	}
 
 	/// Private probe function.
@@ -216,13 +206,13 @@ impl Probe {
 	pub(super) fn probe_inner(
 		&mut self,
 		ms: Box<dyn MediaSource>,
-		mut m: Metadata,
+		mime: AudioMime,
 	) -> Result<Metadata, ProbeError> {
 		// Extraction functions.
 		use crate::meta::extract::{
-			album_title,artist_name,cover_art,sample_rate,
-			release_date,total_runtime,track_number,track_title,
-			disc_number,compilation,genre
+			album,artist,art,sample_rate,
+			release,runtime,track_number,track,
+			disc,compilation,genre
 		};
 
 		let mss = MediaSourceStream::new(ms, MEDIA_SOURCE_STREAM_OPTIONS);
@@ -237,10 +227,27 @@ impl Probe {
 		let mut format = probe_result.format;
 		let mut metadata = probe_result.metadata;
 
-		if let Some(track) = format.tracks().first() {
-			m.sample_rate   = sample_rate(track);
-			m.total_runtime = total_runtime(track);
-		}
+		// Create our `Metadata` we'll be mutating throughout
+		// this function with the baseline values.
+		//
+		// All metadata after this is technically optional.
+		let mut m = match format.tracks().first() {
+			Some(track) => {
+				let Some(sample_rate) = sample_rate(track) else {
+					return Err(ProbeError::MissingSampleRate);
+				};
+
+				let Some(runtime) = runtime(track) else {
+					return Err(ProbeError::MissingRuntime);
+				};
+
+				let extension = mime.extension();
+				let mime      = mime.mime();
+
+				Metadata::from_base(sample_rate, runtime, mime, extension)
+			},
+			None => return Err(ProbeError::MissingTracks),
+		};
 
 		// Extract a usable `MetadataRevision` from a `ProbeResult`.
 		//
@@ -270,47 +277,47 @@ impl Probe {
 		let tags    = md.tags();
 		let visuals = md.visuals();
 
-		let artist_name = artist_name(tags);
-		let album_title = album_title(tags);
+		let artist = artist(tags);
+		let album = album(tags);
 
 		/// Fill in the in-scope `m` with track data.
 		macro_rules! fill_track {
 			() => {
-				m.track_title  = track_title(tags).map(Arc::from);
+				m.track  = track(tags).map(Arc::from);
 				m.track_number = track_number(tags);
 			};
 		}
 		/// Fill in the in-scope `m` with misc metadata.
 		macro_rules! fill_metadata {
 			() => {
-				m.disc_number  = disc_number(tags);
-				m.cover_art    = cover_art(visuals).map(Arc::from);
-				m.release_date = release_date(tags).map(Arc::from);
+				m.disc  = disc(tags);
+				m.art    = art(visuals).map(Arc::from);
+				m.release = release(tags).map(Arc::from);
 				m.genre        = genre(tags).map(Arc::from);
 				m.compilation  = compilation(tags);
 			};
 		}
 
-		let Some(artist_name) = artist_name else {
-			m.album_title = album_title.map(Arc::from);
+		let Some(artist) = artist else {
+			m.album = album.map(Arc::from);
 			fill_track!();
 			fill_metadata!();
 			return Ok(m);
 		};
 
-		let Some(album_title) = album_title else {
+		let Some(album) = album else {
 			fill_track!();
 			fill_metadata!();
 			return Ok(m);
 		};
 
-		// We have an `artist_name` & `album_title` at this point.
+		// We have an `artist` & `album` at this point.
 
 		#[allow(clippy::redundant_else)]
 		// If the artist already exists...
-		if let Some(album_map) = self.map.get_mut::<str>(artist_name.borrow()) {
+		if let Some(album_map) = self.map.get_mut::<str>(artist.borrow()) {
 			// and the album also exists...
-			if let Some(metadata) = album_map.get::<str>(album_title.borrow()) {
+			if let Some(metadata) = album_map.get::<str>(album.borrow()) {
 				// Copy the metadata, assume the track
 				// is different and re-parse it, and return.
 				m = metadata.clone();
@@ -321,24 +328,24 @@ impl Probe {
 				fill_track!();
 				fill_metadata!();
 
-				let album_title = Arc::<str>::from(album_title);
-				m.album_title = Some(Arc::clone(&album_title));
+				let album = Arc::<str>::from(album);
+				m.album = Some(Arc::clone(&album));
 
-				album_map.insert(album_title, m.clone());
+				album_map.insert(album, m.clone());
 			}
 		} else {
 			// Else, the artist doesn't exist,
 			// create everything and insert.
 			fill_track!();
 			fill_metadata!();
-			let artist_name = Arc::<str>::from(artist_name);
-			let album_title = Arc::<str>::from(album_title);
-			m.artist_name = Some(Arc::clone(&artist_name));
-			m.album_title = Some(Arc::clone(&album_title));
+			let artist = Arc::<str>::from(artist);
+			let album = Arc::<str>::from(album);
+			m.artist = Some(Arc::clone(&artist));
+			m.album = Some(Arc::clone(&album));
 
-			let album_map = BTreeMap::from([(album_title, m.clone())]);
+			let album_map = BTreeMap::from([(album, m.clone())]);
 
-			self.map.insert(artist_name, album_map);
+			self.map.insert(artist, album_map);
 		}
 
 		Ok(m)
