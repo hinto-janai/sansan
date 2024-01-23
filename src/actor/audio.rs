@@ -13,6 +13,7 @@ use std::{
 	},
 };
 use crate::{
+	actor::actor::Actor,
 	state::AtomicState,
 	output::AudioOutput,
 	error::OutputError,
@@ -22,7 +23,7 @@ use crate::{
 };
 
 // Audio I/O backend.
-use crate::output::AudioOutputStruct;
+use crate::output::OutputStruct;
 
 // Resampler backend.
 use crate::resampler::ResamplerStruct;
@@ -89,8 +90,6 @@ pub(crate) enum AudioToKernel {
 //---------------------------------------------------------------------------------------------------- Audio Impl
 #[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct InitArgs {
-	pub(crate) init_blocking:     bool,
-	pub(crate) shutdown_blocking: bool,
 	pub(crate) barrier:           Arc<Barrier>,
 	pub(crate) atomic_state:      Arc<AtomicState>,
 	pub(crate) ready_to_recv:     Arc<AtomicBool>,
@@ -103,6 +102,108 @@ pub(crate) struct InitArgs {
 	pub(crate) to_kernel_error:   Sender<OutputError>,
 }
 
+//---------------------------------------------------------------------------------------------------- Actor
+impl<Output: AudioOutput> Actor for Audio<Output> {
+	const NAME: &'static str = "Audio";
+
+	type MainArgs = Channels;
+	type InitArgs = InitArgs;
+
+	#[cold] #[inline(never)]
+	fn barrier(&self) -> &Barrier {
+		&self.barrier
+	}
+
+	#[cold] #[inline(never)]
+	fn init(init_args: Self::InitArgs) -> (Self, Self::MainArgs) {
+		let InitArgs {
+			barrier,
+			atomic_state,
+			ready_to_recv,
+			audio_retry,
+			to_gc,
+			to_caller_elapsed,
+			from_decode,
+			to_kernel,
+			from_kernel,
+			to_kernel_error,
+		} = init_args;
+
+		let channels = Channels {
+			to_gc,
+			to_caller_elapsed,
+			from_decode,
+			to_kernel,
+			from_kernel,
+			to_kernel_error,
+		};
+
+		// TODO:
+		// obtain audio output depending on user config, hang, try again, etc.
+		let audio_retry_secs = audio_retry.as_secs_f32();
+		let output: OutputStruct<ResamplerStruct> = loop {
+			match OutputStruct::dummy() {
+				Ok(output) => break output,
+				Err(e) => {
+					debug2!("{ACTOR} (init) - output failed: {e}, sleeping for: {audio_retry_secs}s");
+					channels.to_kernel_error.try_send(e);
+
+					// We need to make sure we don't infinitely
+					// loop and ignore shutdown signals, so handle them.
+					if matches!(channels.from_kernel.try_recv(), Ok(KernelToAudio::Shutdown)) {
+						crate::free::shutdown(ACTOR, shutdown_blocking, barrier);
+						return;
+					}
+
+					std::thread::sleep(audio_retry);
+				},
+			}
+		};
+
+		let this = Audio {
+			atomic_state,
+			playing: false,
+			elapsed_callback: 0.0,
+			elapsed_audio_state: 0.0,
+			ready_to_recv,
+			output,
+			barrier,
+			shutdown_blocking,
+		};
+
+		(this, channels)
+	}
+
+	#[cold] #[inline(never)]
+	#[allow(clippy::ignored_unit_patterns)]
+	fn main(self, _: Self::MainArgs) -> Arc<Barrier> {
+		let mut select = Select::new();
+
+		assert_eq!(0, select.recv(&self.from_audio));
+		assert_eq!(1, select.recv(&self.from_decode));
+		assert_eq!(2, select.recv(&self.from_kernel));
+		assert_eq!(3, select.recv(&self.shutdown));
+
+		// Reduce [Gc] to the lowest thread priority.
+		lpt::lpt();
+
+		// Loop, receive garbage, and immediately drop it.
+		loop {
+			match select.ready() {
+				0 => drop(select_recv!(self.from_audio)),
+				1 => drop(select_recv!(self.from_decode)),
+				2 => drop(select_recv!(self.from_kernel)),
+				3 => {
+					select_recv!(self.shutdown);
+					 return self.barrier;
+				},
+
+				_ => unreachable!(),
+			}
+		}
+	}
+}
+
 //---------------------------------------------------------------------------------------------------- Audio Impl
 impl<Output: AudioOutput> Audio<Output> {
 	//---------------------------------------------------------------------------------------------------- Init
@@ -113,62 +214,6 @@ impl<Output: AudioOutput> Audio<Output> {
 		std::thread::Builder::new()
 			.name(ACTOR.into())
 			.spawn(move || {
-				let InitArgs {
-					init_blocking,
-					shutdown_blocking,
-					barrier,
-					atomic_state,
-					ready_to_recv,
-					audio_retry,
-					to_gc,
-					to_caller_elapsed,
-					from_decode,
-					to_kernel,
-					from_kernel,
-					to_kernel_error,
-				} = args;
-
-				let channels = Channels {
-					to_gc,
-					to_caller_elapsed,
-					from_decode,
-					to_kernel,
-					from_kernel,
-					to_kernel_error,
-				};
-
-				// TODO:
-				// obtain audio output depending on user config, hang, try again, etc.
-				let audio_retry_secs = audio_retry.as_secs_f32();
-				let output: AudioOutputStruct<ResamplerStruct> = loop {
-					match AudioOutputStruct::dummy() {
-						Ok(output) => break output,
-						Err(e) => {
-							debug2!("{ACTOR} (init) - output failed: {e}, sleeping for: {audio_retry_secs}s");
-							channels.to_kernel_error.try_send(e);
-
-							// We need to make sure we don't infinitely
-							// loop and ignore shutdown signals, so handle them.
-							if matches!(channels.from_kernel.try_recv(), Ok(KernelToAudio::Shutdown)) {
-								crate::free::shutdown(ACTOR, shutdown_blocking, barrier);
-								return;
-							}
-
-							std::thread::sleep(audio_retry);
-						},
-					}
-				};
-
-				let this = Audio {
-					atomic_state,
-					playing: false,
-					elapsed_callback: 0.0,
-					elapsed_audio_state: 0.0,
-					ready_to_recv,
-					output,
-					barrier,
-					shutdown_blocking,
-				};
 
 				crate::free::init(ACTOR, init_blocking, &this.barrier);
 

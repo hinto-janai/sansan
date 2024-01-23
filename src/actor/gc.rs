@@ -6,6 +6,7 @@ use std::{
 	thread::JoinHandle, marker::PhantomData,
 };
 use crate::{
+	actor::actor::Actor,
 	actor::kernel::KernelToGc,
 	actor::decode::DecodeToGc,
 	state::{AudioState,Current},
@@ -16,52 +17,37 @@ use crate::{
 use crossbeam::channel::{Receiver, Select};
 use symphonia::core::audio::AudioBuffer;
 
-//---------------------------------------------------------------------------------------------------- Constants
-/// Actor name.
-const ACTOR: &str = "Gc";
-
 //---------------------------------------------------------------------------------------------------- Gc
 /// The [G]arbage [c]ollector.
 #[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct Gc<Extra: ExtraData> {
-	pub(crate) shutdown_blocking: bool,
-	pub(crate) barrier:           Arc<Barrier>,
-	pub(crate) shutdown:          Receiver<()>,
-	pub(crate) from_audio:        Receiver<AudioBuffer<f32>>,
-	pub(crate) from_decode:       Receiver<DecodeToGc>,
-	pub(crate) from_kernel:       Receiver<KernelToGc<Extra>>,
+	pub(crate) barrier:     Arc<Barrier>,
+	pub(crate) shutdown:    Receiver<()>,
+	pub(crate) from_audio:  Receiver<AudioBuffer<f32>>,
+	pub(crate) from_decode: Receiver<DecodeToGc>,
+	pub(crate) from_kernel: Receiver<KernelToGc<Extra>>,
 }
 
-//---------------------------------------------------------------------------------------------------- InitArgs
-#[allow(clippy::missing_docs_in_private_items)]
-pub(crate) struct InitArgs<Extra: ExtraData> {
-	pub(crate) init_blocking: bool,
-	pub(crate) gc: Gc<Extra>,
-}
+//---------------------------------------------------------------------------------------------------- Actor
+impl<Extra: ExtraData> Actor for Gc<Extra> {
+	const NAME: &'static str = "Gc";
 
-//---------------------------------------------------------------------------------------------------- Gc Impl
-impl<Extra: ExtraData> Gc<Extra> {
-	//---------------------------------------------------------------------------------------------------- Init
-	#[cold]
-	#[inline(never)]
-	/// Initialize [`Gc`].
-	pub(crate) fn init(init_args: InitArgs<Extra>) -> Result<JoinHandle<()>, std::io::Error> {
-		std::thread::Builder::new()
-			.name(ACTOR.into())
-			.spawn(move || {
-				crate::free::init(ACTOR, init_args.init_blocking, &init_args.gc.barrier);
+	type MainArgs = ();
+	type InitArgs = Self;
 
-				Self::main(init_args.gc);
-			})
+	#[cold] #[inline(never)]
+	fn barrier(&self) -> &Barrier {
+		&self.barrier
 	}
 
-	//---------------------------------------------------------------------------------------------------- Main Loop
-	#[cold]
-	#[inline(never)]
-	/// `Gc`'s main function.
-	fn main(self) {
-		debug2!("{ACTOR} - main()");
+	#[cold] #[inline(never)]
+	fn init(init_args: Self::InitArgs) -> (Self, Self::MainArgs) {
+		(init_args, ())
+	}
 
+	#[cold] #[inline(never)]
+	#[allow(clippy::ignored_unit_patterns)]
+	fn main(self, _: Self::MainArgs) -> Arc<Barrier> {
 		let mut select = Select::new();
 
 		assert_eq!(0, select.recv(&self.from_audio));
@@ -80,8 +66,7 @@ impl<Extra: ExtraData> Gc<Extra> {
 				2 => drop(select_recv!(self.from_kernel)),
 				3 => {
 					select_recv!(self.shutdown);
-					crate::free::shutdown(ACTOR, self.shutdown_blocking, self.barrier);
-					return;
+					 return self.barrier;
 				},
 
 				_ => unreachable!(),

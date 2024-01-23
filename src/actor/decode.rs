@@ -4,6 +4,7 @@
 use std::{thread::JoinHandle, marker::PhantomData};
 use crossbeam::channel::{Receiver, Select, Sender, TrySendError};
 use crate::{
+	actor::actor::Actor,
 	signal::{self,SeekError,SeekedTime},
 	source::{Source, source_decode::SourceDecode},
 	state::AudioState,
@@ -42,7 +43,7 @@ use strum::EnumCount;
 pub(crate) const DECODE_BUFFER_LEN: usize = 16_000;
 
 /// Actor name.
-const ACTOR: &str = "Decode";
+const NAME: &str = "Decode";
 
 //---------------------------------------------------------------------------------------------------- Decode
 /// TODO
@@ -52,7 +53,6 @@ pub(crate) struct Decode<Extra: ExtraData> {
 	buffer:              VecDeque<(AudioBuffer<f32>, Time)>, // Local decoded packets, ready to send to [Audio]
 	source:              SourceDecode,                       // Our current [Source] that we are decoding
 	done_decoding:       bool,                               // Whether we have finished decoding our current [Source]
-	shutdown_blocking:   bool,
 	barrier:             Arc<Barrier>,
 	_p:                  PhantomData<Extra>,
 }
@@ -92,8 +92,6 @@ pub(crate) enum DecodeToGc {
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct InitArgs<Extra: ExtraData> {
-	pub(crate) init_blocking:          bool,
-	pub(crate) shutdown_blocking:      bool,
 	pub(crate) barrier:                Arc<Barrier>,
 	pub(crate) audio_ready_to_recv:    Arc<AtomicBool>,
 	pub(crate) to_gc:                  Sender<DecodeToGc>,
@@ -105,67 +103,62 @@ pub(crate) struct InitArgs<Extra: ExtraData> {
 	pub(crate) to_kernel_error_source: Sender<SourceError>,
 }
 
-//---------------------------------------------------------------------------------------------------- Decode Impl
-impl<Extra: ExtraData> Decode<Extra> {
-	//---------------------------------------------------------------------------------------------------- Init
-	#[cold]
-	#[inline(never)]
-	/// Initialize `Decode`.
-	pub(crate) fn init(args: InitArgs<Extra>) -> Result<JoinHandle<()>, std::io::Error> {
-		std::thread::Builder::new()
-			.name(ACTOR.into())
-			.spawn(move || {
-				let InitArgs {
-					init_blocking,
-					shutdown_blocking,
-					barrier,
-					audio_ready_to_recv,
-					to_gc,
-					to_audio,
-					to_kernel_seek,
-					to_kernel_source,
-					from_kernel,
-					to_kernel_error_decode,
-					to_kernel_error_source,
-				} = args;
+//---------------------------------------------------------------------------------------------------- Actor
+impl<Extra: ExtraData> Actor for Decode<Extra> {
+	const NAME: &'static str = NAME;
 
-				let channels = Channels {
-					to_gc,
-					to_audio,
-					to_kernel_seek,
-					to_kernel_source,
-					from_kernel,
-					to_kernel_error_decode,
-					to_kernel_error_source,
-				};
+	type MainArgs = Channels<Extra>;
+	type InitArgs = InitArgs<Extra>;
 
-				let this = Self {
-					audio_ready_to_recv,
-					buffer: VecDeque::with_capacity(DECODE_BUFFER_LEN),
-					source: SourceDecode::dummy(),
-					done_decoding: true,
-					barrier,
-					shutdown_blocking,
-					_p: PhantomData,
-				};
-
-				crate::free::init(ACTOR, init_blocking, &this.barrier);
-
-				Self::main(this, channels);
-			})
+	#[cold] #[inline(never)]
+	fn barrier(&self) -> &Barrier {
+		&self.barrier
 	}
 
-	//---------------------------------------------------------------------------------------------------- Main Loop
-	#[cold]
-	#[inline(never)]
-	/// `Decode`'s main function.
-	fn main(mut self, c: Channels<Extra>) {
+	#[cold] #[inline(never)]
+	fn init(init_args: Self::InitArgs) -> (Self, Self::MainArgs) {
+		let InitArgs {
+			barrier,
+			audio_ready_to_recv,
+			to_gc,
+			to_audio,
+			to_kernel_seek,
+			to_kernel_source,
+			from_kernel,
+			to_kernel_error_decode,
+			to_kernel_error_source,
+		} = init_args;
+
+		let channels = Channels {
+			to_gc,
+			to_audio,
+			to_kernel_seek,
+			to_kernel_source,
+			from_kernel,
+			to_kernel_error_decode,
+			to_kernel_error_source,
+		};
+
+		let this = Self {
+			audio_ready_to_recv,
+			buffer: VecDeque::with_capacity(DECODE_BUFFER_LEN),
+			source: SourceDecode::dummy(),
+			done_decoding: true,
+			barrier,
+			_p: PhantomData,
+		};
+
+		(this, channels)
+	}
+
+	#[cold] #[inline(never)]
+	fn main(mut self, c: Channels<Extra>) -> Arc<Barrier> {
 		// The "Decode" loop.
 		loop {
 			// Listen to other actors.
 			let signal: Result<KernelToDecode<Extra>, ()> = if self.done_decoding {
 				// Blocking
-				trace2!("{ACTOR} - waiting for msgs on recv()");
+				trace2!("{NAME} - waiting for msgs on recv()");
 				c.from_kernel.recv().map_err(|_e| ())
 			} else {
 				// Non-blocking
@@ -182,8 +175,7 @@ impl<Extra: ExtraData> Decode<Extra> {
 					KernelToDecode::Seek((seek, elapsed)) => self.seek(seek, elapsed, &c.to_gc, &c.to_kernel_seek),
 					KernelToDecode::DiscardAudioAndStop   => self.discard_audio_and_stop(&c.to_gc),
 					KernelToDecode::Shutdown => {
-						crate::free::shutdown(ACTOR, self.shutdown_blocking, self.barrier);
-						return;
+						return self.barrier;
 					}
 				}
 			}
@@ -201,7 +193,7 @@ impl<Extra: ExtraData> Decode<Extra> {
 				// This "end of stream" error is currently the only way
 				// a [FormatReader] can indicate the media is complete.
 				Err(symphonia::core::errors::Error::IoError(_)) => {
-					debug2!("{ACTOR} - done decoding");
+					debug2!("{NAME} - done decoding");
 					self.done_decoding = true;
 
 					// INVARIANT: If `Audio` is not ready, it means its
@@ -240,13 +232,14 @@ impl<Extra: ExtraData> Decode<Extra> {
 			try_send!(c.to_gc, DecodeToGc::Packet(packet));
 		}
 	}
+}
 
-	//---------------------------------------------------------------------------------------------------- Signal Handlers
-	// Function Handlers.
-	//
-	// These are the functions invoked in response
-	// to exact messages/signals from the other actors.
-
+//---------------------------------------------------------------------------------------------------- Signal Handlers
+// Function Handlers.
+//
+// These are the functions invoked in response
+// to exact messages/signals from the other actors.
+impl<Extra: ExtraData> Decode<Extra> {
 	#[inline]
 	/// Send decoded audio data to [Audio]
 	/// if they are ready, else, store locally.
@@ -255,7 +248,7 @@ impl<Extra: ExtraData> Decode<Extra> {
 		to_audio: &Sender<DecodeToAudio>,
 		data: (AudioBuffer<f32>, Time),
 	) {
-		trace2!("{ACTOR} - send_or_store_audio()");
+		trace2!("{NAME} - send_or_store_audio()");
 
 		// Store the buffer first.
 		self.buffer.push_back(data);
@@ -270,7 +263,7 @@ impl<Extra: ExtraData> Decode<Extra> {
 		&mut self,
 		to_audio: &Sender<DecodeToAudio>,
 	) {
-		trace2!("{ACTOR} - send_audio_if_ready()");
+		trace2!("{NAME} - send_audio_if_ready()");
 
 		// While `Audio` is ready to accept more,
 		// send all the audio buffers we have.
@@ -286,7 +279,7 @@ impl<Extra: ExtraData> Decode<Extra> {
 	#[inline]
 	/// TODO
 	fn new_source(&mut self, source: Source<Extra>, channels: &Channels<Extra>) {
-		debug2!("{ACTOR} - new_source(), source: {source:?}");
+		debug2!("{NAME} - new_source(), source: {source:?}");
 
 		match source.try_into() {
 			Ok(mut s) => {
@@ -309,7 +302,7 @@ impl<Extra: ExtraData> Decode<Extra> {
 		to_gc: &Sender<DecodeToGc>,
 		to_kernel_seek: &Sender<Result<SeekedTime, SeekError>>
 	) {
-		debug2!("{ACTOR} - seek(), seek: {seek:?}");
+		debug2!("{NAME} - seek(), seek: {seek:?}");
 
 		// Re-use seek logic.
 		// This is in a separate inner function
@@ -343,7 +336,7 @@ impl<Extra: ExtraData> Decode<Extra> {
 	#[inline(never)]
 	/// TODO
 	fn handle_decode_error(channels: &Channels<Extra>, error: DecodeError) {
-		error2!("{ACTOR} - decode error: {error:?}");
+		error2!("{NAME} - decode error: {error:?}");
 		try_send!(channels.to_kernel_error_decode, error);
 	}
 
@@ -351,14 +344,14 @@ impl<Extra: ExtraData> Decode<Extra> {
 	#[inline(never)]
 	/// TODO
 	fn handle_source_error(channels: &Channels<Extra>, error: SourceError) {
-		error2!("{ACTOR} - source error: {error:?}");
+		error2!("{NAME} - source error: {error:?}");
 		try_send!(channels.to_kernel_error_source, error);
 	}
 
 	#[inline]
 	/// TODO
 	fn discard_audio_and_stop(&mut self, to_gc: &Sender<DecodeToGc>) {
-		trace2!("{ACTOR} - discard_audio_and_stop()");
+		trace2!("{NAME} - discard_audio_and_stop()");
 		self.clear_audio_buffer(to_gc);
 		self.done_decoding = true;
 	}

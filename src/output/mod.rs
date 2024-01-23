@@ -1,8 +1,15 @@
 //! Audio output backends.
 
 mod constants;
+
 mod output;
 pub(crate) use output::AudioOutput;
+
+mod output_or_dummy;
+pub(crate) use output_or_dummy::OutputOrDummy;
+
+mod dummy;
+pub(crate) use dummy::AudioOutputDummy;
 
 // Use cubeb if:
 // - (only) it is enabled
@@ -10,8 +17,7 @@ pub(crate) use output::AudioOutput;
 // - no backend is enabled
 cfg_if::cfg_if! {
 	if #[cfg(any(test, feature = "dummy"))] {
-		mod dummy;
-		pub(crate) use dummy::DummyAudioOutput as AudioOutputStruct;
+		pub(crate) use dummy::AudioOutputDummy as AudioOutputStruct;
 		/// The audio output backend used.
 		pub(crate) const AUDIO_OUTPUT_BACKEND: &str = "dummy";
 	} else if #[cfg(feature = "cpal")] {

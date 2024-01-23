@@ -1,4 +1,7 @@
-# Kernel
+## Actor
+Each file here represents an OS thread, an actor in the `Engine`.
+
+## Kernel
 `Kernel` is in its own module due to the vast separation of all signal handlers that it has to handle, e.g:
 - `play()`
 - `seek()`

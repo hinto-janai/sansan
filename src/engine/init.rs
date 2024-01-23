@@ -2,6 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
+	actor::actor::spawn_actor,
 	engine::Engine,
 	extra_data::ExtraData,
 	macros::{try_send,debug2,info2},
@@ -106,26 +107,6 @@ impl<Extra: ExtraData> Engine<Extra> {
 		// wrapped in `atomic::Atomic<T>`.
 		let atomic_state = Arc::new(AtomicState::from(live_config));
 
-		/// Macro used to spawn all actor's in this function.
-		macro_rules! spawn_actor {
-			(
-				$actor_name:literal, // `&'static str` of the actor's name
-				$init_args:expr,     // InitArgs type for the actor
-				$($spawn_fn:tt)*     // Function to init the actor
-			) => {
-				// In `#[cfg(test]`, all actors get spawned as normal, however,
-				// `Audio` uses a dummy audio output and resampler struct such
-				// that it can "process" audio and actually go through it's real
-				// loop without actually needing to connect to any audio hardware/server.
-				//
-				// This means we can test `sansan` in CI as if it were actually being used.
-				debug2!("Engine - spawning: {}", $actor_name);
-				if let Err(error) = $($spawn_fn)*($init_args) {
-					panic!("failed to spawn thread `{}`: {}", $actor_name, error);
-				}
-			};
-		}
-
 		//-------------------------------------------------------------- Spawn [Caller]
 		let callbacks = {
 			// Prevent destructing `config`.
@@ -165,10 +146,10 @@ impl<Extra: ExtraData> Engine<Extra> {
 			// drop((shutdown, source_new, queue_end, elapsed));
 		// } else {
 		spawn_actor!(
-			"Caller",
+			Caller<Extra>,
+			config.init_blocking,
+			config.shutdown_blocking,
 			crate::actor::caller::InitArgs {
-				init_blocking: config.init_blocking,
-				shutdown_blocking: config.shutdown_blocking,
 				barrier: Arc::clone(&barrier),
 				callbacks,
 				low_priority:  config.callback_low_priority,
@@ -180,9 +161,7 @@ impl<Extra: ExtraData> Engine<Extra> {
 				error_source,
 				error_output,
 			},
-			Caller::init
 		);
-		// }
 
 		//-------------------------------------------------------------- Spawn [Audio]
 		// Initialize [Audio] channels.
@@ -228,10 +207,10 @@ impl<Extra: ExtraData> Engine<Extra> {
 		let (err_source_d_to_k, err_source_k_from_d) = unbounded();
 
 		spawn_actor!(
-			"Decode",
+			Decode<Extra>,
+			config.init_blocking,
+			config.shutdown_blocking,
 			crate::actor::decode::InitArgs {
-				init_blocking:          config.init_blocking,
-				shutdown_blocking:      config.shutdown_blocking,
 				barrier:                Arc::clone(&barrier),
 				audio_ready_to_recv:    Arc::clone(&audio_ready_to_recv),
 				to_gc:                  d_to_gc,
@@ -242,27 +221,23 @@ impl<Extra: ExtraData> Engine<Extra> {
 				to_kernel_error_decode: err_decode_d_to_k,
 				to_kernel_error_source: err_source_d_to_k,
 			},
-			Decode::init
 		);
 
 		//-------------------------------------------------------------- Spawn [Gc]
 		let (gc_shutdown, shutdown)  = bounded(1);
 		let (k_to_gc,     gc_from_k) = unbounded();
-		spawn_actor!(
-			"Gc",
-			crate::actor::gc::InitArgs {
-				init_blocking: config.init_blocking,
-				gc: crate::actor::gc::Gc {
-					shutdown_blocking: config.shutdown_blocking,
-					barrier:           Arc::clone(&barrier),
-					shutdown,
-					from_audio:  gc_from_a,
-					from_decode: gc_from_d,
-					from_kernel: gc_from_k,
-				},
+		spawn_actor! {
+			Gc<Extra>,
+			config.init_blocking,
+			config.shutdown_blocking,
+			Gc {
+				barrier: Arc::clone(&barrier),
+				shutdown,
+				from_audio:  gc_from_a,
+				from_decode: gc_from_d,
+				from_kernel: gc_from_k,
 			},
-			Gc::<Extra>::init
-		);
+		}
 
 		//-------------------------------------------------------------- Initialize [Kernel] <-> [Engine] channels
 		// Variables are prefix/suffixed accordingly:

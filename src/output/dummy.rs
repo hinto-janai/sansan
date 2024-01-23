@@ -38,9 +38,9 @@ use crate::output::constants::{
 	AUDIO_SAMPLE_BUFFER_LEN,
 };
 
-//----------------------------------------------------------------------------------------------- DummyAudioOutput
+//----------------------------------------------------------------------------------------------- AudioOutputDummy
 /// TODO
-pub(crate) struct DummyAudioOutput<R: Resampler> {
+pub(crate) struct AudioOutputDummy<R: Resampler> {
 	/// We send audio data to this channel which
 	/// the audio stream will receive and write.
 	sender: Sender<f32>,
@@ -80,7 +80,7 @@ pub(crate) struct DummyAudioOutput<R: Resampler> {
 }
 
 //----------------------------------------------------------------------------------------------- `AudioOutput` Impl
-impl<R: Resampler> AudioOutput for DummyAudioOutput<R> {
+impl<R: Resampler> AudioOutput for AudioOutputDummy<R> {
 	type E = OutputError;
 	type R = R;
 
@@ -308,48 +308,5 @@ impl<R: Resampler> AudioOutput for DummyAudioOutput<R> {
 
 	fn duration(&self) -> u64 {
 		self.duration
-	}
-}
-
-//----------------------------------------------------------------------------------------------- Error re-map
-impl From<cpal::DefaultStreamConfigError> for OutputError {
-	fn from(error: cpal::DefaultStreamConfigError) -> Self {
-		use cpal::DefaultStreamConfigError as E;
-		match error {
-			E::DeviceNotAvailable => Self::DeviceUnavailable,
-			E::StreamTypeNotSupported => Self::InvalidFormat,
-			E::BackendSpecific { err } => Self::Unknown(Cow::Owned(err.description)),
-		}
-	}
-}
-
-impl From<cpal::StreamError> for OutputError {
-	fn from(error: cpal::StreamError) -> Self {
-		use cpal::StreamError as E;
-		match error {
-			E::DeviceNotAvailable => Self::DeviceUnavailable,
-			E::BackendSpecific { err } => Self::Unknown(Cow::Owned(err.description)),
-		}
-	}
-}
-
-impl From<cpal::BuildStreamError> for OutputError {
-	fn from(error: cpal::BuildStreamError) -> Self {
-		use cpal::BuildStreamError as E;
-		match error {
-			E::DeviceNotAvailable | E::InvalidArgument | E::StreamIdOverflow => Self::DeviceUnavailable,
-			E::StreamConfigNotSupported => Self::InvalidFormat,
-			E::BackendSpecific { err } => Self::Unknown(Cow::Owned(err.description)),
-		}
-	}
-}
-
-impl From<cpal::PlayStreamError> for OutputError {
-	fn from(error: cpal::PlayStreamError) -> Self {
-		use cpal::PlayStreamError as E;
-		match error {
-			E::DeviceNotAvailable => Self::DeviceUnavailable,
-			E::BackendSpecific { err } => Self::Unknown(Cow::Owned(err.description)),
-		}
 	}
 }
