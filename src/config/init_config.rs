@@ -38,7 +38,8 @@ use crate::config::ErrorCallback;
 /// which allows modifying the [`RuntimeConfig`].
 #[derive(Debug)]
 pub struct InitConfig<Extra: ExtraData> {
-	//------------------------------------------ Engine
+	//------------------------------------------ Callbacks
+	//
 	/// Various callbacks to execute upon certain conditions being met.
 	pub callbacks: Callbacks<Extra>,
 
@@ -56,6 +57,8 @@ pub struct InitConfig<Extra: ExtraData> {
 	/// [`lpt`] is used to set low priority.
 	pub callback_low_priority: bool,
 
+	//------------------------------------------ Init
+	//
 	/// Should the [`Engine`] block on [`Drop::drop`]
 	/// until all the internal threads are cleaned up?
 	///
@@ -65,7 +68,7 @@ pub struct InitConfig<Extra: ExtraData> {
 	pub shutdown_blocking: bool,
 
 	/// Should [`Engine::init`] block until it is 100% ready to return?
-	///
+	//
 	/// If this is set to `true`, `Engine::init` will
 	/// block until all of the internals are ready.
 	///
@@ -79,6 +82,8 @@ pub struct InitConfig<Extra: ExtraData> {
 	/// of playback and the [`AudioState`] may be strange.
 	pub init_blocking: bool,
 
+	//------------------------------------------ Audio
+	//
 	/// How often should the audio thread retry a connection
 	/// to the audio hardware/server upon initial failure?
 	///
@@ -102,11 +107,8 @@ pub struct InitConfig<Extra: ExtraData> {
 	/// A practical value would be somewhere between `0.1ms - 5s`.
 	pub audio_retry: Duration,
 
-	//------------------------------------------ Media Controls
-	/// TODO
-	pub media_controls: bool,
-
 	//------------------------------------------ Restore state/settings
+	//
 	/// TODO
 	pub audio_state: Option<AudioState<Extra>>,
 	/// TODO
@@ -127,7 +129,6 @@ impl<Extra: ExtraData> InitConfig<Extra> {
 	///     audio_retry:           std::time::Duration::from_secs(1),
 	///     audio_state:           None,
 	///     live_config:           None,
-	///     media_controls:        false,
 	/// };
 	/// ```
 	pub const DEFAULT: Self = Self {
@@ -136,7 +137,6 @@ impl<Extra: ExtraData> InitConfig<Extra> {
 		shutdown_blocking:     true,
 		init_blocking:         false,
 		audio_retry:           Duration::from_secs(1),
-		media_controls:        false,
 		audio_state:           None,
 		live_config:           None,
 	};
