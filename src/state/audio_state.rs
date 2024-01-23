@@ -4,7 +4,6 @@
 use crate::{
 	signal::{Volume,Repeat,AtomicVolume,AtomicRepeat},
 	source::Source,
-	meta::Metadata,
 	extra_data::ExtraData,
 	state::current::Current,
 };

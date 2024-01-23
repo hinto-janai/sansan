@@ -2,7 +2,6 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	meta::Metadata,
 	error::SourceError,
 	extra_data::ExtraData,
 };

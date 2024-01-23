@@ -170,9 +170,16 @@ pub mod config;
 pub mod signal;
 pub mod error;
 
-#[cfg(feature = "meta")]
-#[cfg_attr(docsrs, doc(cfg(feature = "meta")))]
-pub mod meta;
+// SOMEDAY:
+// This module is getting pretty big, and it's mostly
+// getting outside the scope of what `sansan` is,
+// a real-time music _playback_ library.
+//
+// Extract out into some other crate.
+//
+// #[cfg(feature = "meta")]
+// #[cfg_attr(docsrs, doc(cfg(feature = "meta")))]
+// pub mod meta;
 
 //---------------------------------------------------------------------------------------------------- Private Usage
 mod actor;

@@ -6,6 +6,7 @@ use std::sync::{
 };
 
 //----------------------------------------------------------------------------------------------------
+/// Program wide empty `Arc("")`.
 static EMPTY_ARC_STR_ONCE:  OnceLock<Arc<str>> = OnceLock::new();
 
 #[inline]
