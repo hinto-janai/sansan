@@ -137,6 +137,9 @@
 	clippy::impl_trait_in_params,
 	clippy::struct_excessive_bools,
 	clippy::exit,
+	// This lint is actually good but it's hitting
+	// a false positive on `src/actor/audio.rs`...
+	clippy::self_named_module_files
 )]
 
 #![cfg_attr(debug_assertions, allow(clippy::todo))]
