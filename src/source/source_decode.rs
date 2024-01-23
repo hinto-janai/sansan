@@ -182,6 +182,8 @@ impl TryFrom<MediaSourceStream> for SourceDecode {
 		};
 
 		// Create a decoder for the track.
+		//
+		// TODO: this can be cached so aren't boxing each time.
 		let decoder = match get_codecs().make(&track.codec_params, &DECODER_OPTIONS) {
 			Ok(d) => d,
 			Err(e) => return Err(SourceError::Decoder(e.into())),

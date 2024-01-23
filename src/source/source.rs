@@ -2,6 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
+	source::{empty_source,silent_source},
 	error::SourceError,
 	extra_data::ExtraData,
 };
@@ -74,13 +75,29 @@ impl<Extra: ExtraData> Source<Extra> {
 
 	#[must_use]
 	/// TODO
-	pub fn dummy() -> Self
+	///
+	/// This uses [`empty_source`].
+	pub fn empty() -> Self
 	where
 		Extra: Default,
 	{
 		Self::Byte {
-			source:   Arc::new([]),
-			extra:    Default::default(),
+			source: Arc::clone(empty_source()),
+			extra:  Default::default(),
+		}
+	}
+
+	#[must_use]
+	/// TODO
+	///
+	/// This uses [`silent_source`].
+	pub fn silent() -> Self
+	where
+		Extra: Default,
+	{
+		Self::Byte {
+			source: Arc::clone(silent_source()),
+			extra:  Default::default(),
 		}
 	}
 

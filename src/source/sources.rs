@@ -2,7 +2,7 @@
 
 //---------------------------------------------------------------------------------------------------- Use
 use crate::{
-	source::Source,
+	source::{Source,empty_source,silent_source},
 	error::SourceError,
 	extra_data::ExtraData,
 };
@@ -94,11 +94,21 @@ impl<Extra: ExtraData> Sources<Extra> {
 
 	#[must_use]
 	/// TODO
-	pub fn dummy() -> Self
+	pub fn silent() -> Self
 	where
 		Extra: Default,
 	{
-		let source = Source::dummy();
+		let source = Source::silent();
+		Self::from_1(source)
+	}
+
+	#[must_use]
+	/// TODO
+	pub fn empty() -> Self
+	where
+		Extra: Default,
+	{
+		let source = Source::empty();
 		Self::from_1(source)
 	}
 }
