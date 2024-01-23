@@ -39,6 +39,10 @@ pub fn silent_source() -> &'static Arc<[u8]> {
 	static ONCE: OnceLock<Arc<[u8]>> = OnceLock::new();
 
 	ONCE.get_or_init(|| {
+		// TODO:
+		// This used to be 1s, which revealed something surprising:
+		// `Decode` for some reason can't start decoding on 1s or
+		// shorter length audio data... this should be fixed obviously.
 		Arc::from(include_bytes!("../../assets/audio/silent_2s.mp3").as_slice())
 	})
 }

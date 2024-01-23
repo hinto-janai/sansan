@@ -285,7 +285,20 @@ impl<Output: AudioOutput> Audio<Output> {
 				false, // TODO: disable_device_switch
 				None,  // TODO: buffer_milliseconds
 			) {
-				Ok(o)  => self.output = o,
+				// TODO: this isn't real-time safe...!
+				//
+				// We're dropping our old `Output` which
+				// contains `Vec`'s, channels, etc.
+				//
+				// Sending this to `Gc` is hard since some
+				// things within the `Output` struct aren't `Send`...
+				//
+				// The buffer could just be very big to compensate for this.
+				//
+				// We can also just use a pre-allocated memory pool,
+				// or make `AudioOutput` return the buffers which we re-use.
+				Ok(o) => self.output = o,
+
 				// And if we couldn't, tell `Kernel` we errored.
 				Err(output_error) => {
 					error2!("Audio - couldn't re-open AudioOutput: {output_error:?}");
