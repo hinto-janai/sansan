@@ -56,6 +56,8 @@ use std::sync::{
 use strum::EnumCount;
 
 //---------------------------------------------------------------------------------------------------- Constants
+/// Actor name.
+pub(super) const ACTOR: &str = "Kernel";
 
 //---------------------------------------------------------------------------------------------------- Kernel
 /// TODO
@@ -67,8 +69,9 @@ pub(crate) struct Kernel<Extra: ExtraData> {
 	///
 	/// This originally was [audio_state] but this field is
 	/// accessed a lot, so it is just [w], for [w]riter.
-	pub(super) w:               someday::Writer<AudioState<Extra>>,
-	pub(super) shutdown_wait:   Arc<Barrier>,
+	pub(super) w: someday::Writer<AudioState<Extra>>,
+	pub(super) barrier: Arc<Barrier>,
+	pub(super) shutdown_blocking: bool,
 }
 
 //---------------------------------------------------------------------------------------------------- Msg
@@ -196,11 +199,12 @@ pub(crate) struct Channels<Extra: ExtraData> {
 //---------------------------------------------------------------------------------------------------- Kernel Impl
 #[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct InitArgs<Extra: ExtraData> {
-	pub(crate) init_barrier:  Option<Arc<Barrier>>,
-	pub(crate) atomic_state:  Arc<AtomicState>,
-	pub(crate) shutdown_wait: Arc<Barrier>,
-	pub(crate) w:             someday::Writer<AudioState<Extra>>,
-	pub(crate) channels:      Channels<Extra>,
+	pub(crate) init_blocking:     bool,
+	pub(crate) shutdown_blocking: bool,
+	pub(crate) barrier:           Arc<Barrier>,
+	pub(crate) atomic_state:      Arc<AtomicState>,
+	pub(crate) w:                 someday::Writer<AudioState<Extra>>,
+	pub(crate) channels:          Channels<Extra>,
 }
 
 //---------------------------------------------------------------------------------------------------- Kernel Impl
@@ -211,12 +215,13 @@ impl<Extra: ExtraData> Kernel<Extra> {
 	/// Initialize `Kernel`.
 	pub(crate) fn init(args: InitArgs<Extra>) -> Result<JoinHandle<()>, std::io::Error> {
 		std::thread::Builder::new()
-			.name("Kernel".into())
+			.name(ACTOR.into())
 			.spawn(move || {
 				let InitArgs {
-					init_barrier,
+					init_blocking,
+					shutdown_blocking,
+					barrier,
 					atomic_state,
-					shutdown_wait,
 					w,
 					channels,
 				} = args;
@@ -224,12 +229,11 @@ impl<Extra: ExtraData> Kernel<Extra> {
 				let this = Self {
 					atomic_state,
 					w,
-					shutdown_wait,
+					barrier,
+					shutdown_blocking,
 				};
 
-				if let Some(init_barrier) = init_barrier {
-					init_barrier.wait();
-				}
+				crate::free::init(ACTOR, init_blocking, &this.barrier);
 
 				Self::main(this, channels);
 			})
@@ -367,7 +371,7 @@ impl<Extra: ExtraData> Kernel<Extra> {
 					}
 
 					// Exit loop (thus, the thread).
-					crate::free::shutdown("Kernel", self.shutdown_wait);
+					crate::free::shutdown(ACTOR, self.shutdown_blocking, self.barrier);
 
 					if blocking {
 						try_send!(c.shutdown_done, ());

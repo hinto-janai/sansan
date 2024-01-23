@@ -16,21 +16,26 @@ use crate::{
 use crossbeam::channel::{Receiver, Select};
 use symphonia::core::audio::AudioBuffer;
 
+//---------------------------------------------------------------------------------------------------- Constants
+/// Actor name.
+const ACTOR: &str = "Gc";
+
 //---------------------------------------------------------------------------------------------------- Gc
 /// The [G]arbage [c]ollector.
 #[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct Gc<Extra: ExtraData> {
-	pub(crate) shutdown_wait: Arc<Barrier>,
-	pub(crate) shutdown:      Receiver<()>,
-	pub(crate) from_audio:    Receiver<AudioBuffer<f32>>,
-	pub(crate) from_decode:   Receiver<DecodeToGc>,
-	pub(crate) from_kernel:   Receiver<KernelToGc<Extra>>,
+	pub(crate) shutdown_blocking: bool,
+	pub(crate) barrier:           Arc<Barrier>,
+	pub(crate) shutdown:          Receiver<()>,
+	pub(crate) from_audio:        Receiver<AudioBuffer<f32>>,
+	pub(crate) from_decode:       Receiver<DecodeToGc>,
+	pub(crate) from_kernel:       Receiver<KernelToGc<Extra>>,
 }
 
 //---------------------------------------------------------------------------------------------------- InitArgs
 #[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct InitArgs<Extra: ExtraData> {
-	pub(crate) init_barrier: Option<Arc<Barrier>>,
+	pub(crate) init_blocking: bool,
 	pub(crate) gc: Gc<Extra>,
 }
 
@@ -42,12 +47,9 @@ impl<Extra: ExtraData> Gc<Extra> {
 	/// Initialize [`Gc`].
 	pub(crate) fn init(init_args: InitArgs<Extra>) -> Result<JoinHandle<()>, std::io::Error> {
 		std::thread::Builder::new()
-			.name("Gc".into())
+			.name(ACTOR.into())
 			.spawn(move || {
-				if let Some(init_barrier) = init_args.init_barrier {
-					debug2!("Gc - waiting on init_barrier...");
-					init_barrier.wait();
-				}
+				crate::free::init(ACTOR, init_args.init_blocking, &init_args.gc.barrier);
 
 				Self::main(init_args.gc);
 			})
@@ -58,7 +60,7 @@ impl<Extra: ExtraData> Gc<Extra> {
 	#[inline(never)]
 	/// `Gc`'s main function.
 	fn main(self) {
-		debug2!("Gc - main()");
+		debug2!("{ACTOR} - main()");
 
 		let mut select = Select::new();
 
@@ -78,7 +80,7 @@ impl<Extra: ExtraData> Gc<Extra> {
 				2 => drop(select_recv!(self.from_kernel)),
 				3 => {
 					select_recv!(self.shutdown);
-					crate::free::shutdown("Gc", self.shutdown_wait);
+					crate::free::shutdown(ACTOR, self.shutdown_blocking, self.barrier);
 					return;
 				},
 

@@ -40,6 +40,9 @@ use crate::resampler::ResamplerStruct;
 /// 64 [`AudioBuffer`]'s (with average sample-rate) is around 2 seconds.
 pub(crate) const AUDIO_BUFFER_LEN: usize = 64;
 
+/// Actor name.
+const ACTOR: &str = "Audio";
+
 //---------------------------------------------------------------------------------------------------- Audio
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
@@ -50,8 +53,9 @@ pub(crate) struct Audio<Output: AudioOutput> {
 	elapsed_callback:    f32,              // Elapsed time, used for the elapsed callback (f32 is reset each call)
 	elapsed_audio_state: f32,              // Elapsed time, used for the `atomic_state.elapsed_refresh_rate`
 	ready_to_recv:       Arc<AtomicBool>,  // [Audio]'s way of telling [Decode] it is ready for samples
-	shutdown_wait:       Arc<Barrier>,     // Shutdown barrier between all actors
 	output:              Output,           // Audio hardware/server connection
+	barrier:             Arc<Barrier>,     // Init/Shutdown barrier between all actors
+	shutdown_blocking:   bool,
 }
 
 //---------------------------------------------------------------------------------------------------- Channels
@@ -85,10 +89,11 @@ pub(crate) enum AudioToKernel {
 //---------------------------------------------------------------------------------------------------- Audio Impl
 #[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct InitArgs {
-	pub(crate) init_barrier:      Option<Arc<Barrier>>,
+	pub(crate) init_blocking:     bool,
+	pub(crate) shutdown_blocking: bool,
+	pub(crate) barrier:           Arc<Barrier>,
 	pub(crate) atomic_state:      Arc<AtomicState>,
 	pub(crate) ready_to_recv:     Arc<AtomicBool>,
-	pub(crate) shutdown_wait:     Arc<Barrier>,
 	pub(crate) audio_retry:       Duration,
 	pub(crate) to_gc:             Sender<AudioBuffer<f32>>,
 	pub(crate) to_caller_elapsed: Option<(Sender<Time>, f32)>, // seconds
@@ -106,13 +111,14 @@ impl<Output: AudioOutput> Audio<Output> {
 	/// Initialize `Audio`.
 	pub(crate) fn init(args: InitArgs) -> Result<JoinHandle<()>, std::io::Error> {
 		std::thread::Builder::new()
-			.name("Audio".into())
+			.name(ACTOR.into())
 			.spawn(move || {
 				let InitArgs {
-					init_barrier,
+					init_blocking,
+					shutdown_blocking,
+					barrier,
 					atomic_state,
 					ready_to_recv,
-					shutdown_wait,
 					audio_retry,
 					to_gc,
 					to_caller_elapsed,
@@ -138,13 +144,13 @@ impl<Output: AudioOutput> Audio<Output> {
 					match AudioOutputStruct::dummy() {
 						Ok(output) => break output,
 						Err(e) => {
-							debug2!("Audio (init) - output failed: {e}, sleeping for: {audio_retry_secs}s");
+							debug2!("{ACTOR} (init) - output failed: {e}, sleeping for: {audio_retry_secs}s");
 							channels.to_kernel_error.try_send(e);
 
 							// We need to make sure we don't infinitely
 							// loop and ignore shutdown signals, so handle them.
 							if matches!(channels.from_kernel.try_recv(), Ok(KernelToAudio::Shutdown)) {
-								crate::free::shutdown("Audio (init)", shutdown_wait);
+								crate::free::shutdown(ACTOR, shutdown_blocking, barrier);
 								return;
 							}
 
@@ -159,14 +165,12 @@ impl<Output: AudioOutput> Audio<Output> {
 					elapsed_callback: 0.0,
 					elapsed_audio_state: 0.0,
 					ready_to_recv,
-					shutdown_wait,
 					output,
+					barrier,
+					shutdown_blocking,
 				};
 
-				if let Some(init_barrier) = init_barrier {
-					debug2!("Audio - waiting on init_barrier...");
-					init_barrier.wait();
-				}
+				crate::free::init(ACTOR, init_blocking, &this.barrier);
 
 				Audio::main(this, channels);
 			})
@@ -177,8 +181,6 @@ impl<Output: AudioOutput> Audio<Output> {
 	#[inline(never)]
 	/// `Audio`'s main function.
 	fn main(mut self, c: Channels) {
-		debug2!("Audio - main()");
-
 		loop {
 			// Attempt to receive signal from other actors.
 			let msg_result: Result<KernelToAudio, ()> = if self.atomic_state.playing.load(Ordering::Acquire) {
@@ -197,7 +199,7 @@ impl<Output: AudioOutput> Audio<Output> {
 				}
 
 				// Else, hang until we receive a message from somebody.
-				debug2!("Audio - waiting for msgs on select.ready()");
+				debug2!("{ACTOR} - waiting for msgs on select.ready()");
 				c.from_kernel.recv().map_err(|_e| ())
 			};
 
@@ -215,7 +217,7 @@ impl<Output: AudioOutput> Audio<Output> {
 				},
 				KernelToAudio::DiscardAudio => self.discard_audio(&c.from_decode, &c.to_gc),
 				KernelToAudio::Shutdown => {
-					crate::free::shutdown("Audio", self.shutdown_wait);
+					crate::free::shutdown(ACTOR, self.shutdown_blocking, self.barrier);
 					return;
 				},
 			}
@@ -235,7 +237,7 @@ impl<Output: AudioOutput> Audio<Output> {
 		msg: (AudioBuffer<f32>, symphonia::core::units::Time),
 		c: &Channels,
 	) {
-		trace2!("Audio - play_audio_buffer(), time: {:?}", msg.1);
+		trace2!("{ACTOR} - play_audio_buffer(), time: {:?}", msg.1);
 
 		let (audio, time) = msg;
 
@@ -276,7 +278,7 @@ impl<Output: AudioOutput> Audio<Output> {
 		let output_spec     = self.output.spec();
 		let output_duration = self.output.duration();
 		if spec != *output_spec || duration != output_duration {
-			debug2!("Audio - diff in spec ({spec:?} - {output_spec:?}) and/or duration ({duration} - {output_duration}), re-opening AudioOutput");
+			debug2!("{ACTOR} - diff in spec ({spec:?} - {output_spec:?}) and/or duration ({duration} - {output_duration}), re-opening AudioOutput");
 
 			match AudioOutput::try_open(
 				"TODO".to_string(), // TODO: name
@@ -301,7 +303,7 @@ impl<Output: AudioOutput> Audio<Output> {
 
 				// And if we couldn't, tell `Kernel` we errored.
 				Err(output_error) => {
-					error2!("Audio - couldn't re-open AudioOutput: {output_error:?}");
+					error2!("{ACTOR} - couldn't re-open AudioOutput: {output_error:?}");
 					try_send!(c.to_kernel_error, output_error);
 					return;
 				},
@@ -338,7 +340,7 @@ impl<Output: AudioOutput> Audio<Output> {
 	/// - large amounts of complexity
 	/// - doing real-time unsafe stuff
 	fn end_of_track(to_kernel: &Sender<AudioToKernel>) {
-		debug2!("Audio - end_of_track()");
+		debug2!("{ACTOR} - end_of_track()");
 		try_send!(to_kernel, AudioToKernel::EndOfTrack);
 	}
 
@@ -349,7 +351,7 @@ impl<Output: AudioOutput> Audio<Output> {
 		from_decode: &Receiver<DecodeToAudio>,
 		to_gc: &Sender<AudioBuffer<f32>>,
 	) {
-		debug2!("Audio - discard_audio()");
+		debug2!("{ACTOR} - discard_audio()");
 
 		// While we are discarding audio, signal to [Decode]
 		// that we don't want any new [AudioBuffer]'s

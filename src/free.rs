@@ -6,6 +6,24 @@ use std::num::NonZeroUsize;
 use crate::macros::debug2;
 
 //---------------------------------------------------------------------------------------------------- Shutdown
+/// The method called when `actor/`'s `init()`.
+#[cold]
+#[inline(never)]
+pub(crate) fn init(
+    actor_name: &'static str,
+    init_blocking: bool,
+    barrier: &Barrier,
+) {
+    debug2!("{actor_name} (init) - waiting on others...");
+
+    if init_blocking {
+        // Wait until all threads are ready to shutdown.
+        barrier.wait();
+    }
+
+	debug2!("{actor_name} - init OK, entering main()");
+}
+
 /// The method called when `actor/`'s shutdown.
 ///
 /// This doesn't actual shutdown, it runs some code
@@ -15,12 +33,15 @@ use crate::macros::debug2;
 #[inline(never)]
 pub(crate) fn shutdown(
     actor_name: &'static str,
-    shutdown_wait: Arc<Barrier>,
+    shutdown_blocking: bool,
+    barrier: Arc<Barrier>,
 ) {
     debug2!("{actor_name} - reached shutdown");
 
-    // Wait until all threads are ready to shutdown.
-    shutdown_wait.wait();
+    if shutdown_blocking {
+        // Wait until all threads are ready to shutdown.
+        barrier.wait();
+    }
 
     debug2!("{actor_name} - shutdown ... OK");
 }

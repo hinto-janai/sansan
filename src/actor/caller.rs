@@ -18,13 +18,16 @@ use std::sync::{
 };
 
 //---------------------------------------------------------------------------------------------------- Constants
+/// Actor name.
+const ACTOR: &str = "Caller";
 
 //---------------------------------------------------------------------------------------------------- Caller
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct Caller<Extra: ExtraData> {
-	callbacks:     Callbacks<Extra>,
-	shutdown_wait: Arc<Barrier>,
+	callbacks: Callbacks<Extra>,
+	barrier: Arc<Barrier>,
+	shutdown_blocking: bool,
 }
 
 //---------------------------------------------------------------------------------------------------- Channels
@@ -44,17 +47,18 @@ struct Channels<Extra: ExtraData> {
 /// TODO
 #[allow(clippy::missing_docs_in_private_items)]
 pub(crate) struct InitArgs<Extra: ExtraData> {
-	pub(crate) init_barrier:  Option<Arc<Barrier>>,
-	pub(crate) callbacks:     Callbacks<Extra>,
-	pub(crate) low_priority:  bool,
-	pub(crate) shutdown_wait: Arc<Barrier>,
-	pub(crate) shutdown:      Receiver<()>,
-	pub(crate) source_new:    Receiver<Source<Extra>>,
-	pub(crate) queue_end:     Receiver<()>,
-	pub(crate) elapsed:       Receiver<Time>,
-	pub(crate) error_decode:  Receiver<DecodeError>,
-	pub(crate) error_source:  Receiver<SourceError>,
-	pub(crate) error_output:  Receiver<OutputError>,
+	pub(crate) init_blocking:     bool,
+	pub(crate) shutdown_blocking: bool,
+	pub(crate) barrier:           Arc<Barrier>,
+	pub(crate) callbacks:         Callbacks<Extra>,
+	pub(crate) low_priority:      bool,
+	pub(crate) shutdown:          Receiver<()>,
+	pub(crate) source_new:        Receiver<Source<Extra>>,
+	pub(crate) queue_end:         Receiver<()>,
+	pub(crate) elapsed:           Receiver<Time>,
+	pub(crate) error_decode:      Receiver<DecodeError>,
+	pub(crate) error_source:      Receiver<SourceError>,
+	pub(crate) error_output:      Receiver<OutputError>,
 }
 
 //---------------------------------------------------------------------------------------------------- Caller Impl
@@ -65,13 +69,14 @@ impl<Extra: ExtraData> Caller<Extra> {
 	/// Initialize `Caller`.
 	pub(crate) fn init(args: InitArgs<Extra>) -> Result<JoinHandle<()>, std::io::Error> {
 		std::thread::Builder::new()
-			.name("Caller".into())
+			.name(ACTOR.into())
 			.spawn(move || {
 				let InitArgs {
-					init_barrier,
+					init_blocking,
+					shutdown_blocking,
+					barrier,
 					callbacks,
 					low_priority,
-					shutdown_wait,
 					shutdown,
 					source_new,
 					queue_end,
@@ -93,17 +98,15 @@ impl<Extra: ExtraData> Caller<Extra> {
 
 				let this = Self {
 					callbacks,
-					shutdown_wait,
+					barrier,
+					shutdown_blocking,
 				};
-
-				if let Some(init_barrier) = init_barrier {
-					debug2!("Caller - waiting on init_barrier...");
-					init_barrier.wait();
-				}
 
 				if low_priority {
 					lpt::lpt();
 				}
+
+				crate::free::init(ACTOR, init_blocking, &this.barrier);
 
 				Self::main(this, channels);
 			})
@@ -114,8 +117,6 @@ impl<Extra: ExtraData> Caller<Extra> {
 	#[inline(never)]
 	/// `Caller`'s main function.
 	fn main(mut self, channels: Channels<Extra>) {
-		debug2!("Caller - main()");
-
 		// Create channels that we will
 		// be selecting/listening to for all time.
 		let mut select  = Select::new();
@@ -140,7 +141,7 @@ impl<Extra: ExtraData> Caller<Extra> {
 
 				6 => {
 					select_recv!(channels.shutdown);
-					crate::free::shutdown("Caller", self.shutdown_wait);
+					crate::free::shutdown(ACTOR, self.shutdown_blocking, self.barrier);
 					return;
 				},
 
@@ -158,7 +159,7 @@ impl<Extra: ExtraData> Caller<Extra> {
 	/// TODO
 	#[inline]
 	fn source_new(&mut self, source: Source<Extra>) {
-		trace2!("Caller - source_new()");
+		trace2!("{ACTOR} - source_new()");
 		if let Some(callback) = self.callbacks.source_new.as_mut() {
 			callback(source);
 		}
@@ -167,7 +168,7 @@ impl<Extra: ExtraData> Caller<Extra> {
 	/// TODO
 	#[inline]
 	fn queue_end(&mut self) {
-		trace2!("Caller - queue_end()");
+		trace2!("{ACTOR} - queue_end()");
 		if let Some(callback) = self.callbacks.queue_end.as_mut() {
 			callback();
 		}
@@ -176,7 +177,7 @@ impl<Extra: ExtraData> Caller<Extra> {
 	/// TODO
 	#[inline]
 	fn elapsed(&mut self, time: Time) {
-		trace2!("Caller - elapsed()");
+		trace2!("{ACTOR} - elapsed()");
 		let elapsed = time.seconds as f32 + time.frac as f32;
 		if let Some((callback, _)) = self.callbacks.elapsed.as_mut() {
 			callback(elapsed);

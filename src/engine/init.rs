@@ -44,8 +44,7 @@ use crate::resampler::{ResamplerStruct, RESAMPLER_BACKEND};
 /// [1] Decode
 /// [2] Kernel
 /// [3] Caller
-/// [4] Mc (Media Control)
-/// [5] Gc (Garbage Collector)
+/// [4] Gc (Garbage Collector)
 ///
 /// TODO: finalize all actors
 const ACTOR_COUNT: usize = 5;
@@ -79,31 +78,16 @@ impl<Extra: ExtraData> Engine<Extra> {
 		{
 		}
 
-		// If [config.init_blocking] is true, make a [Some(barrier)]
-		// so all actors can wait on it after successful init, else [None].
-		let effective_actor_count = {
-			let count = ACTOR_COUNT; // TODO
-
-			// If [Media Control] is not spawned
-			// if !config.media_controls {
-				// count -= 1;
-			// }
-
-			// If [Caller] is not spawned
-			// if config.callbacks.all_none() {
-				// count -= 1;
-			// }
-
-			debug2!("Engine - effective actor count: {count}");
-
-			count
-		};
-
-		let init_barrier = if config.init_blocking {
-			Some(Arc::new(Barrier::new(effective_actor_count)))
-		} else {
-			None
-		};
+		// Initialize the "Barrier".
+		//
+		// All threads will wait on this barrier before exiting.
+		// This is done to prevent a scenario where a thread has
+		// exited and dropped a channel, while another thread
+		// hasn't yet exited and has [send()]'ed a message,
+		// causing a panic.
+		//
+		// This is also re-used for the init barrier.
+		let barrier = Arc::new(Barrier::new(ACTOR_COUNT));
 
 		debug2!("Engine - init config audio state:\n{:#?}", config.audio_state);
 
@@ -111,15 +95,6 @@ impl<Extra: ExtraData> Engine<Extra> {
 		// TODO: initialize with `InitConfig`'s AudioState.
 		let (audio_state_reader, audio_state_writer) = someday::new(AudioState::DEFAULT);
 		let audio_state_reader = AudioStateReader(audio_state_reader);
-
-		// Initialize the "Shutdown Barrier".
-		//
-		// All threads will wait on this barrier before exiting.
-		// This is done to prevent a scenario where a thread has
-		// exited and dropped a channel, while another thread
-		// hasn't yet exited and has [send()]'ed a message,
-		// causing a panic.
-		let shutdown_wait = Arc::new(Barrier::new(effective_actor_count));
 
 		// Initialize the "AtomicState".
 		//
@@ -192,10 +167,11 @@ impl<Extra: ExtraData> Engine<Extra> {
 		spawn_actor!(
 			"Caller",
 			crate::actor::caller::InitArgs {
-				init_barrier:  init_barrier.clone(), // Option<Arc<_>>,
+				init_blocking: config.init_blocking,
+				shutdown_blocking: config.shutdown_blocking,
+				barrier: Arc::clone(&barrier),
 				callbacks,
 				low_priority:  config.callback_low_priority,
-				shutdown_wait: Arc::clone(&shutdown_wait),
 				shutdown,
 				source_new,
 				queue_end,
@@ -226,10 +202,11 @@ impl<Extra: ExtraData> Engine<Extra> {
 		spawn_actor!(
 			"Audio",
 			crate::actor::audio::InitArgs {
-				init_barrier:      init_barrier.clone(), // Option<Arc<_>>,
+				init_blocking:     config.init_blocking,
+				shutdown_blocking: config.shutdown_blocking,
+				barrier:           Arc::clone(&barrier),
 				atomic_state:      Arc::clone(&atomic_state),
 				ready_to_recv:     Arc::clone(&audio_ready_to_recv),
-				shutdown_wait:     Arc::clone(&shutdown_wait),
 				audio_retry:       config.audio_retry,
 				to_gc:             a_to_gc,
 				to_caller_elapsed: a_to_caller_elapsed,
@@ -253,9 +230,10 @@ impl<Extra: ExtraData> Engine<Extra> {
 		spawn_actor!(
 			"Decode",
 			crate::actor::decode::InitArgs {
-				init_barrier:        init_barrier.clone(), // Option<Arc<_>>,
-				audio_ready_to_recv: Arc::clone(&audio_ready_to_recv),
-				shutdown_wait:       Arc::clone(&shutdown_wait),
+				init_blocking:          config.init_blocking,
+				shutdown_blocking:      config.shutdown_blocking,
+				barrier:                Arc::clone(&barrier),
+				audio_ready_to_recv:    Arc::clone(&audio_ready_to_recv),
 				to_gc:                  d_to_gc,
 				to_audio:               d_to_a,
 				to_kernel_seek:         d_to_k_seek,
@@ -273,9 +251,10 @@ impl<Extra: ExtraData> Engine<Extra> {
 		spawn_actor!(
 			"Gc",
 			crate::actor::gc::InitArgs {
-				init_barrier:  init_barrier.clone(), // Option<Arc<_>>,
+				init_blocking: config.init_blocking,
 				gc: crate::actor::gc::Gc {
-					shutdown_wait: Arc::clone(&shutdown_wait),
+					shutdown_blocking: config.shutdown_blocking,
+					barrier:           Arc::clone(&barrier),
 					shutdown,
 					from_audio:  gc_from_a,
 					from_decode: gc_from_d,
@@ -393,9 +372,10 @@ impl<Extra: ExtraData> Engine<Extra> {
 		spawn_actor! {
 			"Kernel",
 			crate::actor::kernel::InitArgs {
-				init_barrier,
+				init_blocking: config.init_blocking,
+				shutdown_blocking: config.shutdown_blocking,
+				barrier: Arc::clone(&barrier),
 				atomic_state:  Arc::clone(&atomic_state),
-				shutdown_wait: Arc::clone(&shutdown_wait),
 				w: audio_state_writer,
 				channels,
 			},
