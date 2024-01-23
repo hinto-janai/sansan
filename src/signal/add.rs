@@ -32,7 +32,7 @@ impl<Extra: ExtraData> From<Source<Extra>> for Add<Extra> {
 	///
 	/// ```rust
 	/// # use sansan::{signal::*,source::*};
-	/// let source = Source::<()>::dummy();
+	/// let source = Source::<()>::empty();
 	/// let add    = Add::from(source.clone());
 	///
 	/// // Source is the same, default add values were used.
@@ -101,7 +101,7 @@ impl<Extra: ExtraData> From<Sources<Extra>> for AddMany<Extra> {
 	///
 	/// ```rust
 	/// # use sansan::{signal::*,source::*};
-	/// let sources = Sources::<()>::dummy();
+	/// let sources = Sources::<()>::empty();
 	/// let add     = AddMany::from(sources.clone());
 	///
 	/// // Source is the same, default add values were used.

@@ -3,9 +3,12 @@
 //---------------------------------------------------------------------------------------------------- Use
 use std::sync::{Arc,OnceLock};
 
+#[allow(unused_imports)] // docs
+use crate::source::Source;
+
 //---------------------------------------------------------------------------------------------------- Source
 #[inline]
-/// A valid [`Source`] byte array with 0 length.
+/// A valid empty [`Source`] byte array.
 ///
 /// This returns a static reference to bytes of a 0 second, empty MP3 file.
 ///

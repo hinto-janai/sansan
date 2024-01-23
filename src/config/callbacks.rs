@@ -32,12 +32,12 @@ use crate::{
 /// For example, we can pass a function to run each time the [`Current`] track changes:
 ///
 /// ```rust
-/// # use sansan::{config::*,error::*,source::*,state::*,meta::*};
-/// let mut callbacks = Callbacks::<Metadata>::new();
+/// # use sansan::{config::*,error::*,source::*,state::*};
+/// let mut callbacks = Callbacks::<()>::new();
 /// let (tx, rx) = std::sync::mpsc::sync_channel(1);
-/// # tx.send(Source::dummy());
+/// # tx.send(Source::empty());
 ///
-/// callbacks.source_new(move |source: Source<Metadata>| {
+/// callbacks.source_new(move |source: Source<()>| {
 ///     // A new `Current` was set to this `source`!
 ///     //
 ///     // This closure decides what the `Engine` does after this happens.
@@ -51,8 +51,7 @@ use crate::{
 ///     // We received a message from the `Engine`
 ///     // that we set a new `Source`, print its extra data.
 ///     //
-///     // In this case, `Metadata` is our `<Extra: ExtraData>`.
-///     // So this will print out some audio metadata info.
+///     // In this case, `()` is our `<Extra: ExtraData>`.
 ///     println!("New track: {:#?}", source.extra());
 ///     # break;
 /// }

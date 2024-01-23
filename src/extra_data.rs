@@ -81,7 +81,7 @@ macro_rules! generate_docs {
 		/// //                    v
 		/// let engine = Engine::<()>::init(Default::default());
 		///
-		/// let source = Source::<()>::dummy();
+		/// let source = Source::<()>::empty();
 		/// assert_eq!(source.extra(), &());
 		/// ```
 		$($tokens)*
