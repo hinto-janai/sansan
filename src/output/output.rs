@@ -10,6 +10,7 @@
 //! simplification of what this part of the system should do.
 
 //----------------------------------------------------------------------------------------------- use
+use std::sync::{Arc, atomic::AtomicBool, OnceLock};
 use crate::{
 	error::OutputError,
 	resampler::Resampler,
@@ -33,6 +34,99 @@ pub(crate) trait AudioOutput: Sized {
 	/// The resampler we're using.
 	type R: Resampler;
 
+	//---------------------------------------------------------------------------- Struct field access
+	// Hack functions to access the actual struct
+	// fields of any implementors of `AudioOutput`.
+	//
+	// This basically enforces all
+	// implementors must have these fields.
+	//
+	// Having access to these fields means we can implement
+	// as much as possible here, generically, instead of
+	// each implementor having to redo code that is pretty
+	// much the same.
+
+	/// What is the audio specification
+	/// this `AudioOutput` was created for?
+	fn spec(&self) -> SignalSpec;
+	/// What is the duration
+	/// this `AudioOutput` was created for?
+	fn duration(&self) -> u64;
+	/// Drop all the stack stuff, return all heavy
+	/// (potentially real-time unsafe) stuff.
+	fn into_inner(self) -> (
+		SampleBuffer<f32>,
+		Vec<f32>,
+		Arc<AtomicBool>,
+		Option<Self::R>,
+	);
+
+	//---------------------------------------------------------------------------- Must implement
+	/// Start playback
+	///
+	/// This should "enable" the stream so that it is
+	/// active and playing whatever audio buffers it has.
+	fn play(&mut self) -> Result<(), OutputError>;
+
+	/// Pause playback
+	///
+	/// This should completely "disable" the stream so that it
+	/// is playing nothing and using absolutely 0% CPU.
+	///
+	/// This should _not_ flush the current buffer if any,
+	/// it should solely pause the stream and return immediately.
+	fn pause(&mut self) -> Result<(), OutputError>;
+
+	/// Flush all the current audio in the internal buffer (if any).
+	///
+	/// This means that all the audio have, we _must_ play it back to the speakers.
+	///
+	/// This function is expected to and is allowed to block.
+	fn flush(&mut self);
+
+	/// Discard all the audio in the internal buffer (if any).
+	///
+	/// This is like `flush()`, but we must _not_ play the
+	/// audio to the speakers, we must simply discard them.
+	///
+	/// This function is expected to and is allowed to block.
+	fn discard(&mut self);
+
+	/// Initialize a connection with the audio hardware/server.
+	///
+	/// The `signal_spec`'s sample rate and channel layout
+	/// must be followed, and an appropriate audio connection
+	/// with the same specification must be created.
+	fn try_open(
+		// The name of the audio stream?
+		name: String,
+		// The audio's signal specification.
+		// We're opening a stream matching this spec.
+		signal_spec: SignalSpec,
+		// The audio's duration (u64 from symphonia)
+		duration: symphonia::core::units::Duration,
+		// If `true`, this stream will ignore any
+		// device switching and continue playing
+		// to the original device opened.
+		disable_device_switch: bool,
+		// How many milliseconds should the audio buffer be?
+		//
+		// `None` will pick a reasonable default for low-latency pause/play.
+		buffer_milliseconds: Option<u8>,
+		// Re-usable sample buffer.
+		// This could be from the last time `AudioOutput`.
+		sample_buf: SampleBuffer<f32>,
+		// Re-usable sample vector.
+		// This could be from the last time `AudioOutput`.
+		samples: Vec<f32>,
+		// Re-usable arc bool.
+		// This could be from the last time `AudioOutput`.
+		discarding: Arc<AtomicBool>,
+		// Resampler.
+		resampler: Option<Self::R>,
+	) -> Result<Self, OutputError>;
+
+	//---------------------------------------------------------------------------- Pre-implemented fns
 	/// Slight hack to access the local struct fields
 	/// of `AudioOutput` implementors.
 	///
@@ -174,59 +268,6 @@ pub(crate) trait AudioOutput: Sized {
 		self.write_post()
 	}
 
-	/// Flush all the current audio in the internal buffer (if any).
-	///
-	/// This means that all the audio have, we _must_ play it back to the speakers.
-	///
-	/// This function is expected to and is allowed to block.
-	fn flush(&mut self);
-
-	/// Discard all the audio in the internal buffer (if any).
-	///
-	/// This is like `flush()`, but we must _not_ play the
-	/// audio to the speakers, we must simply discard them.
-	///
-	/// This function is expected to and is allowed to block.
-	fn discard(&mut self);
-
-	/// Initialize a connection with the audio hardware/server.
-	///
-	/// The `signal_spec`'s sample rate and channel layout
-	/// must be followed, and an appropriate audio connection
-	/// with the same specification must be created.
-	fn try_open(
-		// The name of the audio stream?
-		name: String,
-		// The audio's signal specification.
-		// We're opening a stream matching this spec.
-		signal_spec: SignalSpec,
-		// The audio's duration (u64 from symphonia)
-		duration: symphonia::core::units::Duration,
-		// If `true`, this stream will ignore any
-		// device switching and continue playing
-		// to the original device opened.
-		disable_device_switch: bool,
-		// How many milliseconds should the audio buffer be?
-		//
-		// `None` will pick a reasonable default for low-latency pause/play.
-		buffer_milliseconds: Option<u8>,
-	) -> Result<Self, OutputError>;
-
-	/// Start playback
-	///
-	/// This should "enable" the stream so that it is
-	/// active and playing whatever audio buffers it has.
-	fn play(&mut self) -> Result<(), OutputError>;
-
-	/// Pause playback
-	///
-	/// This should completely "disable" the stream so that it
-	/// is playing nothing and using absolutely 0% CPU.
-	///
-	/// This should _not_ flush the current buffer if any,
-	/// it should solely pause the stream and return immediately.
-	fn pause(&mut self) -> Result<(), OutputError>;
-
 	/// `flush()` + `pause()`.
 	fn stop(&mut self) -> Result<(), OutputError> {
 		debug2!("AudioOutput - stop()");
@@ -235,37 +276,41 @@ pub(crate) trait AudioOutput: Sized {
 		self.pause()
 	}
 
-	/// Is the stream currently in play mode?
-	fn is_playing(&mut self) -> bool;
-
-	/// What is the audio specification
-	/// this `AudioOutput` was created for?
-	fn spec(&self) -> &SignalSpec;
-	/// What is the duration
-	/// this `AudioOutput` was created for?
-	fn duration(&self) -> u64;
-
-	/// Toggle playback.
-	fn toggle(&mut self) -> Result<(), OutputError> {
-		debug2!("AudioOutput - toggle()");
-
-		if self.is_playing() {
-			self.pause()
-		} else {
-			self.play()
-		}
-	}
-
 	/// Create a "fake" dummy connection to the audio hardware/server.
+	///
+	/// NOTE: This pre-allocates the needed buffers and should only be called once.
 	fn dummy() -> Result<Self, OutputError> {
-
 		debug2!("AudioOutput - dummy()");
+
 		let spec = SignalSpec {
 			// INVARIANT: Must be non-zero.
 			rate: 44_100,
 			// This also counts a mono speaker.
-			channels: Channels::FRONT_LEFT,
+			channels: Channels::FRONT_LEFT|Channels::FRONT_RIGHT,
 		};
-		Self::try_open(String::new(), spec, 4096, false, None)
+
+		/// Initial buffer capacity.
+		///
+		/// These buffers should only get allocated _once_
+		/// at `Audio::init()`, so they should be so
+		/// ridiculously big such that resizes _never_ occur.
+		const BUF: usize = 65_535;
+
+		let sample_buf = SampleBuffer::new(BUF as u64, spec);
+		let samples: Vec<f32> = Vec::with_capacity(BUF);
+		let discarding = Arc::new(AtomicBool::new(false));
+		let resampler = None;
+
+		Self::try_open(
+			"TODO".into(),
+			spec,
+			4096,
+			false,
+			None,
+			sample_buf,
+			samples,
+			discarding,
+			resampler,
+		)
 	}
 }

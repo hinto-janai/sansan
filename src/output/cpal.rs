@@ -37,15 +37,6 @@ pub(crate) struct Cpal<R: Resampler> {
 	/// the audio stream will receive and write.
 	sender: Sender<f32>,
 
-	/// A signal to `cubeb` that is should ignore
-	/// and discard all sent audio samples and
-	/// return ASAP.
-	discard: Sender<()>,
-
-	/// A signal from `cubeb` telling us it has
-	/// completely drained the audio buffer.
-	drained: Receiver<()>,
-
 	/// The actual audio stream.
 	stream: cpal::Stream,
 
@@ -65,30 +56,49 @@ pub(crate) struct Cpal<R: Resampler> {
 	/// and i'm just gonna set this bool" hack.
 	error: Receiver<cpal::StreamError>,
 
-	/// The resampler.
-	resampler: Option<R>,
-
 	/// Audio spec output was opened with.
 	spec: SignalSpec,
 	/// Duration this output was opened with.
 	duration: u64,
 
+	/// The resampler.
+	resampler: Option<R>,
 	/// A re-usable sample buffer.
 	sample_buf: SampleBuffer<f32>,
 	/// A re-usable Vec of samples.
 	samples: Vec<f32>,
-
-	/// How many channels?
-	channels: usize,
-
-	/// Are we currently playing?
-	playing: bool,
+	/// A signal to `cubeb` that is should ignore
+	/// and discard all sent audio samples and
+	/// return ASAP.
+	discard: Arc<AtomicBool>,
 }
 
 //----------------------------------------------------------------------------------------------- `AudioOutput` Impl
 impl<R: Resampler> AudioOutput for Cpal<R> {
 	type E = cpal::StreamError;
 	type R = R;
+
+	fn spec(&self) -> SignalSpec {
+		self.spec
+	}
+
+	fn duration(&self) -> u64 {
+		self.duration
+	}
+
+	fn into_inner(self) -> (
+		SampleBuffer<f32>,
+		Vec<f32>,
+		Arc<AtomicBool>,
+		Option<R>,
+	) {
+		(
+			self.sample_buf,
+			self.samples,
+			self.discard,
+			self.resampler,
+		)
+	}
 
 	fn write_pre(&mut self) -> (
 		&mut Option<Self::R>,   // Our resampler (none == no resampling needed)
@@ -117,20 +127,13 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 	fn discard(&mut self) {
 		debug2!("AudioOutput - discard()");
 
-		if !self.playing {
-			return;
+		self.discard.store(true, Ordering::Release);
+
+		while !self.sender.is_empty() {
+			std::thread::yield_now();
 		}
 
-		// INVARIANT:
-		// Bounded channels, [try_*]
-		// methods not applicable.
-
-		if self.discard.is_empty() {
-			send!(self.discard, ());
-		}
-
-		// Wait until cubeb has drained.
-		recv!(self.drained);
+		// INVARIANT The callback thread sets `discard` back to `false`.
 	}
 
 	#[cold]
@@ -142,6 +145,10 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 		duration: symphonia::core::units::Duration,
 		disable_device_switch: bool,
 		buffer_milliseconds: Option<u8>,
+		sample_buf: SampleBuffer<f32>,
+		samples: Vec<f32>,
+		discard: Arc<AtomicBool>,
+		resampler: Option<R>,
 	) -> Result<Self, OutputError> {
 		debug2!("AudioOutput - try_open()");
 		debug2!("AudioOutput - signal_spec: {signal_spec:?}, duration: {duration}, disable_device_switch: {disable_device_switch}, buffer_milliseconds: {buffer_milliseconds:?}");
@@ -217,24 +224,24 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 		let channel_len = ((buffer_milliseconds * sample_rate as usize) / 1000) * 2;
 		debug2!("AudioOutput - buffer_milliseconds: {buffer_milliseconds}, channel_len: {channel_len}");
 
-		let (sender, receiver)           = crossbeam::channel::bounded(channel_len);
-		let (discard, discard_recv)      = crossbeam::channel::bounded(1);
-		let (drained_send, drained_recv) = crossbeam::channel::bounded(1);
-		let (error_send, error_recv)     = crossbeam::channel::unbounded();
+		let (sender, receiver)       = crossbeam::channel::bounded(channel_len);
+		let (error_send, error_recv) = crossbeam::channel::unbounded();
 
 		// The actual callback `cpal` will call when polling for audio data.
+		let receiver_clone = receiver.clone();
+		let discard_clone = Arc::clone(&discard);
 		let data_callback = move |output: &mut [f32], _: &cpal::OutputCallbackInfo| {
 			trace2!("AudioOutput - data callback, output.len(): {}", output.len());
 
-			// We received a "discard" signal.
-			// Discard all audio and return ASAP.
-			if discard_recv.try_recv().is_ok() {
-				while receiver.try_recv().is_ok() {} // drain channel
+			// We received a "discard" signal, discard and return ASAP.
+			if discard_clone.load(Ordering::Acquire) {
+				while receiver.try_recv().is_ok() {}
+				// INVARIANT: we are responsible for setting this to `false`.
+				discard_clone.store(false, Ordering::Release);
 				return;
 			}
 
-			// Fill output buffer while there are
-			// messages in the channel.
+			// Fill output buffer while there are messages in the channel.
 			for o in output.iter_mut() {
 				if let Ok(audio) = receiver.try_recv() {
 					*o = audio;
@@ -291,44 +298,23 @@ impl<R: Resampler> AudioOutput for Cpal<R> {
 			stream,
 			error: error_recv,
 			sender,
-			discard,
-			drained: drained_recv,
 			resampler,
 			spec: signal_spec,
 			duration,
-			sample_buf: SampleBuffer::new(duration, signal_spec),
-			samples: Vec::with_capacity(AUDIO_SAMPLE_BUFFER_LEN),
-			channels,
-			playing: false,
+			sample_buf,
+			samples,
+			discard,
 		})
 	}
 
 	fn play(&mut self) -> Result<(), OutputError> {
 		debug2!("AudioOutput - play()");
-		match self.stream.play() {
-			Ok(()) => { self.playing = true; Ok(()) },
-			Err(e) => Err(e.into()),
-		}
+		self.stream.play().map_err(Into::into)
 	}
 
 	fn pause(&mut self) -> Result<(), OutputError> {
 		debug2!("AudioOutput - pause()");
-		match self.stream.pause() {
-			Ok(()) => { self.playing = false; Ok(()) },
-			Err(e) => Err(e.into()),
-		}
-	}
-
-	fn is_playing(&mut self) -> bool {
-		self.playing
-	}
-
-	fn spec(&self) -> &SignalSpec {
-		&self.spec
-	}
-
-	fn duration(&self) -> u64 {
-		self.duration
+		self.stream.pause().map_err(Into::into)
 	}
 }
 
