@@ -48,21 +48,6 @@ impl<Extra: ExtraData> Engine<Extra> {
 		self.atomic_state.update_from_config(&self.config);
 	}
 
-	//---------------------------------------------------------------------------------------------------- Get
-	#[must_use]
-	#[inline]
-	/// TODO
-	pub const fn get_volume(&self) -> Volume {
-		self.volume
-	}
-
-	#[must_use]
-	#[inline]
-	/// TODO
-	pub const fn get_repeat(&self) -> Repeat {
-		self.repeat
-	}
-
 	//---------------------------------------------------------------------------------------------------- Signals
 	// INVARIANT: The `Engine`'s channel <-> return system
 	// relies on the fact that only 1 thread is `.recv()`'ing
