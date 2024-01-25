@@ -12,6 +12,19 @@ use crate::{
 use std::sync::atomic::{AtomicBool,Ordering};
 use crossbeam::atomic::AtomicCell;
 
+//----------------------------------------------------------------------------------------------------
+/// Static assertion to make sure all used atomics are lock-free.
+const _: () = {
+	assert!(
+		crossbeam::atomic::AtomicCell::<f32>::is_lock_free(),
+		"crossbeam::atomic::AtomicCell::<f32> is not lock-free on the target platform.",
+	);
+	assert!(
+		crossbeam::atomic::AtomicCell::<Option<f32>>::is_lock_free(),
+		"crossbeam::atomic::AtomicCell::<Option<f32>> is not lock-free on the target platform.",
+	);
+};
+
 //---------------------------------------------------------------------------------------------------- AtomicState
 /// TODO
 ///
@@ -36,6 +49,8 @@ pub(crate) struct AtomicState {
 	pub(crate) repeat: AtomicRepeat,
 	/// TODO
 	pub(crate) volume: AtomicVolume,
+	/// TODO
+	pub(crate) elapsed: AtomicCell<Option<f32>>,
 }
 
 impl AtomicState {
@@ -50,6 +65,7 @@ impl AtomicState {
 		playing: AtomicBool::new(false),
 		repeat: AtomicRepeat::DEFAULT,
 		volume: AtomicVolume::DEFAULT,
+		elapsed: AtomicCell::new(None),
 	};
 
 	///
@@ -62,12 +78,9 @@ impl AtomicState {
 
 impl From<RuntimeConfig> for AtomicState {
 	fn from(s: RuntimeConfig) -> Self {
-		Self {
-			back_threshold: AtomicCell::new(s.back_threshold.as_secs_f32()),
-			elapsed_refresh_rate: AtomicCell::new(s.elapsed_refresh_rate.as_secs_f32()),
-			queue_end_clear: AtomicBool::new(s.queue_end_clear),
-			..Self::DEFAULT
-		}
+		let this = Self::DEFAULT;
+		this.update_from_config(&s);
+		this
 	}
 }
 

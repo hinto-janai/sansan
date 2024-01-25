@@ -92,11 +92,6 @@ impl<Extra: ExtraData> Engine<Extra> {
 
 		debug2!("Engine - init config audio state:\n{:#?}", config.audio_state);
 
-		// Initialize the `AudioStateReader`.
-		// TODO: initialize with `InitConfig`'s AudioState.
-		let (audio_state_reader, audio_state_writer) = someday::new(AudioState::DEFAULT);
-		let audio_state_reader = AudioStateReader(audio_state_reader);
-
 		// Initialize the "AtomicState".
 		//
 		// This is the state that lives as line as the [Engine]
@@ -106,6 +101,14 @@ impl<Extra: ExtraData> Engine<Extra> {
 		// bit slower, so they're either atomic types, or
 		// wrapped in `atomic::Atomic<T>`.
 		let atomic_state = Arc::new(AtomicState::from(live_config));
+
+		// Initialize the `AudioStateReader`.
+		// TODO: initialize with `InitConfig`'s AudioState.
+		let (audio_state_reader, audio_state_writer) = someday::new(AudioState::DEFAULT);
+		let audio_state_reader = AudioStateReader {
+			reader: audio_state_reader,
+			atomic: Arc::clone(&atomic_state),
+		};
 
 		//-------------------------------------------------------------- Spawn [Caller]
 		let callbacks = {
